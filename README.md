@@ -59,6 +59,13 @@
 * **Видео победы (Good Ending)**: MP4 / WebM или в `assets/victory.mp4`
 * **Музыка победы**: MP3 / WAV или в `assets/victory_music.mp3`
 
+### ⭐ Авторские настройки / NSFW-паки:
+В игре доступна кнопка **«⭐ Авторские настройки»** для моментальной загрузки готового набора ассетов из папки `assets/author/`:
+1. Поместите ваши файлы (`girl.png`, `game_over.mp4`, `girl_music.mp3`, `victory.mp4`) в папку `assets/author/` (подробнее см. в [assets/author/README.md](file:///w:/Projects/game/assets/author/README.md)).
+2. В игре откройте настройки и нажмите **«⭐ Авторские настройки»**.
+3. *Папка `assets/author/*` исключена из git, поэтому ваши личные/NSFW файлы не попадут на GitHub.*
+
+
 ---
 
 ## 🛠️ Исправленные баги

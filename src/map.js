@@ -340,32 +340,71 @@ export class GameMap {
     }
   }
 
-  // Fast Circle-to-AABB collision check with sliding response
+  // Robust Circle-to-AABB collision check with multi-pass relaxation & closest-face ejection
   resolveCollision(pos, radius = 0.5) {
-    let resolved = false;
-    for (let i = 0; i < this.walls.length; i++) {
-      const w = this.walls[i];
-      // Find closest point on AABB to circle center
-      const closestX = Math.max(w.minX, Math.min(pos.x, w.maxX));
-      const closestZ = Math.max(w.minZ, Math.min(pos.z, w.maxZ));
+    let anyResolved = false;
 
-      const dx = pos.x - closestX;
-      const dz = pos.z - closestZ;
-      const distSq = dx * dx + dz * dz;
+    // Up to 3 relaxation passes to resolve corners and multiple adjacent walls cleanly
+    for (let iter = 0; iter < 3; iter++) {
+      let iterResolved = false;
 
-      if (distSq < radius * radius) {
-        resolved = true;
-        const dist = Math.sqrt(distSq);
-        if (dist === 0) {
-          pos.x += radius;
-        } else {
+      // Only check walls in the vicinity of pos (broadphase)
+      const queryRadius = radius + 0.8;
+      for (let i = 0; i < this.walls.length; i++) {
+        const w = this.walls[i];
+        if (
+          pos.x < w.minX - queryRadius ||
+          pos.x > w.maxX + queryRadius ||
+          pos.z < w.minZ - queryRadius ||
+          pos.z > w.maxZ + queryRadius
+        ) {
+          continue;
+        }
+
+        // If center has penetrated inside the wall box, eject along the shallowest face
+        if (pos.x >= w.minX && pos.x <= w.maxX && pos.z >= w.minZ && pos.z <= w.maxZ) {
+          iterResolved = true;
+          anyResolved = true;
+          const dLeft = pos.x - w.minX;
+          const dRight = w.maxX - pos.x;
+          const dBottom = pos.z - w.minZ;
+          const dTop = w.maxZ - pos.z;
+          const minDist = Math.min(dLeft, dRight, dBottom, dTop);
+
+          if (minDist === dLeft) {
+            pos.x = w.minX - radius;
+          } else if (minDist === dRight) {
+            pos.x = w.maxX + radius;
+          } else if (minDist === dBottom) {
+            pos.z = w.minZ - radius;
+          } else {
+            pos.z = w.maxZ + radius;
+          }
+          continue;
+        }
+
+        // Find closest point on AABB to circle center
+        const closestX = Math.max(w.minX, Math.min(pos.x, w.maxX));
+        const closestZ = Math.max(w.minZ, Math.min(pos.z, w.maxZ));
+
+        const dx = pos.x - closestX;
+        const dz = pos.z - closestZ;
+        const distSq = dx * dx + dz * dz;
+
+        if (distSq < radius * radius && distSq > 0.000001) {
+          iterResolved = true;
+          anyResolved = true;
+          const dist = Math.sqrt(distSq);
           const overlap = radius - dist;
           pos.x += (dx / dist) * overlap;
           pos.z += (dz / dist) * overlap;
         }
       }
+
+      if (!iterResolved) break;
     }
-    return resolved;
+
+    return anyResolved;
   }
 
   // Raycast/Line of sight check between two points in 2D

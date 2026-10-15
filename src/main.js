@@ -92,7 +92,7 @@ class Game {
       }
       if (collected >= total) {
         this.showToast('🔓 ВСЕ 3 КЛЮЧА СОБРАНЫ! БЕГИ К ДВЕРИ ВЫХОДА!');
-      } else {
+      } else if (collected > 0) {
         this.showToast(`🗝️ ЗОЛОТОЙ КЛЮЧ НАЙДЕН! (${collected}/${total})`);
       }
     };
@@ -200,6 +200,7 @@ class Game {
       settingsModal: document.getElementById('settings-modal'),
       btnCloseSettings: document.getElementById('btn-close-settings'),
       btnSaveSettings: document.getElementById('btn-save-settings'),
+      btnAuthorPreset: document.getElementById('btn-author-preset'),
       btnResetAssets: document.getElementById('btn-reset-assets'),
       girlInput: document.getElementById('file-girl-input'),
       videoInput: document.getElementById('file-video-input'),
@@ -260,6 +261,8 @@ class Game {
     if (this.dom.btnRestartPause) {
       this.dom.btnRestartPause.addEventListener('click', () => {
         blurActive();
+        soundEngine.init();
+        soundEngine.resume();
         this.startGame();
       });
     }
@@ -267,6 +270,8 @@ class Game {
     // Restart Button on Game Over
     this.dom.btnRestart.addEventListener('click', () => {
       blurActive();
+      soundEngine.init();
+      soundEngine.resume();
       this.dom.gameOverModal.classList.add('hidden');
       this.dom.gameOverVideo.pause();
       this.startGame();
@@ -276,6 +281,8 @@ class Game {
     if (this.dom.btnVictoryRestart) {
       this.dom.btnVictoryRestart.addEventListener('click', () => {
         blurActive();
+        soundEngine.init();
+        soundEngine.resume();
         this.dom.victoryModal.classList.add('hidden');
         this.dom.victoryVideo.pause();
         if (this.dom.victoryAudio) this.dom.victoryAudio.pause();
@@ -554,6 +561,51 @@ class Game {
       });
     }
 
+    // Apply Author Preset from assets/author/ folder
+    if (this.dom.btnAuthorPreset) {
+      this.dom.btnAuthorPreset.addEventListener('click', () => {
+        assetManager.setAuthorPreset();
+
+        // 1. Girl Texture
+        this.dom.girlPreview.src = assetManager.girlTextureUrl;
+        this.girl.updateTexture(assetManager.girlTextureUrl);
+
+        // 2. Game Over Video
+        this.hasValidVideo = true;
+        this.dom.videoPreview.src = assetManager.gameOverVideoUrl;
+        this.dom.videoPreview.load();
+        this.dom.gameOverVideo.src = assetManager.gameOverVideoUrl;
+        this.dom.gameOverVideo.load();
+        this.dom.gameOverVideo.style.display = 'block';
+        this.dom.gameOverFallback.style.display = 'none';
+
+        // 3. Victory Video
+        this.hasValidVictoryVideo = true;
+        if (this.dom.victoryVideoPreview) {
+          this.dom.victoryVideoPreview.src = assetManager.victoryVideoUrl;
+          this.dom.victoryVideoPreview.load();
+        }
+        if (this.dom.victoryVideo) {
+          this.dom.victoryVideo.src = assetManager.victoryVideoUrl;
+          this.dom.victoryVideo.load();
+          this.dom.victoryVideo.style.display = 'block';
+        }
+        if (this.dom.victoryFallback) {
+          this.dom.victoryFallback.style.display = 'none';
+        }
+
+        // 4. Chase Music
+        this.dom.nextbotAudio.src = assetManager.girlMusicUrl;
+        this.dom.nextbotAudio.load();
+        soundEngine.setHasCustomMusic(true);
+        if (this.dom.musicTrackName) {
+          this.dom.musicTrackName.textContent = '🎵 Авторский трек: assets/author/girl_music.mp3';
+        }
+
+        this.showToast('⭐ Авторские настройки применены (папка assets/author/)!');
+      });
+    }
+
     // Reset Defaults
     this.dom.btnResetAssets.addEventListener('click', () => {
       assetManager.resetDefaults();
@@ -697,9 +749,13 @@ class Game {
     if (this.dom.victoryVideo) this.dom.victoryVideo.pause();
     if (this.dom.victoryAudio) this.dom.victoryAudio.pause();
 
+    soundEngine.init();
+    soundEngine.resume();
     soundEngine.stopHeartbeat();
+    soundEngine.resetChaseMusic();
 
     if (soundEngine.hasCustomMusic && this.dom.nextbotAudio.src) {
+      this.dom.nextbotAudio.currentTime = 0;
       this.dom.nextbotAudio.play().catch(() => {});
     }
 
@@ -832,9 +888,9 @@ class Game {
 
     const hasVideoSource = this.hasValidVictoryVideo || assetManager.hasCustomVictoryVideo;
 
-    if (this.dom.victoryAudio && (assetManager.hasCustomVictoryMusic || this.dom.victoryAudio.src)) {
-      this.dom.victoryAudio.volume = soundEngine.volume;
-      this.dom.victoryAudio.play().catch(() => {});
+    if (this.dom.victoryAudio) {
+      this.dom.victoryAudio.pause();
+      this.dom.victoryAudio.currentTime = 0;
     }
 
     if (!hasVideoSource) {

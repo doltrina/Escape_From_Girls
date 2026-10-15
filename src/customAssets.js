@@ -79,6 +79,20 @@ export class AssetManager {
     this.notify();
   }
 
+  setAuthorPreset() {
+    this.girlTextureUrl = './assets/author/girl.png';
+    this.gameOverVideoUrl = './assets/author/game_over.mp4';
+    this.girlMusicUrl = './assets/author/girl_music.mp3';
+    this.victoryVideoUrl = './assets/author/victory.mp4';
+    this.victoryMusicUrl = './assets/author/victory_music.mp3';
+    this.hasCustomVideo = true;
+    this.hasCustomGirl = true;
+    this.hasCustomMusic = true;
+    this.hasCustomVictoryVideo = true;
+    this.hasCustomVictoryMusic = true;
+    this.notify();
+  }
+
   resetDefaults() {
     this.girlTextureUrl = './assets/girl.png';
     this.gameOverVideoUrl = './assets/game_over.mp4';

@@ -288,10 +288,15 @@
         <input type="range" id="volume-slider" class="range-slider" min="0" max="1" step="0.05" value="0.8">
       </div>
 
-      <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 10px;">
-        <button id="btn-reset-assets" class="btn-secondary" style="color: #ffaa00;">
-          Сбросить на стандартные
-        </button>
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button id="btn-author-preset" class="btn-secondary" style="color: #00f3ff; border-color: rgba(0, 243, 255, 0.5); background: rgba(0, 243, 255, 0.1);">
+            ⭐ Авторские настройки
+          </button>
+          <button id="btn-reset-assets" class="btn-secondary" style="color: #ffaa00;">
+            Сбросить на стандартные
+          </button>
+        </div>
         <button id="btn-save-settings" class="btn-primary" style="padding: 10px 24px; font-size: 16px;">
           Готово
         </button>
@@ -349,15 +354,15 @@
       <video id="victory-video" playsinline loop muted></video>
       <div id="victory-fallback" class="victory-fallback-scene">
         <div class="victory-sunburst"></div>
-        <div class="victory-badge-large">👑 ИСТИННЫЙ СИГМА-САМУРАЙ 👑</div>
       </div>
       <div class="victory-overlay-tint"></div>
     </div>
 
     <div class="game-over-content victory-content">
       <h1 class="victory-title">
-        ТЫ СОХРАНИЛ ДЕВСТВЕННОСТЬ!<br>СЧАСТЛИВЫЙ КОНЕЦ (ПОБЕДА)
+        ТЫ СОХРАНИЛ ДЕВСТВЕННОСТЬ!<br><span class="victory-subtitle-text">СЧАСТЛИВЫЙ КОНЕЦ (ПОБЕДА)</span>
       </h1>
+      <div class="victory-badge-large">👑 ИСТИННЫЙ СИГМА-САМУРАЙ 👑</div>
       <p class="victory-description">
         Ты собрал все 3 ключа, обхитрил девушку и вырвался на свободу! Твоя свобода и чистая душа в безопасности!
       </p>

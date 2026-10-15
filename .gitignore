@@ -7,3 +7,7 @@ Thumbs.db
 .vscode/
 .idea/
 *.log
+
+# Custom/Author 18+ assets (keep repo safe and clean for GitHub)
+assets/author/*
+!assets/author/README.md
