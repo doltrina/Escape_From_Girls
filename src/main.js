@@ -3,6 +3,7 @@ import { GameMap } from './map.js';
 import { Player } from './player.js';
 import { NextbotGirl } from './nextbot.js';
 import { ShieldManager } from './shields.js';
+import { EscapeGoalManager } from './escapeGoal.js';
 import { soundEngine } from './audio.js';
 import { assetManager } from './customAssets.js';
 
@@ -11,7 +12,8 @@ const STATE = {
   MENU: 'MENU',
   PLAYING: 'PLAYING',
   PAUSED: 'PAUSED',
-  GAMEOVER: 'GAMEOVER'
+  GAMEOVER: 'GAMEOVER',
+  VICTORY: 'VICTORY'
 };
 
 class Game {
@@ -78,8 +80,30 @@ class Game {
     this.girl = new NextbotGirl(this.scene, this.map, assetManager.girlTextureUrl);
 
     // Shield Manager
-    // Shield Manager
     this.shieldManager = new ShieldManager(this.scene, this.map);
+
+    // Escape Goal Manager (3 Keys + Exit Door)
+    this.escapeGoal = new EscapeGoalManager(this.scene, this.map);
+
+    this.escapeGoal.onKeysChange = (collected, total) => {
+      if (this.dom && this.dom.hudKeysCount) {
+        this.dom.hudKeysCount.textContent = collected;
+        this.dom.hudKeysBadge.classList.toggle('ready', collected >= total);
+      }
+      if (collected >= total) {
+        this.showToast('🔓 ВСЕ 3 КЛЮЧА СОБРАНЫ! БЕГИ К ДВЕРИ ВЫХОДА!');
+      } else {
+        this.showToast(`🗝️ ЗОЛОТОЙ КЛЮЧ НАЙДЕН! (${collected}/${total})`);
+      }
+    };
+
+    this.escapeGoal.onDoorAttemptLocked = (collected, total) => {
+      this.showToast(`🔒 ДВЕРЬ ЗАПЕРТА: Нужно собрать все 3 ключа! (${collected}/${total})`);
+    };
+
+    this.escapeGoal.onEscapeSuccess = () => {
+      this.triggerVictory();
+    };
 
     // Player inventory callbacks
     this.player.onInventoryChange = (inv) => {
@@ -112,16 +136,31 @@ class Game {
     this.girl.spawn(girlSpawn);
 
     this.shieldManager.reset(playerSpawn);
+    this.escapeGoal.reset();
+
+    if (this.dom && this.dom.hudKeysCount) {
+      this.dom.hudKeysCount.textContent = '0';
+      this.dom.hudKeysBadge.classList.remove('ready');
+    }
+
     if (this.player.inventory) {
       this.updateHotbarUI(this.player.inventory);
     }
   }
 
   initUI() {
+    const blurActive = () => {
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+    };
+
     this.dom = {
       hud: document.getElementById('hud'),
       hudTimer: document.getElementById('hud-timer'),
       hudRecord: document.getElementById('hud-record'),
+      hudKeysBadge: document.getElementById('hud-keys-badge'),
+      hudKeysCount: document.getElementById('hud-keys-count'),
       hudShields: document.getElementById('hud-shields-count'),
       hudLives: document.getElementById('hud-lives-count'),
       staminaFill: document.getElementById('stamina-fill'),
@@ -146,11 +185,16 @@ class Game {
 
       // Music Audio
       nextbotAudio: document.getElementById('nextbot-audio'),
+      victoryAudio: document.getElementById('victory-audio'),
       musicInput: document.getElementById('file-music-input'),
       musicTrackName: document.getElementById('music-track-name'),
 
       menuOverlay: document.getElementById('menu-overlay'),
+      menuTitle: document.getElementById('menu-title'),
+      menuSubtitle: document.getElementById('menu-subtitle'),
       btnStart: document.getElementById('btn-start-game'),
+      btnResume: document.getElementById('btn-resume-game'),
+      btnRestartPause: document.getElementById('btn-restart-from-pause'),
       btnOpenSettings: document.getElementById('btn-open-settings'),
 
       settingsModal: document.getElementById('settings-modal'),
@@ -159,8 +203,12 @@ class Game {
       btnResetAssets: document.getElementById('btn-reset-assets'),
       girlInput: document.getElementById('file-girl-input'),
       videoInput: document.getElementById('file-video-input'),
+      fileVictoryVideoInput: document.getElementById('file-victory-video-input'),
+      fileVictoryMusicInput: document.getElementById('file-victory-music-input'),
       girlPreview: document.getElementById('girl-preview-img'),
       videoPreview: document.getElementById('video-preview-player'),
+      victoryVideoPreview: document.getElementById('victory-video-preview'),
+      victoryMusicName: document.getElementById('victory-music-name'),
       sensSlider: document.getElementById('mouse-sens-slider'),
       sensDisplay: document.getElementById('sens-val-display'),
       volSlider: document.getElementById('volume-slider'),
@@ -174,40 +222,92 @@ class Game {
       goShields: document.getElementById('go-shields'),
       goRecord: document.getElementById('go-record'),
       btnRestart: document.getElementById('btn-restart-game'),
-      btnGoSettings: document.getElementById('btn-go-settings')
+      btnGoSettings: document.getElementById('btn-go-settings'),
+
+      // Victory Modal
+      victoryModal: document.getElementById('victory-modal'),
+      victoryVideo: document.getElementById('victory-video'),
+      victoryFallback: document.getElementById('victory-fallback'),
+      btnToggleVictorySound: document.getElementById('btn-toggle-victory-sound'),
+      btnVictoryRestart: document.getElementById('btn-victory-restart'),
+      btnVictorySettings: document.getElementById('btn-victory-settings'),
+      vicTime: document.getElementById('vic-time'),
+      vicKeys: document.getElementById('vic-keys'),
+      vicShields: document.getElementById('vic-shields')
     };
 
     this.hasValidVideo = false;
+    this.hasValidVictoryVideo = false;
     this.updateRecordDisplay();
 
-    // Start Button
+    // Start Button (First launch)
     this.dom.btnStart.addEventListener('click', () => {
+      blurActive();
       soundEngine.init();
       soundEngine.resume();
       this.startGame();
     });
 
-    // Restart Button
+    // Resume Button (from Pause)
+    if (this.dom.btnResume) {
+      this.dom.btnResume.addEventListener('click', () => {
+        blurActive();
+        this.resumeGame();
+      });
+    }
+
+    // Restart Button from Pause menu
+    if (this.dom.btnRestartPause) {
+      this.dom.btnRestartPause.addEventListener('click', () => {
+        blurActive();
+        this.startGame();
+      });
+    }
+
+    // Restart Button on Game Over
     this.dom.btnRestart.addEventListener('click', () => {
+      blurActive();
       this.dom.gameOverModal.classList.add('hidden');
       this.dom.gameOverVideo.pause();
       this.startGame();
     });
 
+    // Restart Button on Victory
+    if (this.dom.btnVictoryRestart) {
+      this.dom.btnVictoryRestart.addEventListener('click', () => {
+        blurActive();
+        this.dom.victoryModal.classList.add('hidden');
+        this.dom.victoryVideo.pause();
+        if (this.dom.victoryAudio) this.dom.victoryAudio.pause();
+        this.startGame();
+      });
+    }
+
+    if (this.dom.btnVictorySettings) {
+      this.dom.btnVictorySettings.addEventListener('click', () => {
+        blurActive();
+        this.dom.settingsModal.classList.remove('hidden');
+      });
+    }
+
     // Settings Buttons
     this.dom.btnOpenSettings.addEventListener('click', () => {
+      blurActive();
       this.dom.settingsModal.classList.remove('hidden');
     });
 
     this.dom.btnGoSettings.addEventListener('click', () => {
+      blurActive();
       this.dom.settingsModal.classList.remove('hidden');
     });
 
     this.dom.btnCloseSettings.addEventListener('click', () => {
+      blurActive();
       this.dom.settingsModal.classList.add('hidden');
     });
 
     this.dom.btnSaveSettings.addEventListener('click', () => {
+      blurActive();
       this.dom.settingsModal.classList.add('hidden');
     });
 
@@ -226,23 +326,29 @@ class Game {
       this.dom.volDisplay.textContent = `${Math.round(val * 100)}%`;
       soundEngine.setVolume(val);
       this.dom.gameOverVideo.volume = val;
+      if (this.dom.victoryVideo) this.dom.victoryVideo.volume = val;
+      if (this.dom.victoryAudio) this.dom.victoryAudio.volume = val;
     });
 
     // Hotbar Slot Click Handlers
     this.dom.slotForcefield.addEventListener('click', () => {
+      blurActive();
       if (this.player && this.player.useItem('forcefield')) {
         this.showToast('🛡️ СИЛОВОЕ ПОЛЕ АКТИВИРОВАНО!');
       }
     });
     this.dom.slotEnergyDrink.addEventListener('click', () => {
+      blurActive();
       if (this.player && this.player.useItem('energy_drink')) {
         this.showToast('⚡ МОНСТР ЭНЕРДЖИ: ТУРБО-БЕГ АКТИВЕН!');
       }
     });
     this.dom.slotDakimakura.addEventListener('click', () => {
+      blurActive();
       if (this.player) this.player.useItem('dakimakura');
     });
     this.dom.slotD20Dice.addEventListener('click', () => {
+      blurActive();
       if (this.player) this.player.useItem('d20_dice');
     });
 
@@ -257,8 +363,17 @@ class Game {
 
     // Keyboard Hotkeys
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'KeyR' && this.state === STATE.GAMEOVER) {
-        this.dom.btnRestart.click();
+      if (e.code === 'Escape') {
+        if (this.state === STATE.PAUSED) {
+          this.resumeGame();
+        }
+      }
+      if (e.code === 'KeyR') {
+        if (this.state === STATE.GAMEOVER) {
+          this.dom.btnRestart.click();
+        } else if (this.state === STATE.VICTORY && this.dom.btnVictoryRestart) {
+          this.dom.btnVictoryRestart.click();
+        }
       }
     });
   }
@@ -275,7 +390,8 @@ class Game {
     this.dom.countDakimakura.textContent = inv.dakimakura || 0;
     this.dom.slotDakimakura.classList.toggle('has-items', (inv.dakimakura || 0) > 0);
 
-    const d20Total = (inv.d20_dice || 0) + (this.player ? this.player.extraLives : 0);
+    // FIXED: Only display actual inv.d20_dice count without duplicating extraLives
+    const d20Total = inv.d20_dice || 0;
     this.dom.countD20Dice.textContent = d20Total;
     this.dom.slotD20Dice.classList.toggle('has-items', d20Total > 0);
   }
@@ -366,6 +482,50 @@ class Game {
       });
     }
 
+    // Victory Video Customizer
+    if (this.dom.fileVictoryVideoInput) {
+      this.dom.fileVictoryVideoInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          assetManager.setCustomVictoryVideo(file);
+          this.hasValidVictoryVideo = true;
+
+          // Preview in settings modal
+          if (this.dom.victoryVideoPreview) {
+            this.dom.victoryVideoPreview.src = assetManager.victoryVideoUrl;
+            this.dom.victoryVideoPreview.load();
+            this.dom.victoryVideoPreview.play().catch(() => {});
+          }
+
+          // Prepare the victory video element
+          this.dom.victoryVideo.src = assetManager.victoryVideoUrl;
+          this.dom.victoryVideo.load();
+          this.dom.victoryVideo.style.display = 'block';
+          this.dom.victoryFallback.style.display = 'none';
+
+          this.showToast('✅ MP4 видео победы успешно обновлено!');
+        }
+      });
+    }
+
+    // Victory Music Customizer
+    if (this.dom.fileVictoryMusicInput) {
+      this.dom.fileVictoryMusicInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          assetManager.setCustomVictoryMusic(file);
+          if (this.dom.victoryAudio) {
+            this.dom.victoryAudio.src = assetManager.victoryMusicUrl;
+            this.dom.victoryAudio.load();
+          }
+          if (this.dom.victoryMusicName) {
+            this.dom.victoryMusicName.textContent = `🎺 Выбран трек: ${file.name}`;
+          }
+          this.showToast(`🎺 Музыка победы установлена: ${file.name}`);
+        }
+      });
+    }
+
     // Sound toggle button on Game Over screen
     if (this.dom.btnToggleSound) {
       this.dom.btnToggleSound.addEventListener('click', () => {
@@ -380,6 +540,20 @@ class Game {
       });
     }
 
+    // Sound toggle button on Victory screen
+    if (this.dom.btnToggleVictorySound) {
+      this.dom.btnToggleVictorySound.addEventListener('click', () => {
+        if (this.dom.victoryVideo.muted) {
+          this.dom.victoryVideo.muted = false;
+          this.dom.victoryVideo.volume = soundEngine.volume;
+          this.dom.btnToggleVictorySound.textContent = '🔊 Звук: ВКЛ';
+        } else {
+          this.dom.victoryVideo.muted = true;
+          this.dom.btnToggleVictorySound.textContent = '🔇 Звук: ВЫКЛ';
+        }
+      });
+    }
+
     // Reset Defaults
     this.dom.btnResetAssets.addEventListener('click', () => {
       assetManager.resetDefaults();
@@ -390,14 +564,58 @@ class Game {
       this.dom.gameOverVideo.src = '';
       this.dom.gameOverVideo.style.display = 'none';
       this.dom.gameOverFallback.style.display = 'block';
+
+      this.hasValidVictoryVideo = false;
+      if (this.dom.victoryVideo) {
+        this.dom.victoryVideo.src = '';
+        this.dom.victoryVideo.style.display = 'none';
+      }
+      if (this.dom.victoryFallback) {
+        this.dom.victoryFallback.style.display = 'flex';
+      }
+      if (this.dom.victoryVideoPreview) {
+        this.dom.victoryVideoPreview.src = '';
+      }
+      if (this.dom.victoryAudio) {
+        this.dom.victoryAudio.src = '';
+      }
+
       this.dom.nextbotAudio.src = '';
       soundEngine.setHasCustomMusic(false);
       if (this.dom.musicTrackName) {
         this.dom.musicTrackName.innerHTML = 'Загрузи свой MP3/WAV трек или положи в <code>assets/girl_music.mp3</code>';
       }
       if (this.dom.btnToggleSound) this.dom.btnToggleSound.style.display = 'none';
+      if (this.dom.btnToggleVictorySound) this.dom.btnToggleVictorySound.style.display = 'none';
       this.showToast('Сброшено на стандартные ассеты');
     });
+
+    // Check if default assets/victory.mp4 exists on server
+    fetch('./assets/victory.mp4', { method: 'HEAD' })
+      .then((res) => {
+        if (res.ok) {
+          this.hasValidVictoryVideo = true;
+          this.dom.victoryVideo.src = './assets/victory.mp4';
+          this.dom.victoryVideo.load();
+        } else {
+          this.hasValidVictoryVideo = false;
+        }
+      })
+      .catch(() => {
+        this.hasValidVictoryVideo = false;
+      });
+
+    // Check if default assets/victory_music.mp3 exists on server
+    fetch('./assets/victory_music.mp3', { method: 'HEAD' })
+      .then((res) => {
+        if (res.ok && this.dom.victoryAudio) {
+          this.dom.victoryAudio.src = './assets/victory_music.mp3';
+          if (this.dom.victoryMusicName) {
+            this.dom.victoryMusicName.textContent = '🎺 Трек: assets/victory_music.mp3';
+          }
+        }
+      })
+      .catch(() => {});
 
     // Listen to video loading errors/readiness
     this.dom.gameOverVideo.addEventListener('loadeddata', () => {
@@ -411,6 +629,20 @@ class Game {
         this.dom.gameOverFallback.style.display = 'block';
       }
     });
+
+    if (this.dom.victoryVideo) {
+      this.dom.victoryVideo.addEventListener('loadeddata', () => {
+        this.hasValidVictoryVideo = true;
+      });
+
+      this.dom.victoryVideo.addEventListener('error', () => {
+        if (!assetManager.hasCustomVictoryVideo) {
+          this.hasValidVictoryVideo = false;
+          this.dom.victoryVideo.style.display = 'none';
+          this.dom.victoryFallback.style.display = 'flex';
+        }
+      });
+    }
   }
 
   showToast(message) {
@@ -458,23 +690,46 @@ class Game {
 
     this.dom.menuOverlay.classList.add('hidden');
     this.dom.gameOverModal.classList.add('hidden');
+    if (this.dom.victoryModal) this.dom.victoryModal.classList.add('hidden');
     this.dom.hud.classList.remove('hidden');
+
+    this.dom.gameOverVideo.pause();
+    if (this.dom.victoryVideo) this.dom.victoryVideo.pause();
+    if (this.dom.victoryAudio) this.dom.victoryAudio.pause();
+
+    soundEngine.stopHeartbeat();
 
     if (soundEngine.hasCustomMusic && this.dom.nextbotAudio.src) {
       this.dom.nextbotAudio.play().catch(() => {});
     }
 
     this.renderer.domElement.requestPointerLock();
-    this.showToast('🏃 БЕГИ! ОНА ИДЕТ ЗА ТОБОЙ!');
+    this.showToast('🏃 БЕГИ! СОБЕРИ 3 КЛЮЧА И НАЙДИ ВЫХОД!');
   }
 
   pauseGame() {
     this.state = STATE.PAUSED;
+    if (this.dom.menuTitle) this.dom.menuTitle.textContent = 'ПАУЗА';
+    if (this.dom.menuSubtitle) this.dom.menuSubtitle.textContent = 'ИГРА ПРИОСТАНОВЛЕНА';
+    if (this.dom.btnResume) this.dom.btnResume.style.display = 'block';
+    if (this.dom.btnStart) this.dom.btnStart.style.display = 'none';
+    if (this.dom.btnRestartPause) this.dom.btnRestartPause.style.display = 'block';
     this.dom.menuOverlay.classList.remove('hidden');
+
     if (this.dom.nextbotAudio) {
       this.dom.nextbotAudio.pause();
     }
+    soundEngine.stopHeartbeat();
     soundEngine.stopProceduralChaseLoop();
+  }
+
+  resumeGame() {
+    this.state = STATE.PLAYING;
+    this.dom.menuOverlay.classList.add('hidden');
+    if (soundEngine.hasCustomMusic && this.dom.nextbotAudio.src) {
+      this.dom.nextbotAudio.play().catch(() => {});
+    }
+    this.renderer.domElement.requestPointerLock();
   }
 
   playGameOverMedia() {
@@ -542,6 +797,12 @@ class Game {
       document.exitPointerLock();
     }
 
+    soundEngine.stopHeartbeat();
+    soundEngine.stopProceduralChaseLoop();
+    if (this.dom.nextbotAudio) {
+      this.dom.nextbotAudio.pause();
+    }
+
     // High score check
     let isNewRecord = false;
     if (this.elapsedTime > this.highScore) {
@@ -564,6 +825,91 @@ class Game {
     this.playGameOverMedia();
   }
 
+  playVictoryMedia() {
+    const video = this.dom.victoryVideo;
+    const fallback = this.dom.victoryFallback;
+    const soundBtn = this.dom.btnToggleVictorySound;
+
+    const hasVideoSource = this.hasValidVictoryVideo || assetManager.hasCustomVictoryVideo;
+
+    if (this.dom.victoryAudio && (assetManager.hasCustomVictoryMusic || this.dom.victoryAudio.src)) {
+      this.dom.victoryAudio.volume = soundEngine.volume;
+      this.dom.victoryAudio.play().catch(() => {});
+    }
+
+    if (!hasVideoSource) {
+      if (video) video.style.display = 'none';
+      if (fallback) fallback.style.display = 'flex';
+      if (soundBtn) soundBtn.style.display = 'none';
+      return;
+    }
+
+    if (video.src !== assetManager.victoryVideoUrl) {
+      video.src = assetManager.victoryVideoUrl;
+    }
+
+    video.currentTime = 0;
+    video.volume = soundEngine.volume;
+    video.muted = false;
+
+    video.style.display = 'block';
+    if (fallback) fallback.style.display = 'none';
+
+    const playPromise = video.play();
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
+        video.style.display = 'block';
+        if (fallback) fallback.style.display = 'none';
+        if (soundBtn) {
+          soundBtn.style.display = 'inline-block';
+          soundBtn.textContent = '🔊 Звук: ВКЛ';
+        }
+      }).catch(() => {
+        video.muted = true;
+        video.play().then(() => {
+          video.style.display = 'block';
+          if (fallback) fallback.style.display = 'none';
+          if (soundBtn) {
+            soundBtn.style.display = 'inline-block';
+            soundBtn.textContent = '🔇 Звук: ВЫКЛ (Кликни)';
+          }
+        }).catch(() => {
+          video.style.display = 'none';
+          if (fallback) fallback.style.display = 'flex';
+          if (soundBtn) soundBtn.style.display = 'none';
+        });
+      });
+    }
+  }
+
+  triggerVictory() {
+    this.state = STATE.VICTORY;
+    soundEngine.playVictory();
+
+    if (document.exitPointerLock) {
+      document.exitPointerLock();
+    }
+
+    soundEngine.stopHeartbeat();
+    soundEngine.stopProceduralChaseLoop();
+    if (this.dom.nextbotAudio) {
+      this.dom.nextbotAudio.pause();
+    }
+
+    // Populate Victory stats
+    if (this.dom.vicTime) this.dom.vicTime.textContent = this.formatTime(this.elapsedTime);
+    if (this.dom.vicKeys) this.dom.vicKeys.textContent = `${this.escapeGoal.keysCollected} / ${this.escapeGoal.totalKeys}`;
+    if (this.dom.vicShields) this.dom.vicShields.textContent = this.shieldsCollected.toString();
+
+    // Show Victory Modal
+    this.dom.hud.classList.add('hidden');
+    if (this.dom.victoryModal) {
+      this.dom.victoryModal.classList.remove('hidden');
+    }
+
+    this.playVictoryMedia();
+  }
+
   animate() {
     requestAnimationFrame(this.animate);
 
@@ -578,6 +924,9 @@ class Game {
 
       // Update Girl Nextbot AI
       const distToGirl = this.girl.update(delta, this.player, this.elapsedTime);
+
+      // Check Keys and Exit Door
+      this.escapeGoal.update(delta, this.player.position);
 
       // Check Shields Pickups
       this.shieldManager.update(delta, this.player, this.girl, (type) => {

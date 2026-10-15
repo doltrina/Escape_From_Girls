@@ -253,7 +253,7 @@ class SoundEngine {
   startHeartbeatLoop() {
     this.heartbeatActive = true;
     const beat = () => {
-      if (!this.nextHeartbeatInterval) {
+      if (!this.heartbeatActive || !this.nextHeartbeatInterval) {
         this.heartbeatActive = false;
         return;
       }
@@ -271,6 +271,15 @@ class SoundEngine {
       this.heartbeatTimer = setTimeout(beat, delay);
     };
     beat();
+  }
+
+  stopHeartbeat() {
+    this.heartbeatActive = false;
+    this.nextHeartbeatInterval = null;
+    if (this.heartbeatTimer) {
+      clearTimeout(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
   }
 
   playRealLub(vol = 1.0) {
@@ -491,8 +500,7 @@ class SoundEngine {
 
   playGameOver() {
     if (!this.ctx) return;
-    if (this.heartbeatTimer) clearTimeout(this.heartbeatTimer);
-    this.heartbeatActive = false;
+    this.stopHeartbeat();
     this.stopProceduralChaseLoop();
 
     if (this.customAudio) {
@@ -513,6 +521,117 @@ class SoundEngine {
     gain.connect(this.masterGain);
     osc.start(now);
     osc.stop(now + 1.0);
+  }
+
+  // Golden Key Pickup: Sparkling magical chime
+  playKeyPickup() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const notes = [659.25, 830.61, 987.77, 1318.51, 1661.22]; // E5, G#5, B5, E6, G#6
+    notes.forEach((freq, idx) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+
+      gain.gain.setValueAtTime(0.3, now + idx * 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.35);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now + idx * 0.06);
+      osc.stop(now + idx * 0.06 + 0.38);
+    });
+  }
+
+  // Heavy locked metallic door rattle
+  playDoorLocked() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(140, now);
+    osc.frequency.exponentialRampToValueAtTime(60, now + 0.15);
+
+    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  }
+
+  // Heavy vault door unlatch & opening hum
+  playDoorOpen() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    // Metallic clank followed by power hum
+    const clank = this.ctx.createOscillator();
+    const clankGain = this.ctx.createGain();
+    clank.type = 'triangle';
+    clank.frequency.setValueAtTime(480, now);
+    clank.frequency.exponentialRampToValueAtTime(110, now + 0.35);
+    clankGain.gain.setValueAtTime(0.5, now);
+    clankGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    clank.connect(clankGain);
+    clankGain.connect(this.masterGain);
+    clank.start(now);
+    clank.stop(now + 0.45);
+
+    // Deep hydraulic opening hum
+    const hum = this.ctx.createOscillator();
+    const humGain = this.ctx.createGain();
+    hum.type = 'sawtooth';
+    hum.frequency.setValueAtTime(80, now + 0.1);
+    hum.frequency.exponentialRampToValueAtTime(180, now + 0.9);
+    humGain.gain.setValueAtTime(0.001, now + 0.1);
+    humGain.gain.linearRampToValueAtTime(0.35, now + 0.35);
+    humGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    hum.connect(humGain);
+    humGain.connect(this.masterGain);
+    hum.start(now + 0.1);
+    hum.stop(now + 1.25);
+  }
+
+  // Triumphant Victory Synth Fanfare
+  playVictory() {
+    if (!this.ctx) return;
+    this.stopHeartbeat();
+    this.stopProceduralChaseLoop();
+
+    if (this.customAudio) {
+      this.customAudio.pause();
+    }
+
+    const now = this.ctx.currentTime;
+    // Joyous victory arpeggio: C4, E4, G4, C5, E5, G5, C6 triumph
+    const melody = [
+      { f: 261.63, t: 0.00, d: 0.18 }, // C4
+      { f: 329.63, t: 0.18, d: 0.18 }, // E4
+      { f: 392.00, t: 0.36, d: 0.18 }, // G4
+      { f: 523.25, t: 0.54, d: 0.30 }, // C5
+      { f: 659.25, t: 0.72, d: 0.30 }, // E5
+      { f: 783.99, t: 0.90, d: 0.30 }, // G5
+      { f: 1046.50, t: 1.15, d: 1.20 } // C6 (long triumphant note!)
+    ];
+
+    melody.forEach((note) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(note.f, now + note.t);
+
+      gain.gain.setValueAtTime(0.001, now + note.t);
+      gain.gain.linearRampToValueAtTime(0.4, now + note.t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + note.t + note.d);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now + note.t);
+      osc.stop(now + note.t + note.d + 0.05);
+    });
   }
 }
 

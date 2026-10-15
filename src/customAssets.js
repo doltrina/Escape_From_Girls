@@ -6,10 +6,14 @@ export class AssetManager {
     this.gameOverVideoUrl = './assets/game_over.mp4';
     this.romanticFallbackUrl = './assets/romantic_scene.jpg';
     this.girlMusicUrl = './assets/girl_music.mp3';
+    this.victoryVideoUrl = './assets/victory.mp4';
+    this.victoryMusicUrl = './assets/victory_music.mp3';
 
     this.hasCustomVideo = false;
     this.hasCustomGirl = false;
     this.hasCustomMusic = false;
+    this.hasCustomVictoryVideo = false;
+    this.hasCustomVictoryMusic = false;
 
     this.listeners = [];
   }
@@ -24,9 +28,13 @@ export class AssetManager {
         girlUrl: this.girlTextureUrl,
         videoUrl: this.gameOverVideoUrl,
         musicUrl: this.girlMusicUrl,
+        victoryVideoUrl: this.victoryVideoUrl,
+        victoryMusicUrl: this.victoryMusicUrl,
         hasCustomVideo: this.hasCustomVideo,
         hasCustomGirl: this.hasCustomGirl,
-        hasCustomMusic: this.hasCustomMusic
+        hasCustomMusic: this.hasCustomMusic,
+        hasCustomVictoryVideo: this.hasCustomVictoryVideo,
+        hasCustomVictoryMusic: this.hasCustomVictoryMusic
       });
     }
   }
@@ -47,6 +55,14 @@ export class AssetManager {
     this.notify();
   }
 
+  setCustomVictoryVideo(file) {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    this.victoryVideoUrl = url;
+    this.hasCustomVictoryVideo = true;
+    this.notify();
+  }
+
   setCustomMusic(file) {
     if (!file) return;
     const url = URL.createObjectURL(file);
@@ -55,13 +71,25 @@ export class AssetManager {
     this.notify();
   }
 
+  setCustomVictoryMusic(file) {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    this.victoryMusicUrl = url;
+    this.hasCustomVictoryMusic = true;
+    this.notify();
+  }
+
   resetDefaults() {
     this.girlTextureUrl = './assets/girl.png';
     this.gameOverVideoUrl = './assets/game_over.mp4';
     this.girlMusicUrl = './assets/girl_music.mp3';
+    this.victoryVideoUrl = './assets/victory.mp4';
+    this.victoryMusicUrl = './assets/victory_music.mp3';
     this.hasCustomVideo = false;
     this.hasCustomGirl = false;
     this.hasCustomMusic = false;
+    this.hasCustomVictoryVideo = false;
+    this.hasCustomVictoryMusic = false;
     this.notify();
   }
 }

@@ -121,6 +121,10 @@ export class Player {
 
     // Keyboard inputs
     window.addEventListener('keydown', (e) => {
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+        e.preventDefault();
+      }
+
       switch (e.code) {
         case 'KeyW':
         case 'ArrowUp':
