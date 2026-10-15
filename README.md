@@ -67,8 +67,8 @@
 
 ### ⭐ Авторские настройки / NSFW-паки:
 В игре доступна кнопка **«⭐ Авторские настройки»** для моментальной загрузки готового набора ассетов из папки `assets/author/`:
-1. Скачайте пак файлов автора: **[Ссылка на файлы автора игры (Google Диск)](https://drive.google.com/)** *(замените ссылку на вашу)*.
-2. Поместите распакованные файлы в папку `assets/author/` (подробнее см. в [assets/author/README.md](file:///w:/Projects/game/assets/author/README.md)).
+1. Скачайте пак файлов автора: **[Ссылка на файлы автора игры (Google Диск)](https://drive.google.com/file/d/1XV2FlycmMbd54ix4t6J2u7g95oQ8FGpf/view?usp=sharing)**.
+2. Поместите распакованные файлы в папку `assets/author/` (подробнее см. в [assets/author/README.md](assets/author/README.md)).
 3. В игре откройте настройки (⚙️) и нажмите **«⭐ Авторские настройки»**.
 
 
