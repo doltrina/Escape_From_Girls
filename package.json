@@ -1,0 +1,17 @@
+{
+  "name": "escape-from-girls",
+  "version": "1.0.0",
+  "description": "Nextbot First-Person 3D Game: Escape From Girls",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "game",
+    "nextbot",
+    "threejs",
+    "survival"
+  ],
+  "author": "",
+  "license": "MIT"
+}

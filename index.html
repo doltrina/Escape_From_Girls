@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escape From Girls: Keep Your Virginity | Nextbot 3D</title>
+  <meta name="description" content="Псевдо-3D хоррор-комедия от первого лица в стиле Nextbot. Убегай от девушек и защищай свою девственность!">
+  <link rel="stylesheet" href="style.css">
+
+  <!-- ES Module Import Map for Three.js -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./libs/three.module.js",
+      "three/addons/": "./libs/"
+    }
+  }
+  </script>
+</head>
+<body>
+
+  <!-- 3D Render Canvas Container -->
+  <div id="game-canvas"></div>
+
+  <!-- Danger Screen Edge Vignette (Pulses as Girl gets closer) -->
+  <div id="danger-vignette"></div>
+
+  <!-- FPS Crosshair -->
+  <div id="crosshair">
+    <div class="crosshair-dot"></div>
+  </div>
+
+  <!-- Floating Toast Notifications -->
+  <div id="toast-container"></div>
+
+  <!-- Main HUD In-Game -->
+  <div id="hud" class="hidden">
+    <!-- Top Bar -->
+    <div class="hud-top">
+      <div class="hud-panel">
+        <div class="hud-timer" id="hud-timer">00:00.00</div>
+      </div>
+
+      <div class="hud-panel">
+        <div class="hud-record" id="hud-record">🏆 РЕКОРД: 00:00.00</div>
+      </div>
+
+      <div class="hud-panel hud-stats">
+        <div class="stat-badge">
+          🛡️ ЩИТЫ: <span id="hud-shields-count">0</span>
+        </div>
+        <div class="stat-badge">
+          ❤️ ЖИЗНИ: <span id="hud-lives-count">1</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Bar -->
+    <div class="hud-bottom">
+      <!-- Stamina & Flashlight -->
+      <div class="hud-panel stamina-panel">
+        <div class="stamina-label">
+          <span>⚡ ВЫНОСЛИВОСТЬ [SHIFT]</span>
+          <span id="stamina-percent">100%</span>
+        </div>
+        <div class="stamina-bar-bg">
+          <div class="stamina-bar-fill" id="stamina-fill"></div>
+        </div>
+        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">
+          🔦 ФОНАРИК [F]: <span id="flashlight-status" style="color: var(--cyan); font-weight: bold;">ВКЛ</span>
+        </div>
+      </div>
+
+      <!-- Center: Inventory Hotbar -->
+      <div class="hud-hotbar" id="hud-hotbar">
+        <div class="hotbar-slot" id="slot-forcefield" data-item="forcefield" title="Нажми [1] для активации">
+          <span class="slot-key">1</span>
+          <span class="slot-icon">🛡️</span>
+          <span class="slot-name">RTX 5090</span>
+          <span class="slot-count" id="count-forcefield">0</span>
+        </div>
+        <div class="hotbar-slot" id="slot-energy_drink" data-item="energy_drink" title="Нажми [2] для активации">
+          <span class="slot-key">2</span>
+          <span class="slot-icon">⚡</span>
+          <span class="slot-name">Monster</span>
+          <span class="slot-count" id="count-energy_drink">0</span>
+        </div>
+        <div class="hotbar-slot" id="slot-dakimakura" data-item="dakimakura" title="Нажми [3] для сброса приманки">
+          <span class="slot-key">3</span>
+          <span class="slot-icon">🎎</span>
+          <span class="slot-name">Приманка</span>
+          <span class="slot-count" id="count-dakimakura">0</span>
+        </div>
+        <div class="hotbar-slot passive" id="slot-d20_dice" data-item="d20_dice" title="Пассивный спас-бросок жизни">
+          <span class="slot-key">4</span>
+          <span class="slot-icon">🎲</span>
+          <span class="slot-name">D20 Жизнь</span>
+          <span class="slot-count" id="count-d20_dice">0</span>
+        </div>
+      </div>
+
+      <!-- Active Buff Badge -->
+      <div class="active-buff-card" id="active-buff-card">
+        🛡️ СИЛОВОЕ ПОЛЕ АКТИВНО (5.0s)
+      </div>
+
+      <!-- ECG Proximity Heart Rate Monitor -->
+      <div class="hud-panel heartbeat-panel">
+        <div class="heart-icon" id="heart-icon">❤️</div>
+        <div>
+          <div class="bpm-value" id="bpm-value">72 BPM</div>
+          <div class="bpm-status" id="bpm-status">СПОКОЙСТВИЕ</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio element for custom Nextbot music -->
+  <audio id="nextbot-audio" loop playsinline></audio>
+
+  <!-- Start & Pause Menu Overlay -->
+  <div id="menu-overlay" class="overlay-screen">
+    <div class="card-container">
+      <div>
+        <h1 class="game-title">ESCAPE FROM GIRLS</h1>
+        <div class="game-subtitle">СОХРАНИ СВОЮ ДЕВСТВЕННОСТЬ</div>
+      </div>
+
+      <p class="game-tagline">
+        Она рыщет по коридорам... Если она догонит тебя — прощай, девственность!<br>
+        Беги, маневрируй и собирай священные артефакты истинного холостяка.
+      </p>
+
+      <button id="btn-start-game" class="btn-primary">
+        ▶ НАЧАТЬ ПОБЕГ
+      </button>
+
+      <!-- Artifacts Legend -->
+      <div class="feature-grid">
+        <div class="feature-box">
+          <div class="feature-icon">🛡️</div>
+          <div class="feature-info">
+            <h4>RTX 5090 (Силовое Поле)</h4>
+            <p>Отталкивает девушку взрывной волной при приближении</p>
+          </div>
+        </div>
+
+        <div class="feature-box">
+          <div class="feature-icon">⚡</div>
+          <div class="feature-info">
+            <h4>Monster / Flash</h4>
+            <p>Ультра-буст скорости и бесконечная выносливость на 5с</p>
+          </div>
+        </div>
+
+        <div class="feature-box">
+          <div class="feature-icon">🎎</div>
+          <div class="feature-info">
+            <h4>Дакимакура (Приманка)</h4>
+            <p>Девушка залипает на аниме-подушку на 5 секунд</p>
+          </div>
+        </div>
+
+        <div class="feature-box">
+          <div class="feature-icon">🎲</div>
+          <div class="feature-info">
+            <h4>D20 Кость</h4>
+            <p>Дополнительная жизнь (+1 спасение от девственности)</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls Cheatsheet -->
+      <div class="controls-bar">
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Ходьба</span>
+        <span><kbd>SHIFT</kbd> Бег</span>
+        <span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Артефакты</span>
+        <span><kbd>F</kbd> Фонарик</span>
+        <span><kbd>ESC</kbd> Меню</span>
+      </div>
+
+      <button id="btn-open-settings" class="btn-secondary">
+        ⚙️ Своя картинка девушки и MP4 видео
+      </button>
+    </div>
+  </div>
+
+  <!-- Settings & Custom Assets Modal -->
+  <div id="settings-modal" class="hidden">
+    <div class="settings-card">
+      <div class="settings-header">
+        <h2>⚙️ Кастомизация & Настройки</h2>
+        <button id="btn-close-settings" class="close-btn">&times;</button>
+      </div>
+
+      <div class="custom-asset-section">
+        <!-- Girl Model Replacement -->
+        <div class="upload-box">
+          <img id="girl-preview-img" class="upload-preview" src="./assets/girl.png" alt="Превью девушки">
+          <div class="upload-info">
+            <h4>Фото девушки (Nextbot)</h4>
+            <p>Загрузи любое фото/мем (PNG, JPG) или положи в <code>assets/girl.png</code></p>
+          </div>
+          <label class="btn-upload">
+            Выбрать файл
+            <input type="file" id="file-girl-input" class="file-input" accept="image/*">
+          </label>
+        </div>
+
+        <!-- Game Over Video Replacement -->
+        <div class="upload-box">
+          <video id="video-preview-player" class="upload-preview" muted playsinline></video>
+          <div class="upload-info">
+            <h4>Видео проигрыша (MP4)</h4>
+            <p>Загрузи своё эротическое/мемное видео (MP4, WebM) или положи в <code>assets/game_over.mp4</code></p>
+          </div>
+          <label class="btn-upload">
+            Выбрать файл
+            <input type="file" id="file-video-input" class="file-input" accept="video/mp4,video/webm">
+          </label>
+        </div>
+
+        <!-- Nextbot Music Replacement -->
+        <div class="upload-box">
+          <div class="upload-preview" style="display:flex; align-items:center; justify-content:center; font-size:26px; background: rgba(255,0,119,0.2);">🎵</div>
+          <div class="upload-info">
+            <h4>Музыка девушки (Nextbot Chase Music)</h4>
+            <p id="music-track-name">Загрузи свой MP3/WAV трек или положи в <code>assets/girl_music.mp3</code></p>
+          </div>
+          <label class="btn-upload">
+            Выбрать трек
+            <input type="file" id="file-music-input" class="file-input" accept="audio/*">
+          </label>
+        </div>
+      </div>
+
+      <!-- Sensitivity & Volume -->
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>Чувствительность мыши</span>
+          <span id="sens-val-display">1.0x</span>
+        </div>
+        <input type="range" id="mouse-sens-slider" class="range-slider" min="0.2" max="2.5" step="0.1" value="1.0">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>Громкость звуков</span>
+          <span id="vol-val-display">80%</span>
+        </div>
+        <input type="range" id="volume-slider" class="range-slider" min="0" max="1" step="0.05" value="0.8">
+      </div>
+
+      <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 10px;">
+        <button id="btn-reset-assets" class="btn-secondary" style="color: #ffaa00;">
+          Сбросить на стандартные
+        </button>
+        <button id="btn-save-settings" class="btn-primary" style="padding: 10px 24px; font-size: 16px;">
+          Готово
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div id="game-over-modal" class="hidden">
+    <div class="game-over-media-container">
+      <!-- MP4 Video Player -->
+      <video id="game-over-video" playsinline loop muted></video>
+      <!-- Romantic Aesthetic Fallback Scene (Shown if no MP4 or while video loads) -->
+      <div id="game-over-fallback" style="background-image: url('./assets/romantic_scene.jpg');"></div>
+      <div class="game-over-overlay-tint"></div>
+    </div>
+
+    <div class="game-over-content">
+      <h1 class="game-over-title">
+        ТЫ ПОТЕРЯЛ ДЕВСТВЕННОСТЬ<br>ТЫ ПРОИГРАЛ
+      </h1>
+
+      <div class="game-over-stats">
+        <div class="game-over-stat-item">
+          <span class="game-over-stat-label">Время девственности</span>
+          <span class="game-over-stat-val" id="go-time">00:00.00</span>
+        </div>
+        <div class="game-over-stat-item">
+          <span class="game-over-stat-label">Собрано щитов</span>
+          <span class="game-over-stat-val" id="go-shields">0</span>
+        </div>
+        <div class="game-over-stat-item">
+          <span class="game-over-stat-label">Рекорд</span>
+          <span class="game-over-stat-val gold" id="go-record">00:00.00</span>
+        </div>
+      </div>
+
+      <div class="game-over-actions">
+        <button id="btn-restart-game" class="btn-primary">
+          🔄 ПОПРОБОВАТЬ СПАСТИСЬ СНОВА
+        </button>
+        <button id="btn-toggle-video-sound" class="btn-secondary" style="display: none;">
+          🔊 Звук: ВКЛ
+        </button>
+        <button id="btn-go-settings" class="btn-secondary">
+          ⚙️ СМЕНИТЬ ВИДЕО / ФОТО
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Game Logic Entrypoint -->
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
