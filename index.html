@@ -46,6 +46,9 @@
       </div>
 
       <div class="hud-panel hud-stats">
+        <div class="stat-badge keys-badge" id="hud-keys-badge">
+          🗝️ КЛЮЧИ: <span id="hud-keys-count">0</span> / 3
+        </div>
         <div class="stat-badge">
           🛡️ ЩИТЫ: <span id="hud-shields-count">0</span>
         </div>
@@ -122,18 +125,26 @@
   <div id="menu-overlay" class="overlay-screen">
     <div class="card-container">
       <div>
-        <h1 class="game-title">ESCAPE FROM GIRLS</h1>
-        <div class="game-subtitle">СОХРАНИ СВОЮ ДЕВСТВЕННОСТЬ</div>
+        <h1 class="game-title" id="menu-title">ESCAPE FROM GIRLS</h1>
+        <div class="game-subtitle" id="menu-subtitle">СОХРАНИ СВОЮ ДЕВСТВЕННОСТЬ</div>
       </div>
 
-      <p class="game-tagline">
-        Она рыщет по коридорам... Если она догонит тебя — прощай, девственность!<br>
-        Беги, маневрируй и собирай священные артефакты истинного холостяка.
+      <p class="game-tagline" id="menu-tagline">
+        Она рыщет по коридорам... Если догонит — прощай, девственность!<br>
+        Найди <strong>3 золотых ключа</strong> (один спрятан в опасном тупике!) и открой бронедверь <strong>ВЫХОД</strong>, чтобы сбежать на свободу!
       </p>
 
-      <button id="btn-start-game" class="btn-primary">
-        ▶ НАЧАТЬ ПОБЕГ
-      </button>
+      <div class="menu-action-buttons">
+        <button id="btn-resume-game" class="btn-primary" style="display: none;">
+          ▶ ПРОДОЛЖИТЬ ПОБЕГ
+        </button>
+        <button id="btn-start-game" class="btn-primary">
+          ▶ НАЧАТЬ ПОБЕГ
+        </button>
+        <button id="btn-restart-from-pause" class="btn-secondary" style="display: none;">
+          🔄 С НАЧАЛА
+        </button>
+      </div>
 
       <!-- Artifacts Legend -->
       <div class="feature-grid">
@@ -232,6 +243,32 @@
             <input type="file" id="file-music-input" class="file-input" accept="audio/*">
           </label>
         </div>
+
+        <!-- Victory Video Replacement -->
+        <div class="upload-box">
+          <video id="victory-video-preview" class="upload-preview" muted playsinline></video>
+          <div class="upload-info">
+            <h4>Видео победы (MP4)</h4>
+            <p id="victory-video-name">Загрузи своё триумфальное видео или положи в <code>assets/victory.mp4</code></p>
+          </div>
+          <label class="btn-upload">
+            Выбрать видео
+            <input type="file" id="file-victory-video-input" class="file-input" accept="video/mp4,video/webm">
+          </label>
+        </div>
+
+        <!-- Victory Music Replacement -->
+        <div class="upload-box">
+          <div class="upload-preview" style="display:flex; align-items:center; justify-content:center; font-size:26px; background: rgba(0,255,136,0.2);">🎺</div>
+          <div class="upload-info">
+            <h4>Музыка победы (Victory Fanfare)</h4>
+            <p id="victory-music-name">Загрузи свой победный трек или положи в <code>assets/victory_music.mp3</code></p>
+          </div>
+          <label class="btn-upload">
+            Выбрать трек
+            <input type="file" id="file-victory-music-input" class="file-input" accept="audio/*">
+          </label>
+        </div>
       </div>
 
       <!-- Sensitivity & Volume -->
@@ -251,10 +288,15 @@
         <input type="range" id="volume-slider" class="range-slider" min="0" max="1" step="0.05" value="0.8">
       </div>
 
-      <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 10px;">
-        <button id="btn-reset-assets" class="btn-secondary" style="color: #ffaa00;">
-          Сбросить на стандартные
-        </button>
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button id="btn-author-preset" class="btn-secondary" style="color: #00f3ff; border-color: rgba(0, 243, 255, 0.5); background: rgba(0, 243, 255, 0.1);">
+            ⭐ Авторские настройки
+          </button>
+          <button id="btn-reset-assets" class="btn-secondary" style="color: #ffaa00;">
+            Сбросить на стандартные
+          </button>
+        </div>
         <button id="btn-save-settings" class="btn-primary" style="padding: 10px 24px; font-size: 16px;">
           Готово
         </button>
@@ -305,6 +347,57 @@
       </div>
     </div>
   </div>
+
+  <!-- Victory / Good Ending Screen -->
+  <div id="victory-modal" class="hidden">
+    <div class="game-over-media-container victory-media-container">
+      <video id="victory-video" playsinline loop muted></video>
+      <div id="victory-fallback" class="victory-fallback-scene">
+        <div class="victory-sunburst"></div>
+      </div>
+      <div class="victory-overlay-tint"></div>
+    </div>
+
+    <div class="game-over-content victory-content">
+      <h1 class="victory-title">
+        ТЫ СОХРАНИЛ ДЕВСТВЕННОСТЬ!<br><span class="victory-subtitle-text">СЧАСТЛИВЫЙ КОНЕЦ (ПОБЕДА)</span>
+      </h1>
+      <div class="victory-badge-large">👑 ИСТИННЫЙ СИГМА-САМУРАЙ 👑</div>
+      <p class="victory-description">
+        Ты собрал все 3 ключа, обхитрил девушку и вырвался на свободу! Твоя свобода и чистая душа в безопасности!
+      </p>
+
+      <div class="game-over-stats victory-stats">
+        <div class="game-over-stat-item">
+          <span class="game-over-stat-label">Время побега</span>
+          <span class="game-over-stat-val gold" id="vic-time">00:00.00</span>
+        </div>
+        <div class="game-over-stat-item">
+          <span class="game-over-stat-label">Собрано ключей</span>
+          <span class="game-over-stat-val" id="vic-keys">3 / 3</span>
+        </div>
+        <div class="game-over-stat-item">
+          <span class="game-over-stat-label">Собрано артефактов</span>
+          <span class="game-over-stat-val" id="vic-shields">0</span>
+        </div>
+      </div>
+
+      <div class="game-over-actions">
+        <button id="btn-victory-restart" class="btn-primary victory-btn">
+          👑 СЫГРАТЬ ЕЩЕ РАЗ
+        </button>
+        <button id="btn-toggle-victory-sound" class="btn-secondary" style="display: none;">
+          🔊 Звук: ВКЛ
+        </button>
+        <button id="btn-victory-settings" class="btn-secondary">
+          ⚙️ НАСТРОЙКИ
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio element for custom Victory music -->
+  <audio id="victory-audio" loop playsinline></audio>
 
   <!-- Main Game Logic Entrypoint -->
   <script type="module" src="./src/main.js"></script>

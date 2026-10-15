@@ -27,6 +27,8 @@ class SoundEngine {
     this.isProceduralMusicPlaying = false;
     this.proceduralChaseTimer = null;
     this.useProceduralChase = true;
+    this.currentChaseGain = 0;
+    this.proceduralNoteIndex = 0;
 
     // External HTML5 Audio element for custom Nextbot music
     this.customAudio = null;
@@ -68,6 +70,13 @@ class SoundEngine {
 
   setCustomAudioElement(audioEl) {
     this.customAudio = audioEl;
+    if (this.customAudio) {
+      this.customAudio.loop = true;
+      this.customAudio.addEventListener('ended', () => {
+        this.customAudio.currentTime = 0;
+        this.customAudio.play().catch(() => {});
+      });
+    }
   }
 
   setHasCustomMusic(hasCustom) {
@@ -121,20 +130,19 @@ class SoundEngine {
       41.2, 41.2, 49.0, 41.2, 55.0, 41.2, 49.0, 46.25, // E1, E1, B1, E1, A1, E1, B1, Bb1
       41.2, 41.2, 61.74, 55.0, 49.0, 41.2, 36.71, 38.89 // E1, E1, D2, A1, B1, E1, D1, Eb1
     ];
-    let noteIdx = 0;
 
     const playStep = () => {
       if (!this.isProceduralMusicPlaying || !this.ctx) return;
       if (!this.hasCustomMusic) {
-        const freq = bassline[noteIdx % bassline.length];
+        const freq = bassline[this.proceduralNoteIndex % bassline.length];
         this.synthBassHit(freq, stepTime * 0.85);
 
         // Hi-hat click on off-beats
-        if (noteIdx % 2 === 1) {
+        if (this.proceduralNoteIndex % 2 === 1) {
           this.synthHiHat();
         }
       }
-      noteIdx++;
+      this.proceduralNoteIndex++;
       this.proceduralChaseTimer = setTimeout(playStep, stepTime * 1000);
     };
     playStep();
@@ -146,10 +154,27 @@ class SoundEngine {
       clearTimeout(this.proceduralChaseTimer);
       this.proceduralChaseTimer = null;
     }
+    if (this.proceduralChaseGain && this.ctx) {
+      this.proceduralChaseGain.gain.setValueAtTime(0, this.ctx.currentTime);
+    }
+    this.currentChaseGain = 0;
+  }
+
+  resetChaseMusic() {
+    this.stopProceduralChaseLoop();
+    this.proceduralNoteIndex = 0;
+    this.currentChaseGain = 0;
+
+    if (this.customAudio) {
+      try {
+        this.customAudio.pause();
+        this.customAudio.currentTime = 0;
+      } catch (e) {}
+    }
   }
 
   synthBassHit(freq, duration) {
-    if (!this.ctx || this.proceduralChaseGain.gain.value < 0.005) return;
+    if (!this.ctx || this.currentChaseGain < 0.005) return;
     const now = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
     const filter = this.ctx.createBiquadFilter();
@@ -174,7 +199,7 @@ class SoundEngine {
   }
 
   synthHiHat() {
-    if (!this.ctx || this.proceduralChaseGain.gain.value < 0.005) return;
+    if (!this.ctx || this.currentChaseGain < 0.005) return;
     const now = this.ctx.currentTime;
     const bufferSize = this.ctx.sampleRate * 0.03;
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -217,12 +242,12 @@ class SoundEngine {
       this.customAudio.volume = Math.max(0, Math.min(1, volumeCurve * this.volume));
     } else {
       // 2. Procedural Nextbot chase music
+      this.currentChaseGain = volumeCurve * 0.85;
       if (!this.isProceduralMusicPlaying && prox > 0.05) {
         this.startProceduralChaseLoop();
       }
       if (this.proceduralChaseGain) {
-        const targetVol = volumeCurve * 0.85;
-        this.proceduralChaseGain.gain.setTargetAtTime(targetVol, this.ctx.currentTime, 0.08);
+        this.proceduralChaseGain.gain.setTargetAtTime(this.currentChaseGain, this.ctx.currentTime, 0.08);
       }
     }
 
@@ -253,7 +278,7 @@ class SoundEngine {
   startHeartbeatLoop() {
     this.heartbeatActive = true;
     const beat = () => {
-      if (!this.nextHeartbeatInterval) {
+      if (!this.heartbeatActive || !this.nextHeartbeatInterval) {
         this.heartbeatActive = false;
         return;
       }
@@ -271,6 +296,15 @@ class SoundEngine {
       this.heartbeatTimer = setTimeout(beat, delay);
     };
     beat();
+  }
+
+  stopHeartbeat() {
+    this.heartbeatActive = false;
+    this.nextHeartbeatInterval = null;
+    if (this.heartbeatTimer) {
+      clearTimeout(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
   }
 
   playRealLub(vol = 1.0) {
@@ -491,8 +525,7 @@ class SoundEngine {
 
   playGameOver() {
     if (!this.ctx) return;
-    if (this.heartbeatTimer) clearTimeout(this.heartbeatTimer);
-    this.heartbeatActive = false;
+    this.stopHeartbeat();
     this.stopProceduralChaseLoop();
 
     if (this.customAudio) {
@@ -513,6 +546,118 @@ class SoundEngine {
     gain.connect(this.masterGain);
     osc.start(now);
     osc.stop(now + 1.0);
+  }
+
+  // Golden Key Pickup: Sparkling magical chime
+  playKeyPickup() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const notes = [659.25, 830.61, 987.77, 1318.51, 1661.22]; // E5, G#5, B5, E6, G#6
+    notes.forEach((freq, idx) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+
+      gain.gain.setValueAtTime(0.3, now + idx * 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.35);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now + idx * 0.06);
+      osc.stop(now + idx * 0.06 + 0.38);
+    });
+  }
+
+  // Heavy locked metallic door rattle
+  playDoorLocked() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(140, now);
+    osc.frequency.exponentialRampToValueAtTime(60, now + 0.15);
+
+    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  }
+
+  // Heavy vault door unlatch & opening hum
+  playDoorOpen() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    // Metallic clank followed by power hum
+    const clank = this.ctx.createOscillator();
+    const clankGain = this.ctx.createGain();
+    clank.type = 'triangle';
+    clank.frequency.setValueAtTime(480, now);
+    clank.frequency.exponentialRampToValueAtTime(110, now + 0.35);
+    clankGain.gain.setValueAtTime(0.5, now);
+    clankGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    clank.connect(clankGain);
+    clankGain.connect(this.masterGain);
+    clank.start(now);
+    clank.stop(now + 0.45);
+
+    // Deep hydraulic opening hum
+    const hum = this.ctx.createOscillator();
+    const humGain = this.ctx.createGain();
+    hum.type = 'sawtooth';
+    hum.frequency.setValueAtTime(80, now + 0.1);
+    hum.frequency.exponentialRampToValueAtTime(180, now + 0.9);
+    humGain.gain.setValueAtTime(0.001, now + 0.1);
+    humGain.gain.linearRampToValueAtTime(0.35, now + 0.35);
+    humGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    hum.connect(humGain);
+    humGain.connect(this.masterGain);
+    hum.start(now + 0.1);
+    hum.stop(now + 1.25);
+  }
+
+  // Nextbot OOB Recovery / Jumpscare Scream
+  playNextbotRespawn() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const filter = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(640, now);
+    osc.frequency.exponentialRampToValueAtTime(120, now + 0.55);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1200, now);
+
+    gain.gain.setValueAtTime(0.55, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc.start(now);
+    osc.stop(now + 0.65);
+  }
+
+  // Victory: Stops all chase music, heartbeat and sounds so video plays cleanly with its own audio
+  playVictory() {
+    this.stopHeartbeat();
+    this.stopProceduralChaseLoop();
+    this.resetChaseMusic();
+
+    if (this.customAudio) {
+      try {
+        this.customAudio.pause();
+        this.customAudio.currentTime = 0;
+      } catch (e) {}
+    }
   }
 }
 

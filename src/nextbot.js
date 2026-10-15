@@ -105,9 +105,14 @@ export class NextbotGirl {
     }
     dir.normalize();
 
-    // 1. Immediately separate girl physically outside the collision radius
-    this.position.add(dir.clone().multiplyScalar(immediatePush));
-    this.map.resolveCollision(this.position, this.radius);
+    // 1. Physically push girl backward in sub-steps with collision resolution
+    // so she cannot jump over or glitch through outer walls
+    const steps = 8;
+    const stepDist = immediatePush / steps;
+    for (let s = 0; s < steps; s++) {
+      this.position.add(dir.clone().multiplyScalar(stepDist));
+      this.map.resolveCollision(this.position, this.radius);
+    }
 
     // 2. Impart backward kinetic velocity
     this.velocity.copy(dir.clone().multiplyScalar(force));
@@ -121,6 +126,45 @@ export class NextbotGirl {
 
   knockback(fromPosition, force = 18.0) {
     this.repelFrom(fromPosition, force, 5.5);
+  }
+
+  checkMapBounds(player) {
+    // Playable area boundary margins (inside perimeter walls)
+    const minX = this.map.offsetX + this.map.tileSize * 0.6;
+    const maxX = this.map.offsetX + this.map.width - this.map.tileSize * 0.6;
+    const minZ = this.map.offsetZ + this.map.tileSize * 0.6;
+    const maxZ = this.map.offsetZ + this.map.depth - this.map.tileSize * 0.6;
+
+    const isOutOfBounds = this.position.x < minX || this.position.x > maxX ||
+                          this.position.z < minZ || this.position.z > maxZ ||
+                          this.position.y < -1.0;
+
+    if (isOutOfBounds) {
+      this.outOfBoundsFrames = (this.outOfBoundsFrames || 0) + 1;
+      // If outside the maze perimeter, trigger aggressive tactical respawn
+      if (this.outOfBoundsFrames >= 2) {
+        this.aggressiveRespawn(player);
+        this.outOfBoundsFrames = 0;
+      }
+    } else {
+      this.outOfBoundsFrames = 0;
+    }
+  }
+
+  aggressiveRespawn(player) {
+    // Choose a valid corridor position within tactical distance from player
+    const spawnPoint = this.map.getRandomSpawnPoint(player.position, 16);
+    this.position.copy(spawnPoint);
+    this.position.y = 0;
+    this.meshGroup.position.copy(this.position);
+    this.velocity.set(0, 0, 0);
+    this.stunTimer = 0.4; // brief recovery
+
+    // Play ominous jumpscare scream sound
+    soundEngine.playNextbotRespawn();
+    if (window.gameInstance && window.gameInstance.showToast) {
+      window.gameInstance.showToast('😈 ОНА ВЕРНУЛАСЬ! ТЫ НЕ СБЕЖИШЬ!');
+    }
   }
 
   update(delta, player, elapsedTime) {
@@ -145,6 +189,9 @@ export class NextbotGirl {
       this.position.x += this.velocity.x * delta;
       this.position.z += this.velocity.z * delta;
       this.map.resolveCollision(this.position, this.radius);
+
+      // Check map bounds during stun knockback
+      this.checkMapBounds(player);
 
       // Stun wobble / disorientation tilt
       this.meshGroup.position.set(this.position.x, 0, this.position.z);
@@ -222,6 +269,9 @@ export class NextbotGirl {
 
     // Resolve wall collisions
     this.map.resolveCollision(this.position, this.radius);
+
+    // Ensure she stays within map bounds
+    this.checkMapBounds(player);
 
     // Nextbot Bobbing & Wobble Animation
     const speed = this.velocity.length();

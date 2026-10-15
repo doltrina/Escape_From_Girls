@@ -121,6 +121,10 @@ export class Player {
 
     // Keyboard inputs
     window.addEventListener('keydown', (e) => {
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+        e.preventDefault();
+      }
+
       switch (e.code) {
         case 'KeyW':
         case 'ArrowUp':
@@ -281,12 +285,17 @@ export class Player {
       this.velocity.lerp(new THREE.Vector3(0, 0, 0), this.friction * delta);
     }
 
-    // Apply horizontal movement
-    this.position.x += this.velocity.x * delta;
-    this.position.z += this.velocity.z * delta;
+    // Apply horizontal movement with sub-stepping to prevent tunneling at high speeds
+    const speed = Math.hypot(this.velocity.x, this.velocity.z);
+    const totalDist = speed * delta;
+    const subSteps = Math.max(1, Math.min(4, Math.ceil(totalDist / (this.radius * 0.5))));
+    const stepDelta = delta / subSteps;
 
-    // Resolve map wall collision
-    this.map.resolveCollision(this.position, this.radius);
+    for (let s = 0; s < subSteps; s++) {
+      this.position.x += this.velocity.x * stepDelta;
+      this.position.z += this.velocity.z * stepDelta;
+      this.map.resolveCollision(this.position, this.radius);
+    }
 
     // Gravity & Vertical Movement
     if (!this.isGrounded) {
