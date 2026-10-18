@@ -123,6 +123,26 @@ function createCharredWoodTexture() {
   return texture;
 }
 
+// Global texture cache to prevent re-rendering canvases on every load
+let cachedBasaltTexture = null;
+let cachedLavaTexture = null;
+let cachedCharredWoodTexture = null;
+
+function getBasaltTexture() {
+  if (!cachedBasaltTexture) cachedBasaltTexture = createBasaltTexture();
+  return cachedBasaltTexture;
+}
+
+function getLavaTexture() {
+  if (!cachedLavaTexture) cachedLavaTexture = createLavaTexture();
+  return cachedLavaTexture;
+}
+
+function getCharredWoodTexture() {
+  if (!cachedCharredWoodTexture) cachedCharredWoodTexture = createCharredWoodTexture();
+  return cachedCharredWoodTexture;
+}
+
 export class CraterMap {
   constructor(scene) {
     this.scene = scene;
@@ -141,8 +161,11 @@ export class CraterMap {
     this.magmaLevel = 0.5; // current Y
     this.initialMagmaLevel = 0.5;
     this.maxMagmaLevel = 29.5; // stops just below summit
-    this.magmaRisingSpeed = 0.36; // meters per second
-    this.isMagmaRising = false;
+    this.magmaBaseSpeed = 0.18; // steady rising speed from game start
+    this.magmaRapidSpeed = 0.48; // rapid rising speed after Key 1 alarm
+    this.magmaRisingSpeed = this.magmaBaseSpeed;
+    this.isMagmaRising = true; // ALWAYS actively rising from start!
+    this.isRapidRise = false;
     this.magmaTime = 0;
 
     // Platform lists
@@ -170,15 +193,15 @@ export class CraterMap {
     this.root = new THREE.Group();
     this.scene.add(this.root);
 
-    // Materials
+    // Materials using cached procedural textures
     this.basaltMat = new THREE.MeshStandardMaterial({
-      map: createBasaltTexture(),
+      map: getBasaltTexture(),
       roughness: 0.85,
       metalness: 0.15
     });
 
     this.charredWoodMat = new THREE.MeshStandardMaterial({
-      map: createCharredWoodTexture(),
+      map: getCharredWoodTexture(),
       roughness: 0.9,
       metalness: 0.1
     });
@@ -204,14 +227,14 @@ export class CraterMap {
     this.calderaWall.material.side = THREE.BackSide;
     this.root.add(this.calderaWall);
 
-    // 2. Rising Magma Pool Surface
-    const lavaGeo = new THREE.CircleGeometry(this.calderaRadius * 0.95, 48);
+    // 2. Rising Magma Pool Surface with 3D Wave Undulation
+    const lavaGeo = new THREE.PlaneGeometry(this.calderaRadius * 2.15, this.calderaRadius * 2.15, 28, 28);
     this.lavaMat = new THREE.MeshStandardMaterial({
-      map: createLavaTexture(),
+      map: getLavaTexture(),
       emissive: 0xff3300,
-      emissiveIntensity: 0.85,
-      roughness: 0.2,
-      metalness: 0.8
+      emissiveIntensity: 0.9,
+      roughness: 0.25,
+      metalness: 0.75
     });
     this.lavaMesh = new THREE.Mesh(lavaGeo, this.lavaMat);
     this.lavaMesh.rotation.x = -Math.PI / 2;
@@ -255,7 +278,10 @@ export class CraterMap {
 
     const platformData = {
       mesh,
-      box: new THREE.Box3().setFromObject(mesh),
+      box: new THREE.Box3(
+        new THREE.Vector3(x - w / 2, y - h / 2, z - d / 2),
+        new THREE.Vector3(x + w / 2, y + h / 2, z + d / 2)
+      ),
       x, y, z, w, h, d,
       topY: y + h / 2,
       type,
@@ -497,7 +523,7 @@ export class CraterMap {
   // 🌋 VOLCANIC ASH & SPARKS PARTICLES
   // -------------------------------------------------------------
   initAshParticles() {
-    const particleCount = 450;
+    const particleCount = 180; // Optimized count for 60fps performance
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const velocities = new Float32Array(particleCount * 3);
@@ -575,8 +601,8 @@ export class CraterMap {
   // 🔄 UPDATE LOOP & LOGIC
   // -------------------------------------------------------------
   startMagmaRise() {
-    if (this.isMagmaRising) return;
-    this.isMagmaRising = true;
+    this.isRapidRise = true;
+    this.magmaRisingSpeed = this.magmaRapidSpeed;
     soundEngine.playSirenAlarm();
     if (this.onMagmaRiseStart) {
       this.onMagmaRiseStart();
@@ -686,21 +712,37 @@ export class CraterMap {
   }
 
   update(delta) {
+    if (delta > 0.1) delta = 0.1;
     this.magmaTime += delta;
 
-    // 1. Rising Magma Logic
+    // 1. Rising Magma Logic (always creeping up, accelerated on alarm!)
     if (this.isMagmaRising && this.magmaLevel < this.maxMagmaLevel) {
       this.magmaLevel += this.magmaRisingSpeed * delta;
       this.lavaMesh.position.y = this.magmaLevel;
       this.magmaLight.position.y = this.magmaLevel + 2.5;
     }
 
-    // 2. Magma surface bubbling undulation
-    if (this.lavaMat && this.lavaMat.map) {
-      this.lavaMat.map.offset.x = (this.magmaTime * 0.04) % 1;
-      this.lavaMat.map.offset.y = (this.magmaTime * 0.03) % 1;
+    // 2. Magma surface 3D bubbling undulation waves
+    if (this.lavaMesh && this.lavaMesh.geometry) {
+      const posAttr = this.lavaMesh.geometry.attributes.position;
+      const count = posAttr.count;
+      const t = this.magmaTime;
+      for (let i = 0; i < count; i++) {
+        const vx = posAttr.getX(i);
+        const vy = posAttr.getY(i);
+        const wave = Math.sin(t * 3.4 + vx * 0.32) * 0.28 +
+                     Math.cos(t * 2.7 + vy * 0.32) * 0.22;
+        posAttr.setZ(i, wave);
+      }
+      posAttr.needsUpdate = true;
     }
-    this.magmaLight.intensity = 3.2 + Math.sin(this.magmaTime * 6) * 0.6;
+
+    if (this.lavaMat && this.lavaMat.map) {
+      this.lavaMat.map.offset.x = (this.magmaTime * 0.06) % 1;
+      this.lavaMat.map.offset.y = (this.magmaTime * 0.04) % 1;
+      this.lavaMat.emissiveIntensity = 0.8 + Math.sin(this.magmaTime * 4.0) * 0.3;
+    }
+    this.magmaLight.intensity = 3.2 + Math.sin(this.magmaTime * 6) * 0.8;
 
     // 3. Crumbling Platforms Update
     for (const p of this.crumblingPlatforms) {
@@ -783,7 +825,10 @@ export class CraterMap {
 
   reset() {
     this.magmaLevel = this.initialMagmaLevel;
-    this.isMagmaRising = false;
+    this.isMagmaRising = true;
+    this.isRapidRise = false;
+    this.magmaRisingSpeed = this.magmaBaseSpeed;
+    this.magmaTime = 0;
     this.lavaMesh.position.y = this.magmaLevel;
     this.magmaLight.position.y = this.magmaLevel + 2.5;
 

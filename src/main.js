@@ -50,10 +50,10 @@ class Game {
   }
 
   initThree() {
-    // Renderer
+    // Renderer (optimized pixel ratio for smooth 60fps)
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
     this.container.appendChild(this.renderer.domElement);
@@ -245,6 +245,10 @@ class Game {
   }
 
   resetPositions() {
+    if (this.map && typeof this.map.reset === 'function') {
+      this.map.reset();
+    }
+
     const playerSpawn = this.map.getRandomSpawnPoint();
     this.player.spawnAt(playerSpawn);
 
@@ -1356,10 +1360,11 @@ class Game {
         // Update Player
         this.player.update(delta);
 
-        // Update altitude display in crater
+        // Update altitude and rising magma display in crater
         if (this.currentMapType === 'crater' && this.dom.hudAltitudeValue) {
           const altMeters = Math.max(0, this.player.position.y).toFixed(0);
-          this.dom.hudAltitudeValue.textContent = `${altMeters}m`;
+          const magmaMeters = this.map && this.map.magmaLevel !== undefined ? this.map.magmaLevel.toFixed(1) : '0';
+          this.dom.hudAltitudeValue.textContent = `${altMeters}m (Лава: ${magmaMeters}m)`;
         }
       }
 
