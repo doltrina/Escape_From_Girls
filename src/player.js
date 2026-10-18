@@ -63,6 +63,15 @@ export class Player {
     this.extraLives = 0;
     this.invulnerabilityTimer = 0;
 
+    // Downed / Co-op Rescue State
+    this.isDowned = false;
+    this.downedTimer = 25.0;
+    this.targetEyeHeight = this.eyeHeight;
+    this.currentEyeHeight = this.eyeHeight;
+    this.revivingTarget = null;
+    this.reviveHoldTime = 0;
+    this.isHoldingRevive = false;
+
     // Inventory System
     this.inventory = {
       forcefield: 0,
@@ -73,9 +82,28 @@ export class Player {
     this.onInventoryChange = null;
     this.onItemUsed = null;
     this.onPassiveItemClicked = null;
+    this.onDownedStateChange = null;
 
     this.isLocked = false;
     this.setupInputs();
+  }
+
+  setDowned(downed) {
+    this.isDowned = downed;
+    if (this.isDowned) {
+      this.downedTimer = 25.0;
+      this.targetEyeHeight = 0.45;
+      this.shieldActive = false;
+      this.shieldTimeRemaining = 0;
+      this.speedBoostTimeRemaining = 0;
+    } else {
+      this.targetEyeHeight = this.eyeHeight;
+      this.invulnerabilityTimer = 3.5; // Brief grace period after revive
+      this.stamina = 100;
+    }
+    if (this.onDownedStateChange) {
+      this.onDownedStateChange(this.isDowned);
+    }
   }
 
   initFlashlight() {
@@ -121,6 +149,11 @@ export class Player {
 
     // Keyboard inputs
     window.addEventListener('keydown', (e) => {
+      // Ignore if typing in text inputs or chat
+      if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
+        return;
+      }
+
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
         e.preventDefault();
       }
@@ -144,33 +177,36 @@ export class Player {
           break;
         case 'ShiftLeft':
         case 'ShiftRight':
-          this.keys.sprint = true;
+          if (!this.isDowned) this.keys.sprint = true;
           break;
         case 'Space':
           this.keys.jump = true;
-          if (this.isGrounded) {
+          if (this.isGrounded && !this.isDowned) {
             this.verticalVelocity = this.jumpForce;
             this.isGrounded = false;
           }
+          break;
+        case 'KeyE':
+          this.isHoldingRevive = true;
           break;
         case 'KeyF':
           this.toggleFlashlight();
           break;
         case 'Digit1':
         case 'Numpad1':
-          this.useItem('forcefield');
+          if (!this.isDowned) this.useItem('forcefield');
           break;
         case 'Digit2':
         case 'Numpad2':
-          this.useItem('energy_drink');
+          if (!this.isDowned) this.useItem('energy_drink');
           break;
         case 'Digit3':
         case 'Numpad3':
-          this.useItem('dakimakura');
+          if (!this.isDowned) this.useItem('dakimakura');
           break;
         case 'Digit4':
         case 'Numpad4':
-          this.useItem('d20_dice');
+          if (!this.isDowned) this.useItem('d20_dice');
           break;
       }
     });
@@ -200,6 +236,9 @@ export class Player {
         case 'Space':
           this.keys.jump = false;
           break;
+        case 'KeyE':
+          this.isHoldingRevive = false;
+          break;
       }
     });
   }
@@ -215,6 +254,8 @@ export class Player {
     this.speedBoostTimeRemaining = 0;
     this.extraLives = 0;
     this.invulnerabilityTimer = 0;
+    this.setDowned(false);
+    this.currentEyeHeight = this.eyeHeight;
     this.inventory = {
       forcefield: 0,
       energy_drink: 0,
@@ -239,6 +280,14 @@ export class Player {
       this.invulnerabilityTimer -= delta;
     }
 
+    // Downed timer handling
+    if (this.isDowned) {
+      this.downedTimer = Math.max(0, this.downedTimer - delta);
+    }
+
+    // Smooth camera eye height
+    this.currentEyeHeight = THREE.MathUtils.lerp(this.currentEyeHeight, this.targetEyeHeight, 8 * delta);
+
     const hasSpeedBoost = this.speedBoostTimeRemaining > 0;
     if (hasSpeedBoost) {
       this.speedBoostTimeRemaining -= delta;
@@ -246,10 +295,15 @@ export class Player {
 
     // Determine target speed & stamina
     let isMoving = this.keys.forward || this.keys.backward || this.keys.left || this.keys.right;
-    let wantsSprint = this.keys.sprint && isMoving && !this.isExhausted;
+    let wantsSprint = this.keys.sprint && isMoving && !this.isExhausted && !this.isDowned;
 
     let targetSpeed = this.walkSpeed;
-    if (hasSpeedBoost) {
+    if (this.isDowned) {
+      // Crawling when downed
+      targetSpeed = 1.5;
+      wantsSprint = false;
+      this.stamina = 0;
+    } else if (hasSpeedBoost) {
       targetSpeed = this.sprintSpeed * 1.35;
       wantsSprint = true;
     } else if (wantsSprint && this.stamina > 0) {
@@ -312,7 +366,7 @@ export class Player {
     // Head bobbing effect
     const horizontalSpeed = Math.hypot(this.velocity.x, this.velocity.z);
     let bobOffset = 0;
-    if (this.isGrounded && horizontalSpeed > 0.5) {
+    if (this.isGrounded && horizontalSpeed > 0.5 && !this.isDowned) {
       const bobFreq = wantsSprint ? 14 : 9;
       this.bobTimer += delta * bobFreq;
       bobOffset = Math.sin(this.bobTimer) * (wantsSprint ? 0.08 : 0.04);
@@ -327,7 +381,8 @@ export class Player {
     }
 
     // Update Camera Position and Rotation
-    this.camera.position.set(this.position.x, this.position.y + bobOffset, this.position.z);
+    const camY = (this.position.y - this.eyeHeight) + this.currentEyeHeight + bobOffset;
+    this.camera.position.set(this.position.x, camY, this.position.z);
     this.camera.rotation.order = 'YXZ';
     this.camera.rotation.y = this.yaw;
     this.camera.rotation.x = this.pitch;

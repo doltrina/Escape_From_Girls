@@ -167,18 +167,78 @@ export class NextbotGirl {
     }
   }
 
-  update(delta, player, elapsedTime) {
+  applyNetworkUpdate(data) {
+    if (data.x !== undefined && data.z !== undefined) {
+      if (!this.targetNetPos) this.targetNetPos = new THREE.Vector3();
+      this.targetNetPos.set(data.x, 0, data.z);
+    }
+    if (data.stunTimer !== undefined) this.stunTimer = data.stunTimer;
+    if (data.distractedTimer !== undefined) this.distractedTimer = data.distractedTimer;
+  }
+
+  update(delta, player, elapsedTime, remotePlayers = [], isHost = true) {
     if (delta > 0.1) delta = 0.1;
+
+    // Non-host client synchronization: smoothly follow host's authoritative nextbot position
+    if (!isHost && this.targetNetPos) {
+      this.position.lerp(this.targetNetPos, 16 * delta);
+      this.meshGroup.position.set(this.position.x, 0, this.position.z);
+      this.meshGroup.lookAt(player.camera.position.x, this.meshGroup.position.y, player.camera.position.z);
+      this.bobTimer += delta * 6;
+      this.spriteMesh.rotation.z = Math.sin(this.bobTimer * 4) * 0.12;
+
+      const toLocalP = new THREE.Vector3().subVectors(player.position, this.position);
+      toLocalP.y = 0;
+      const dist = toLocalP.length();
+      soundEngine.updateChaseDistance(dist, 38);
+      return dist;
+    }
 
     // Difficulty scaling: speed increases slightly over survival time
     this.speedMultiplier = 1.0 + Math.floor(elapsedTime / 20) * 0.05;
     this.currentSpeed = this.baseSpeed * this.speedMultiplier;
 
+    // Pick closest active (non-downed) target among local player and remote players
+    let currentTarget = player;
+    let minDist = 999999;
+
+    const candidates = [];
+    if (!player.isDowned) {
+      candidates.push({ pos: player.position, entity: player });
+    }
+    for (const rp of remotePlayers) {
+      if (!rp.isDowned) {
+        candidates.push({ pos: rp.root.position, entity: rp });
+      }
+    }
+
+    // If everyone is downed, still target closest for final catch
+    if (candidates.length === 0) {
+      candidates.push({ pos: player.position, entity: player });
+      for (const rp of remotePlayers) {
+        candidates.push({ pos: rp.root.position, entity: rp });
+      }
+    }
+
+    for (const cand of candidates) {
+      const d = Math.hypot(cand.pos.x - this.position.x, cand.pos.z - this.position.z);
+      if (d < minDist) {
+        minDist = d;
+        currentTarget = cand.entity;
+      }
+    }
+
+    const targetPos = (currentTarget === player) ? player.position : currentTarget.root.position;
+    const toTarget = new THREE.Vector3().subVectors(targetPos, this.position);
+    toTarget.y = 0;
+    const distToTarget = toTarget.length();
+
+    // Distance to local player for local audio spatialization
     const toPlayer = new THREE.Vector3().subVectors(player.position, this.position);
     toPlayer.y = 0;
     const distToPlayer = toPlayer.length();
 
-    // Spatial chase music & heartbeat distance update
+    // Spatial chase music & heartbeat distance update for local player
     soundEngine.updateChaseDistance(distToPlayer, 38);
 
     // If currently stunned from a shield blast or D20 save
@@ -198,9 +258,7 @@ export class NextbotGirl {
       this.spriteMesh.rotation.z = Math.sin(performance.now() * 0.02) * 0.28;
       this.meshGroup.lookAt(player.camera.position.x, this.meshGroup.position.y, player.camera.position.z);
 
-      const toP = new THREE.Vector3().subVectors(player.position, this.position);
-      toP.y = 0;
-      return toP.length();
+      return distToPlayer;
     }
 
     // If distracted by dakimakura decoy
@@ -216,16 +274,16 @@ export class NextbotGirl {
     }
 
     // Nextbot Navigation Logic
-    const hasLOS = this.map.hasLineOfSight(this.position, player.position);
+    const hasLOS = this.map.hasLineOfSight(this.position, targetPos);
 
     let moveDir = new THREE.Vector3();
 
     if (hasLOS) {
-      // Direct chase
-      moveDir.copy(toPlayer).normalize();
+      // Direct chase towards currentTarget
+      moveDir.copy(toTarget).normalize();
     } else {
       // Obstacle avoidance navigation: probe forward and angled rays
-      const idealDir = toPlayer.clone().normalize();
+      const idealDir = toTarget.clone().normalize();
       moveDir.copy(idealDir);
 
       const angles = [0, 0.45, -0.45, 0.9, -0.9, 1.4, -1.4];

@@ -1051,3 +1051,569 @@ body, html {
   transform: translateY(-2px);
 }
 
+/* ==================== 👥 CO-OP ONLINE MULTIPLAYER STYLES ==================== */
+.mode-select-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+}
+
+.mode-btn {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 14px !important;
+  padding: 16px 20px !important;
+  text-align: left !important;
+  border-radius: 14px !important;
+  text-decoration: none !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.btn-icon {
+  font-size: 32px;
+  line-height: 1;
+  filter: drop-shadow(0 0 8px rgba(0, 243, 255, 0.5));
+}
+
+.mode-btn-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mode-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.mode-desc {
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.8;
+  line-height: 1.3;
+}
+
+.coop-launch-btn {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(0, 243, 255, 0.3) 100%) !important;
+  border: 1px solid rgba(168, 85, 247, 0.6) !important;
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.3), inset 0 0 15px rgba(0, 243, 255, 0.15) !important;
+}
+
+.coop-launch-btn:hover {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.5) 0%, rgba(0, 243, 255, 0.5) 100%) !important;
+  border-color: #00f3ff !important;
+  box-shadow: 0 0 35px rgba(0, 243, 255, 0.5) !important;
+  transform: translateY(-2px);
+}
+
+/* Co-op Lobby Modal */
+#coop-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 6, 10, 0.88);
+  backdrop-filter: blur(14px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+#coop-modal.hidden {
+  display: none !important;
+}
+
+.coop-card {
+  max-width: 680px;
+  width: 100%;
+  background: rgba(14, 18, 28, 0.95);
+  border: 1px solid rgba(0, 243, 255, 0.3);
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 243, 255, 0.2);
+}
+
+.coop-player-setup {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.setup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setup-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.setup-field input[type="text"] {
+  background: rgba(10, 14, 22, 0.8);
+  border: 1px solid rgba(0, 243, 255, 0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #fff;
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.setup-field input[type="text"]:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+}
+
+.color-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+}
+
+.color-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+}
+
+.color-dot:hover {
+  transform: scale(1.15);
+}
+
+.color-dot.active {
+  border-color: #ffffff;
+  box-shadow: 0 0 14px currentColor, 0 0 4px #fff;
+  transform: scale(1.2);
+}
+
+/* Matchmaking actions */
+.coop-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.coop-action-card {
+  background: rgba(20, 26, 38, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  transition: all 0.25s;
+}
+
+.coop-action-card:hover {
+  border-color: rgba(0, 243, 255, 0.4);
+  background: rgba(20, 26, 38, 0.9);
+}
+
+.coop-action-card h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--cyan);
+}
+
+.coop-action-card p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.coop-join-row {
+  display: flex;
+  gap: 8px;
+}
+
+.coop-join-row input {
+  flex: 1;
+  background: rgba(10, 14, 22, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #fff;
+  font-family: 'Rajdhani', monospace;
+  font-size: 16px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Room View in Lobby */
+.room-status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0, 243, 255, 0.08);
+  border: 1px solid rgba(0, 243, 255, 0.3);
+  border-radius: 10px;
+  padding: 12px 18px;
+  margin-bottom: 16px;
+}
+
+.room-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 18px;
+}
+
+.room-badge strong {
+  font-size: 22px;
+  color: var(--cyan);
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+}
+
+.btn-copy-code {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-copy-code:hover {
+  background: rgba(0, 243, 255, 0.25);
+  border-color: var(--cyan);
+}
+
+.room-players-count {
+  font-weight: 700;
+  color: var(--amber);
+  font-size: 15px;
+}
+
+.coop-player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+}
+
+.coop-player-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 16px;
+}
+
+.player-item-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.player-avatar-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.player-item-name {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.player-item-badge {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
+
+.player-item-badge.host {
+  background: rgba(255, 170, 0, 0.2);
+  color: var(--amber);
+  border: 1px solid rgba(255, 170, 0, 0.4);
+}
+
+.coop-lobby-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.waiting-notice {
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-style: italic;
+  padding: 8px;
+  animation: pulseOpacity 2s infinite ease-in-out;
+}
+
+@keyframes pulseOpacity {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Co-op Squad HUD in game */
+.coop-squad-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 14px;
+}
+
+.squad-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--cyan);
+  letter-spacing: 1px;
+}
+
+.squad-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.squad-member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.squad-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.squad-status-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.squad-status-text.downed {
+  color: var(--red);
+  font-weight: 800;
+  animation: blinkRed 0.8s infinite;
+}
+
+@keyframes blinkRed {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Revive Interaction Prompt */
+.revive-prompt {
+  position: absolute;
+  top: 55%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(14, 18, 28, 0.92);
+  border: 2px solid #00f3ff;
+  border-radius: 36px;
+  padding: 12px 24px;
+  box-shadow: 0 0 35px rgba(0, 243, 255, 0.5), inset 0 0 15px rgba(0, 243, 255, 0.2);
+  z-index: 100;
+  pointer-events: none;
+  animation: bounceIn 0.3s ease-out;
+}
+
+.revive-prompt.hidden {
+  display: none !important;
+}
+
+.revive-progress-ring {
+  position: relative;
+  width: 44px;
+  height: 44px;
+}
+
+.revive-progress-ring svg {
+  transform: rotate(-90deg);
+  width: 100%;
+  height: 100%;
+}
+
+.revive-bg-ring {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 4;
+}
+
+.revive-fill-ring {
+  fill: none;
+  stroke: #39ff14;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 113;
+  stroke-dashoffset: 113; /* Controlled by JS 113 to 0 */
+  transition: stroke-dashoffset 0.05s linear;
+}
+
+.revive-key {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  color: #fff;
+}
+
+.revive-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.revive-text strong {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 18px;
+  color: #39ff14;
+  letter-spacing: 1px;
+}
+
+.revive-text span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Downed Banner */
+.downed-banner {
+  position: absolute;
+  top: 25%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(40, 6, 14, 0.92);
+  border: 2px solid #ff0044;
+  border-radius: 20px;
+  padding: 20px 40px;
+  text-align: center;
+  box-shadow: 0 0 60px rgba(255, 0, 68, 0.7);
+  z-index: 90;
+  pointer-events: none;
+  animation: pulseDowned 1.5s infinite alternate;
+}
+
+.downed-banner.hidden {
+  display: none !important;
+}
+
+.downed-banner h2 {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 32px;
+  font-weight: 900;
+  color: #ff2255;
+  letter-spacing: 2px;
+  text-shadow: 0 0 20px rgba(255, 34, 85, 0.8);
+}
+
+.downed-banner p {
+  font-size: 16px;
+  color: #ffd4dc;
+  margin-top: 6px;
+}
+
+@keyframes pulseDowned {
+  from { transform: translate(-50%, -50%) scale(0.98); box-shadow: 0 0 40px rgba(255, 0, 68, 0.4); }
+  to { transform: translate(-50%, -50%) scale(1.02); box-shadow: 0 0 70px rgba(255, 0, 68, 0.8); }
+}
+
+/* In-Game Chat Box */
+.hud-chat-box {
+  position: absolute;
+  bottom: 110px;
+  left: 32px;
+  width: 380px;
+  max-width: calc(100vw - 64px);
+  background: rgba(10, 14, 22, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: auto;
+  z-index: 80;
+  transition: opacity 0.2s;
+}
+
+.hud-chat-box.hidden {
+  display: none !important;
+}
+
+.chat-logs {
+  max-height: 140px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  padding-right: 4px;
+}
+
+.chat-msg {
+  display: flex;
+  gap: 6px;
+  line-height: 1.3;
+}
+
+.chat-sender {
+  font-weight: 700;
+}
+
+.chat-content {
+  color: #e2e8f0;
+  word-break: break-word;
+}
+
+.chat-input-bar input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(0, 243, 255, 0.3);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #fff;
+  font-size: 13px;
+  font-family: 'Outfit', sans-serif;
+  outline: none;
+}
+
+.chat-input-bar input:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.4);
+}
+
+

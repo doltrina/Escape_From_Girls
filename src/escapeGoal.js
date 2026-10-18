@@ -310,6 +310,7 @@ export class EscapeGoalManager {
 
       this.keys.push({
         id: idx + 1,
+        index: idx,
         name: loc.name,
         position: pos,
         group,
@@ -327,6 +328,30 @@ export class EscapeGoalManager {
     }
   }
 
+  collectKeyByIndex(index, isLocal = false) {
+    const k = this.keys.find(item => item.index === index);
+    if (k && !k.collected) {
+      k.collected = true;
+      this.keysCollected++;
+      this.scene.remove(k.group);
+      this.updateLockLeds();
+      soundEngine.playKeyPickup();
+
+      if (this.onKeysChange) {
+        this.onKeysChange(this.keysCollected, this.totalKeys);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  triggerDoorOpenSequence() {
+    if (!this.doorOpening && !this.isDoorOpened) {
+      this.doorOpening = true;
+      soundEngine.playDoorOpen();
+    }
+  }
+
   reset() {
     // Reset door opening progress
     this.isDoorOpened = false;
@@ -341,7 +366,7 @@ export class EscapeGoalManager {
 
   update(delta, playerPos) {
     // 1. Animate Keys and check pickups
-    for (let i = this.keys.length - 1; i >= 0; i--) {
+    for (let i = 0; i < this.keys.length; i++) {
       const k = this.keys[i];
       if (k.collected) continue;
 
@@ -355,18 +380,10 @@ export class EscapeGoalManager {
       // Distance to player
       const dist = Math.hypot(k.position.x - playerPos.x, k.position.z - playerPos.z);
       if (dist < 1.35) {
-        // Collected!
-        k.collected = true;
-        this.keysCollected++;
-        soundEngine.playKeyPickup();
-
-        this.scene.remove(k.group);
-        this.keys.splice(i, 1);
-
-        this.updateLockLeds();
-
-        if (this.onKeysChange) {
-          this.onKeysChange(this.keysCollected, this.totalKeys);
+        // Collected by local player!
+        const collected = this.collectKeyByIndex(k.index, true);
+        if (collected && this.onLocalKeyCollected) {
+          this.onLocalKeyCollected(k.index);
         }
       }
     }
@@ -392,8 +409,10 @@ export class EscapeGoalManager {
     if (distToDoor < 2.4) {
       if (this.keysCollected >= this.totalKeys) {
         // Trigger door opening sequence!
-        this.doorOpening = true;
-        soundEngine.playDoorOpen();
+        this.triggerDoorOpenSequence();
+        if (this.onLocalDoorReached) {
+          this.onLocalDoorReached();
+        }
       } else {
         // Locked! Rate-limit locked sound/feedback
         const now = performance.now();

@@ -6,6 +6,8 @@ import { ShieldManager } from './shields.js';
 import { EscapeGoalManager } from './escapeGoal.js';
 import { soundEngine } from './audio.js';
 import { assetManager } from './customAssets.js';
+import { networkManager } from './multiplayer.js';
+import { RemotePlayer } from './remotePlayer.js';
 
 // Game States
 const STATE = {
@@ -24,11 +26,20 @@ class Game {
     this.highScore = parseFloat(localStorage.getItem('virginity_record') || '0');
     this.lastShieldRepelTime = 0;
 
+    // Multiplayer State
+    this.isMultiplayer = false;
+    this.remotePlayers = new Map(); // id -> RemotePlayer
+    this.selectedColor = localStorage.getItem('coop_player_color') || '#00f3ff';
+    this.reviveProgress = 0;
+    this.reviveTarget = null;
+    this.chatOpen = false;
+
     this.container = document.getElementById('game-canvas');
     this.initThree();
     this.initUI();
     this.initGameEntities();
     this.initCustomAssets();
+    this.initCoopNetworking();
 
     this.clock = new THREE.Clock();
     this.animate = this.animate.bind(this);
@@ -97,6 +108,18 @@ class Game {
       }
     };
 
+    this.escapeGoal.onLocalKeyCollected = (keyIndex) => {
+      if (this.isMultiplayer) {
+        networkManager.sendKeyCollected(keyIndex, networkManager.playerName);
+      }
+    };
+
+    this.escapeGoal.onLocalDoorReached = () => {
+      if (this.isMultiplayer) {
+        networkManager.sendDoorEscaped(networkManager.playerName);
+      }
+    };
+
     this.escapeGoal.onDoorAttemptLocked = (collected, total) => {
       this.showToast(`🔒 ДВЕРЬ ЗАПЕРТА: Нужно собрать все 3 ключа! (${collected}/${total})`);
     };
@@ -114,6 +137,9 @@ class Game {
       if (itemType === 'dakimakura') {
         this.shieldManager.spawnDroppedDecoy(pos, this.girl, 5.0);
         this.showToast('🎎 ТЫ БРОСИЛ ДАКИМАКУРУ! ДЕВУШКА ОТВЛЕКЛАСЬ НА 5 СЕК!');
+        if (this.isMultiplayer) {
+          networkManager.sendDecoyDropped(pos, 5.0, networkManager.playerName);
+        }
       }
     };
 
@@ -234,7 +260,40 @@ class Game {
       btnVictorySettings: document.getElementById('btn-victory-settings'),
       vicTime: document.getElementById('vic-time'),
       vicKeys: document.getElementById('vic-keys'),
-      vicShields: document.getElementById('vic-shields')
+      vicShields: document.getElementById('vic-shields'),
+
+      // Co-op Multiplayer UI
+      btnOpenCoop: document.getElementById('btn-open-coop'),
+      coopModal: document.getElementById('coop-modal'),
+      btnCloseCoop: document.getElementById('btn-close-coop'),
+      coopNameInput: document.getElementById('coop-name-input'),
+      colorPickerRow: document.getElementById('color-picker-row'),
+      coopConnectView: document.getElementById('coop-connect-view'),
+      coopRoomView: document.getElementById('coop-room-view'),
+      btnCoopQuick: document.getElementById('btn-coop-quick'),
+      btnCoopCreate: document.getElementById('btn-coop-create'),
+      coopRoomCodeInput: document.getElementById('coop-room-code-input'),
+      btnCoopJoin: document.getElementById('btn-coop-join'),
+      coopDisplayRoom: document.getElementById('coop-display-room'),
+      btnCopyRoomCode: document.getElementById('btn-copy-room-code'),
+      coopPlayersCount: document.getElementById('coop-players-count'),
+      coopPlayerList: document.getElementById('coop-player-list'),
+      btnCoopLeave: document.getElementById('btn-coop-leave'),
+      btnCoopStartGame: document.getElementById('btn-coop-start-game'),
+      coopWaitingHostNotice: document.getElementById('coop-waiting-host-notice'),
+
+      // In-game Co-op HUD
+      hudCoopSquad: document.getElementById('hud-coop-squad'),
+      squadList: document.getElementById('squad-list'),
+      hudRevivePrompt: document.getElementById('hud-revive-prompt'),
+      reviveRingFill: document.getElementById('revive-ring-fill'),
+      reviveTargetName: document.getElementById('revive-target-name'),
+      hudDownedBanner: document.getElementById('hud-downed-banner'),
+      downedTimerNum: document.getElementById('downed-timer-num'),
+      hudChatBox: document.getElementById('hud-chat-box'),
+      chatLogs: document.getElementById('chat-logs'),
+      chatForm: document.getElementById('chat-form'),
+      chatInput: document.getElementById('chat-input')
     };
 
     this.hasValidVideo = false;
@@ -735,6 +794,24 @@ class Game {
   }
 
   startGame() {
+    this.isMultiplayer = false;
+    if (networkManager.isConnected) {
+      networkManager.disconnect();
+    }
+    for (const rp of this.remotePlayers.values()) {
+      rp.destroy();
+    }
+    this.remotePlayers.clear();
+    if (this.dom.hudCoopSquad) {
+      this.dom.hudCoopSquad.classList.add('hidden');
+    }
+    if (this.dom.hudDownedBanner) {
+      this.dom.hudDownedBanner.classList.add('hidden');
+    }
+    if (this.dom.hudRevivePrompt) {
+      this.dom.hudRevivePrompt.classList.add('hidden');
+    }
+
     this.state = STATE.PLAYING;
     this.elapsedTime = 0;
     this.shieldsCollected = 0;
@@ -978,8 +1055,43 @@ class Game {
       // Update Player
       this.player.update(delta);
 
+      // In Multiplayer: update remote avatars and send transform
+      if (this.isMultiplayer) {
+        for (const rp of this.remotePlayers.values()) {
+          rp.update(delta, this.camera);
+        }
+
+        const isMoving = this.player.keys.forward || this.player.keys.backward || this.player.keys.left || this.player.keys.right;
+        const wantsSprint = this.player.keys.sprint && isMoving && !this.player.isExhausted && !this.player.isDowned;
+        networkManager.sendPlayerUpdate(
+          this.player.position,
+          this.player.yaw,
+          this.player.pitch,
+          isMoving,
+          wantsSprint,
+          this.player.flashlightOn,
+          this.player.shieldActive,
+          this.player.isDowned
+        );
+
+        if (networkManager.isHost) {
+          networkManager.sendNextbotUpdate(
+            this.girl.position,
+            this.girl.meshGroup.rotation.y,
+            'target',
+            this.girl.stunTimer,
+            this.girl.distractedTimer,
+            this.girl.currentSpeed
+          );
+        }
+
+        this.updateSquadHUD();
+        this.updateReviveMechanic(delta);
+      }
+
       // Update Girl Nextbot AI
-      const distToGirl = this.girl.update(delta, this.player, this.elapsedTime);
+      const remoteList = Array.from(this.remotePlayers.values());
+      const distToGirl = this.girl.update(delta, this.player, this.elapsedTime, remoteList, !this.isMultiplayer || networkManager.isHost);
 
       // Check Keys and Exit Door
       this.escapeGoal.update(delta, this.player.position);
@@ -1000,7 +1112,7 @@ class Game {
       if (distToGirl < 1.7) {
         const now = performance.now();
 
-        // 1. Invulnerability frames active (e.g., player was just saved by D20)
+        // 1. Invulnerability frames active (e.g., player was just saved by D20 or revived)
         if (this.player.invulnerabilityTimer > 0) {
           // Softly push girl away so she doesn't stick inside player
           this.girl.repelFrom(this.player.position, 16.0, 4.0);
@@ -1012,6 +1124,9 @@ class Game {
             this.lastShieldRepelTime = now;
             this.girl.repelFrom(this.player.position, 26.0, 7.5);
             this.showToast('💥 СИЛОВОЕ ПОЛЕ ОТБРОСИЛО ДЕВУШКУ!');
+            if (this.isMultiplayer) {
+              networkManager.sendShieldRepelGirl(this.player.position, 26.0);
+            }
           }
         }
         // 3. D20 Extra Life Passive Save
@@ -1020,14 +1135,17 @@ class Game {
           if (saved) {
             this.girl.repelFrom(this.player.position, 22.0, 6.5);
             this.showToast(`🎲 D20 СПАСЕНИЕ! Осталось костей: ${this.player.inventory.d20_dice}. БЕГИ!`);
+            if (this.isMultiplayer) {
+              networkManager.sendShieldRepelGirl(this.player.position, 22.0);
+            }
           } else {
-            this.triggerGameOver();
+            this.handlePlayerCaught();
             return;
           }
         }
-        // 4. No protection left -> Caught -> Game Over!
+        // 4. No protection left -> Caught!
         else {
-          this.triggerGameOver();
+          this.handlePlayerCaught();
           return;
         }
       }
@@ -1102,6 +1220,471 @@ class Game {
       this.dom.activeBuffCard.style.borderColor = 'var(--green)';
     } else {
       this.dom.activeBuffCard.style.display = 'none';
+    }
+  }
+
+  handlePlayerCaught() {
+    if (!this.isMultiplayer) {
+      this.triggerGameOver();
+      return;
+    }
+
+    // In Co-op Multiplayer: Downed state with rescue chance!
+    if (!this.player.isDowned) {
+      this.player.setDowned(true);
+      this.girl.repelFrom(this.player.position, 14.0, 4.0);
+      networkManager.sendPlayerDowned(this.player.position, networkManager.playerName);
+      this.showToast('🆘 ТЕБЯ ЗАГНАЛИ В УГОЛ! ЗОВИ НАПАРНИКА НА ПОМОЩЬ [E]!');
+      soundEngine.playNextbotRespawn();
+    }
+  }
+
+  initCoopNetworking() {
+    // 1. Player setup & Color picker
+    if (this.dom.coopNameInput) {
+      this.dom.coopNameInput.value = localStorage.getItem('coop_player_name') || 'Самурай';
+      this.dom.coopNameInput.addEventListener('input', () => {
+        localStorage.setItem('coop_player_name', this.dom.coopNameInput.value.trim() || 'Самурай');
+      });
+    }
+
+    if (this.dom.colorPickerRow) {
+      const dots = this.dom.colorPickerRow.querySelectorAll('.color-dot');
+      dots.forEach((dot) => {
+        if (dot.dataset.color === this.selectedColor) {
+          dots.forEach(d => d.classList.remove('active'));
+          dot.classList.add('active');
+        }
+        dot.addEventListener('click', () => {
+          dots.forEach(d => d.classList.remove('active'));
+          dot.classList.add('active');
+          this.selectedColor = dot.dataset.color;
+          localStorage.setItem('coop_player_color', this.selectedColor);
+        });
+      });
+    }
+
+    // 2. Open / Close Co-op Modal
+    if (this.dom.btnOpenCoop) {
+      this.dom.btnOpenCoop.addEventListener('click', () => {
+        if (this.dom.coopModal) this.dom.coopModal.classList.remove('hidden');
+      });
+    }
+
+    if (this.dom.btnCloseCoop) {
+      this.dom.btnCloseCoop.addEventListener('click', () => {
+        if (this.dom.coopModal) this.dom.coopModal.classList.add('hidden');
+      });
+    }
+
+    const connectToRoom = (roomId) => {
+      const name = (this.dom.coopNameInput ? this.dom.coopNameInput.value : 'Самурай').trim() || 'Самурай';
+      this.showToast(`Подключение к комнате ${roomId}...`);
+      networkManager.connect(roomId, name, this.selectedColor)
+        .then(() => {
+          this.dom.coopConnectView.classList.add('hidden');
+          this.dom.coopRoomView.classList.remove('hidden');
+        })
+        .catch((err) => {
+          console.error(err);
+          this.showToast('❌ Ошибка подключения к серверу коопа');
+        });
+    };
+
+    if (this.dom.btnCoopQuick) {
+      this.dom.btnCoopQuick.addEventListener('click', () => {
+        connectToRoom('PUBLIC');
+      });
+    }
+
+    if (this.dom.btnCoopCreate) {
+      this.dom.btnCoopCreate.addEventListener('click', () => {
+        const randomCode = 'BRO' + Math.floor(100 + Math.random() * 900);
+        connectToRoom(randomCode);
+      });
+    }
+
+    if (this.dom.btnCoopJoin) {
+      this.dom.btnCoopJoin.addEventListener('click', () => {
+        const code = (this.dom.coopRoomCodeInput.value || '').trim();
+        if (code) {
+          connectToRoom(code);
+        } else {
+          this.showToast('Введи код комнаты!');
+        }
+      });
+    }
+
+    if (this.dom.btnCopyRoomCode) {
+      this.dom.btnCopyRoomCode.addEventListener('click', () => {
+        if (networkManager.roomId) {
+          navigator.clipboard.writeText(networkManager.roomId).then(() => {
+            this.showToast('📋 Код комнаты скопирован!');
+          });
+        }
+      });
+    }
+
+    if (this.dom.btnCoopLeave) {
+      this.dom.btnCoopLeave.addEventListener('click', () => {
+        networkManager.disconnect();
+        this.dom.coopRoomView.classList.add('hidden');
+        this.dom.coopConnectView.classList.remove('hidden');
+        this.showToast('Вы вышли из комнаты');
+      });
+    }
+
+    if (this.dom.btnCoopStartGame) {
+      this.dom.btnCoopStartGame.addEventListener('click', () => {
+        networkManager.sendStartGame();
+      });
+    }
+
+    // 3. In-Game Chat Handling
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyT' && this.state === STATE.PLAYING && !this.chatOpen) {
+        e.preventDefault();
+        this.openChat();
+      } else if (e.code === 'Escape' && this.chatOpen) {
+        this.closeChat();
+      }
+    });
+
+    if (this.dom.chatForm) {
+      this.dom.chatForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = (this.dom.chatInput.value || '').trim();
+        if (text) {
+          networkManager.sendChatMessage(text);
+          this.addChatMessage(networkManager.playerName, text, true);
+          this.dom.chatInput.value = '';
+        }
+        this.closeChat();
+      });
+    }
+
+    // 4. WebSocket Event Listeners
+    networkManager.onRoomJoined = (msg) => {
+      this.dom.coopDisplayRoom.textContent = msg.roomId;
+      this.renderLobbyPlayers(msg.players);
+    };
+
+    networkManager.onPlayerJoined = (player, players) => {
+      this.renderLobbyPlayers(players);
+      this.showToast(`👥 ${player.name} присоединился к побегу!`);
+    };
+
+    networkManager.onPlayerLeft = (id, name, players) => {
+      this.renderLobbyPlayers(players);
+      const rp = this.remotePlayers.get(id);
+      if (rp) {
+        rp.destroy();
+        this.remotePlayers.delete(id);
+      }
+      this.showToast(`🚪 ${name} покинул игру`);
+    };
+
+    networkManager.onGameStarted = (msg) => {
+      this.startMultiplayerGame(msg);
+    };
+
+    networkManager.onPlayerUpdate = (data) => {
+      if (data.playerId === networkManager.playerId) return;
+      let rp = this.remotePlayers.get(data.playerId);
+      if (!rp) {
+        // Find player info
+        const info = networkManager.players.find(p => p.id === data.playerId) || { id: data.playerId, name: 'Бро' };
+        rp = new RemotePlayer(this.scene, info);
+        this.remotePlayers.set(data.playerId, rp);
+      }
+      rp.applyUpdate(data);
+    };
+
+    networkManager.onNextbotUpdate = (data) => {
+      if (!networkManager.isHost) {
+        this.girl.applyNetworkUpdate(data);
+      }
+    };
+
+    networkManager.onKeyCollected = (data) => {
+      this.escapeGoal.collectKeyByIndex(data.keyIndex);
+      this.showToast(`🗝️ ${data.collectorName} НАШЕЛ КЛЮЧ! (${data.keysCollected}/${data.totalKeys})`);
+    };
+
+    networkManager.onDecoyDropped = (data) => {
+      this.shieldManager.spawnDroppedDecoy(data.position, this.girl, data.duration);
+      this.showToast(`🎎 ${data.dropperName} БРОСИЛ ПРИМАНКУ!`);
+    };
+
+    networkManager.onShieldRepel = (data) => {
+      this.girl.repelFrom(data.position, data.force);
+    };
+
+    networkManager.onPlayerDowned = (data) => {
+      if (data.playerId === networkManager.playerId) {
+        this.player.setDowned(true);
+      } else {
+        const rp = this.remotePlayers.get(data.playerId);
+        if (rp) rp.setDowned(true);
+      }
+      this.showToast(`🆘 ${data.playerName} ЗАГНАН В УГОЛ! СПАСИ БРО! [E]`);
+    };
+
+    networkManager.onPlayerRevived = (data) => {
+      if (data.targetId === networkManager.playerId) {
+        this.player.setDowned(false);
+        this.showToast(`❤️ ${data.reviverName} СПАС ТВОЮ ДЕВСТВЕННОСТЬ! БЕГИ!`);
+      } else {
+        const rp = this.remotePlayers.get(data.targetId);
+        if (rp) rp.setDowned(false);
+        this.showToast(`❤️ ${data.reviverName} СПАС БРО!`);
+      }
+    };
+
+    networkManager.onTeamGameOver = () => {
+      this.showToast('💔 ВСЯ КОМАНДА ПОТЕРЯЛА ДЕВСТВЕННОСТЬ!');
+      this.triggerGameOver();
+    };
+
+    networkManager.onTeamVictory = (data) => {
+      this.showToast(`👑 ${data.escaperName} ОТКРЫЛ ВЫХОД! КОМАНДНАЯ ПОБЕДА!`);
+      this.triggerVictory();
+    };
+
+    networkManager.onGameRestarted = (msg) => {
+      this.startMultiplayerGame(msg);
+    };
+
+    networkManager.onChatMessage = (data) => {
+      if (data.senderId !== networkManager.playerId) {
+        this.addChatMessage(data.senderName, data.text, false);
+      }
+    };
+
+    networkManager.onHostMigrated = (data) => {
+      this.showToast(`👑 ${data.newHostName} стал хостом лобби!`);
+      this.renderLobbyPlayers(networkManager.players);
+    };
+  }
+
+  renderLobbyPlayers(players) {
+    if (!this.dom.coopPlayerList) return;
+    this.dom.coopPlayerList.innerHTML = '';
+    this.dom.coopPlayersCount.textContent = `${players.length}/4 Игроков`;
+
+    const isHost = networkManager.isHost;
+    if (this.dom.btnCoopStartGame) {
+      this.dom.btnCoopStartGame.style.display = isHost ? 'block' : 'none';
+    }
+    if (this.dom.coopWaitingHostNotice) {
+      this.dom.coopWaitingHostNotice.style.display = isHost ? 'none' : 'block';
+    }
+
+    players.forEach((p) => {
+      const item = document.createElement('div');
+      item.className = 'coop-player-item';
+
+      const isMe = p.id === networkManager.playerId;
+      const meTag = isMe ? ' (Вы)' : '';
+
+      item.innerHTML = `
+        <div class="player-item-info">
+          <div class="player-avatar-badge" style="background: ${p.color}; color: ${p.color};"></div>
+          <span class="player-item-name">${p.name}${meTag}</span>
+        </div>
+        <div>
+          ${p.isHost ? '<span class="player-item-badge host">👑 ХОСТ</span>' : '<span class="player-item-badge">ГОТОВ</span>'}
+        </div>
+      `;
+      this.dom.coopPlayerList.appendChild(item);
+    });
+  }
+
+  startMultiplayerGame(msg) {
+    this.isMultiplayer = true;
+    this.state = STATE.PLAYING;
+    this.elapsedTime = 0;
+    this.shieldsCollected = 0;
+
+    // Reset local entities
+    this.resetPositions();
+
+    // Create 3D avatars for teammates
+    for (const rp of this.remotePlayers.values()) {
+      rp.destroy();
+    }
+    this.remotePlayers.clear();
+
+    const players = msg.players || networkManager.players;
+    players.forEach((p) => {
+      if (p.id !== networkManager.playerId) {
+        const rp = new RemotePlayer(this.scene, p);
+        const spawnP = this.map.getRandomSpawnPoint(this.player.position, 6);
+        rp.targetPosition.copy(spawnP);
+        rp.root.position.copy(spawnP);
+        this.remotePlayers.set(p.id, rp);
+      }
+    });
+
+    // UI Updates
+    if (this.dom.coopModal) this.dom.coopModal.classList.add('hidden');
+    this.dom.menuOverlay.classList.add('hidden');
+    this.dom.gameOverModal.classList.add('hidden');
+    if (this.dom.victoryModal) this.dom.victoryModal.classList.add('hidden');
+    this.dom.hud.classList.remove('hidden');
+    if (this.dom.hudCoopSquad) this.dom.hudCoopSquad.classList.remove('hidden');
+
+    this.renderer.domElement.requestPointerLock();
+    this.showToast('🏃 КООПЕРАТИВНЫЙ ПОБЕГ НАЧАЛСЯ! СПАСАЙТЕ ДРУГ ДРУГА!');
+  }
+
+  updateSquadHUD() {
+    if (!this.dom.squadList) return;
+    this.dom.squadList.innerHTML = '';
+
+    const pPos = this.player.position;
+
+    // Local player status item
+    const meItem = document.createElement('div');
+    meItem.className = 'squad-member';
+    const meStatus = this.player.isDowned ? '<span class="squad-status-text downed">🆘 ЗАГНАН!</span>' : '<span class="squad-status-text">🟢 ЖИВ</span>';
+    meItem.innerHTML = `
+      <div class="squad-dot" style="background: ${this.selectedColor}; color: ${this.selectedColor};"></div>
+      <span>${networkManager.playerName} (Вы)</span>
+      ${meStatus}
+    `;
+    this.dom.squadList.appendChild(meItem);
+
+    // Teammates status items
+    for (const [id, rp] of this.remotePlayers) {
+      const dist = Math.hypot(rp.root.position.x - pPos.x, rp.root.position.z - pPos.z);
+      const item = document.createElement('div');
+      item.className = 'squad-member';
+      const statusText = rp.isDowned
+        ? `<span class="squad-status-text downed">🆘 [${dist.toFixed(0)}m]</span>`
+        : `<span class="squad-status-text">🟢 [${dist.toFixed(0)}m]</span>`;
+
+      item.innerHTML = `
+        <div class="squad-dot" style="background: ${rp.colorHex}; color: ${rp.colorHex};"></div>
+        <span>${rp.name}</span>
+        ${statusText}
+      `;
+      this.dom.squadList.appendChild(item);
+    }
+  }
+
+  updateReviveMechanic(delta) {
+    // 1. If local player is downed: show downed banner and handle timer
+    if (this.player.isDowned) {
+      if (this.dom.hudDownedBanner) {
+        this.dom.hudDownedBanner.classList.remove('hidden');
+        if (this.dom.downedTimerNum) {
+          this.dom.downedTimerNum.textContent = Math.ceil(this.player.downedTimer);
+        }
+      }
+      if (this.player.downedTimer <= 0) {
+        // Player failed to be revived -> eliminate
+        this.triggerGameOver();
+        return;
+      }
+    } else if (this.dom.hudDownedBanner) {
+      this.dom.hudDownedBanner.classList.add('hidden');
+    }
+
+    // 2. If local player is alive: check proximity to downed teammates for revive
+    if (!this.player.isDowned) {
+      const pPos = this.player.position;
+      let closestDownedTeammate = null;
+      let closestDist = 2.6; // Within 2.6 meters
+
+      for (const [id, rp] of this.remotePlayers) {
+        if (rp.isDowned) {
+          const d = Math.hypot(rp.root.position.x - pPos.x, rp.root.position.z - pPos.z);
+          if (d < closestDist) {
+            closestDist = d;
+            closestDownedTeammate = rp;
+          }
+        }
+      }
+
+      if (closestDownedTeammate) {
+        if (this.dom.hudRevivePrompt) {
+          this.dom.hudRevivePrompt.classList.remove('hidden');
+          if (this.dom.reviveTargetName) {
+            this.dom.reviveTargetName.textContent = `СПАСТИ ${closestDownedTeammate.name}`;
+          }
+        }
+
+        if (this.player.isHoldingRevive) {
+          this.reviveProgress = Math.min(1.0, this.reviveProgress + delta / 2.0);
+          if (this.dom.reviveRingFill) {
+            this.dom.reviveRingFill.style.strokeDashoffset = (113 - 113 * this.reviveProgress).toString();
+          }
+
+          if (this.reviveProgress >= 1.0) {
+            // Revive successful!
+            this.reviveProgress = 0;
+            closestDownedTeammate.setDowned(false);
+            networkManager.sendPlayerRevived(closestDownedTeammate.id, networkManager.playerName);
+            this.showToast(`❤️ ТЫ СПАС ДЕВСТВЕННОСТЬ ${closestDownedTeammate.name}!`);
+            soundEngine.playPickup();
+          }
+        } else {
+          this.reviveProgress = Math.max(0, this.reviveProgress - delta * 2.5);
+          if (this.dom.reviveRingFill) {
+            this.dom.reviveRingFill.style.strokeDashoffset = (113 - 113 * this.reviveProgress).toString();
+          }
+        }
+      } else {
+        if (this.dom.hudRevivePrompt) {
+          this.dom.hudRevivePrompt.classList.add('hidden');
+        }
+        this.reviveProgress = 0;
+      }
+    }
+  }
+
+  openChat() {
+    this.chatOpen = true;
+    if (this.dom.hudChatBox) {
+      this.dom.hudChatBox.classList.remove('hidden');
+      if (this.dom.chatInput) {
+        this.dom.chatInput.focus();
+      }
+    }
+    if (document.exitPointerLock) {
+      document.exitPointerLock();
+    }
+  }
+
+  closeChat() {
+    this.chatOpen = false;
+    if (this.dom.hudChatBox) {
+      this.dom.hudChatBox.classList.add('hidden');
+    }
+    if (this.state === STATE.PLAYING && this.renderer) {
+      this.renderer.domElement.requestPointerLock();
+    }
+  }
+
+  addChatMessage(sender, text, isMe = false) {
+    if (!this.dom.chatLogs) return;
+    const msgEl = document.createElement('div');
+    msgEl.className = 'chat-msg';
+    const color = isMe ? 'var(--cyan)' : 'var(--amber)';
+    msgEl.innerHTML = `<span class="chat-sender" style="color: ${color}">${sender}:</span> <span class="chat-content">${text}</span>`;
+    this.dom.chatLogs.appendChild(msgEl);
+    this.dom.chatLogs.scrollTop = this.dom.chatLogs.scrollHeight;
+
+    // Show chat box briefly even if not typing so player sees new messages
+    if (!this.chatOpen && this.dom.hudChatBox) {
+      this.dom.hudChatBox.classList.remove('hidden');
+      clearTimeout(this.chatHideTimer);
+      this.chatHideTimer = setTimeout(() => {
+        if (!this.chatOpen && this.dom.hudChatBox) {
+          this.dom.hudChatBox.classList.add('hidden');
+        }
+      }, 5000);
     }
   }
 }

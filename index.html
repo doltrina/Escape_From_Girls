@@ -56,6 +56,36 @@
           ❤️ ЖИЗНИ: <span id="hud-lives-count">1</span>
         </div>
       </div>
+
+      <!-- Co-op Teammates Squad HUD -->
+      <div id="hud-coop-squad" class="hud-panel coop-squad-panel hidden">
+        <div class="squad-title">👥 ОТРЯД</div>
+        <div class="squad-list" id="squad-list">
+          <!-- Dynamic team members -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Center HUD overlays: Revive prompt & Downed Banner -->
+    <div id="hud-revive-prompt" class="revive-prompt hidden">
+      <div class="revive-progress-ring">
+        <svg viewBox="0 0 44 44">
+          <circle cx="22" cy="22" r="18" class="revive-bg-ring"></circle>
+          <circle cx="22" cy="22" r="18" class="revive-fill-ring" id="revive-ring-fill"></circle>
+        </svg>
+        <span class="revive-key">E</span>
+      </div>
+      <div class="revive-text">
+        <strong id="revive-target-name">СПАСЕНИЕ БРО</strong>
+        <span>Удерживай [E], чтобы спасти девственность!</span>
+      </div>
+    </div>
+
+    <!-- Downed Banner -->
+    <div id="hud-downed-banner" class="downed-banner hidden">
+      <div class="downed-pulse"></div>
+      <h2>🆘 ТЕБЯ ЗАГНАЛИ В УГОЛ!</h2>
+      <p>Твоя девственность под угрозой! Ожидай помощи напарника (<span id="downed-timer-num">25</span>с)</p>
     </div>
 
     <!-- Bottom Bar -->
@@ -116,6 +146,14 @@
         </div>
       </div>
     </div>
+
+    <!-- In-Game Chat Box -->
+    <div id="hud-chat-box" class="hud-chat-box hidden">
+      <div class="chat-logs" id="chat-logs"></div>
+      <form id="chat-form" class="chat-input-bar">
+        <input type="text" id="chat-input" maxlength="100" placeholder="Напиши сообщение (Enter для отправки, Esc закрыть)..." autocomplete="off">
+      </form>
+    </div>
   </div>
 
   <!-- Audio element for custom Nextbot music -->
@@ -138,9 +176,22 @@
         <button id="btn-resume-game" class="btn-primary" style="display: none;">
           ▶ ПРОДОЛЖИТЬ ПОБЕГ
         </button>
-        <button id="btn-start-game" class="btn-primary">
-          ▶ НАЧАТЬ ПОБЕГ
-        </button>
+        <div class="mode-select-grid" id="main-mode-select">
+          <button id="btn-start-game" class="btn-primary mode-btn">
+            <span class="btn-icon">🎮</span>
+            <div class="mode-btn-content">
+              <span class="mode-title">ОДИНОЧНЫЙ ПОБЕГ</span>
+              <span class="mode-desc">Классический режим выживания</span>
+            </div>
+          </button>
+          <button id="btn-open-coop" class="btn-primary coop-launch-btn mode-btn">
+            <span class="btn-icon">👥</span>
+            <div class="mode-btn-content">
+              <span class="mode-title">КООПЕРАТИВ (ОНЛАЙН)</span>
+              <span class="mode-desc">Побег с друзьями • Спасай девственность бро!</span>
+            </div>
+          </button>
+        </div>
         <button id="btn-restart-from-pause" class="btn-secondary" style="display: none;">
           🔄 С НАЧАЛА
         </button>
@@ -398,6 +449,77 @@
 
   <!-- Audio element for custom Victory music -->
   <audio id="victory-audio" loop playsinline></audio>
+
+  <!-- Co-op Online Multiplayer Lobby Modal -->
+  <div id="coop-modal" class="hidden">
+    <div class="settings-card coop-card">
+      <div class="settings-header">
+        <h2>👥 ОНЛАЙН КООПЕРАТИВ</h2>
+        <button id="btn-close-coop" class="close-btn">&times;</button>
+      </div>
+
+      <!-- Player Setup (Name & Color) -->
+      <div class="coop-player-setup">
+        <div class="setup-field">
+          <label for="coop-name-input">Твой позывной самурая:</label>
+          <input type="text" id="coop-name-input" maxlength="16" placeholder="Введи ник (например, Самурай)">
+        </div>
+        <div class="setup-field">
+          <label>Цвет твоей брони:</label>
+          <div class="color-picker-row" id="color-picker-row">
+            <button type="button" class="color-dot active" data-color="#00f3ff" style="background:#00f3ff"></button>
+            <button type="button" class="color-dot" data-color="#39ff14" style="background:#39ff14"></button>
+            <button type="button" class="color-dot" data-color="#ff0077" style="background:#ff0077"></button>
+            <button type="button" class="color-dot" data-color="#ffaa00" style="background:#ffaa00"></button>
+            <button type="button" class="color-dot" data-color="#a855f7" style="background:#a855f7"></button>
+            <button type="button" class="color-dot" data-color="#ff3344" style="background:#ff3344"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Connection Screen (Matchmaking & Rooms) -->
+      <div id="coop-connect-view" class="coop-view-section">
+        <div class="coop-actions-grid">
+          <div class="coop-action-card">
+            <h3>⚡ Быстрая игра</h3>
+            <p>Подключись к общему серверу и сбегай от девушки вместе со всеми самураями!</p>
+            <button id="btn-coop-quick" class="btn-primary">В БОЙ (ОБЩАЯ КОМНАТА)</button>
+          </div>
+          <div class="coop-action-card">
+            <h3>🔒 Игра с друзьями</h3>
+            <p>Создай отдельную комнату или введи код лобби своего друга</p>
+            <div class="coop-join-row">
+              <input type="text" id="coop-room-code-input" maxlength="12" placeholder="КОД КОМНАТЫ">
+              <button id="btn-coop-join" class="btn-secondary">ВОЙТИ</button>
+            </div>
+            <button id="btn-coop-create" class="btn-secondary" style="margin-top: 10px; width: 100%;">🏠 СОЗДАТЬ СВОЮ КОМНАТУ</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- In-Lobby Room Screen (Shown when connected to room) -->
+      <div id="coop-room-view" class="coop-view-section hidden">
+        <div class="room-status-bar">
+          <div class="room-badge">
+            <span>КОМНАТА:</span>
+            <strong id="coop-display-room">PUBLIC</strong>
+            <button id="btn-copy-room-code" class="btn-copy-code" title="Скопировать код">📋</button>
+          </div>
+          <div class="room-players-count" id="coop-players-count">1/4 Игроков</div>
+        </div>
+
+        <div class="coop-player-list" id="coop-player-list">
+          <!-- Dynamically populated players -->
+        </div>
+
+        <div class="coop-lobby-actions">
+          <button id="btn-coop-leave" class="btn-secondary">ВЫЙТИ ИЗ КОМНАТЫ</button>
+          <button id="btn-coop-start-game" class="btn-primary" style="display: none;">🚀 НАЧАТЬ ПОБЕГ ВМЕСТЕ</button>
+          <div id="coop-waiting-host-notice" class="waiting-notice">Ожидание запуска игры хостом комнаты...</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Main Game Logic Entrypoint -->
   <script type="module" src="./src/main.js"></script>
