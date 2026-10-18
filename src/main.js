@@ -1668,7 +1668,11 @@ class Game {
 
     // Teammates status items
     for (const [id, rp] of this.remotePlayers) {
-      const dist = Math.hypot(rp.root.position.x - pPos.x, rp.root.position.z - pPos.z);
+      const rx = (rp.root && rp.root.position) ? rp.root.position.x : (rp.position ? rp.position.x : 0);
+      const rz = (rp.root && rp.root.position) ? rp.root.position.z : (rp.position ? rp.position.z : 0);
+      const px = pPos ? pPos.x : 0;
+      const pz = pPos ? pPos.z : 0;
+      const dist = Math.hypot(rx - px, rz - pz);
       const item = document.createElement('div');
       item.className = 'squad-member';
       const statusText = rp.isDowned
