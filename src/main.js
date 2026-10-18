@@ -221,6 +221,7 @@ class Game {
       btnStart: document.getElementById('btn-start-game'),
       btnResume: document.getElementById('btn-resume-game'),
       btnRestartPause: document.getElementById('btn-restart-from-pause'),
+      btnLeaveRoom: document.getElementById('btn-leave-coop-room'),
       btnOpenSettings: document.getElementById('btn-open-settings'),
 
       settingsModal: document.getElementById('settings-modal'),
@@ -326,6 +327,14 @@ class Game {
       });
     }
 
+    // Leave Room Button from Pause menu in Multiplayer
+    if (this.dom.btnLeaveRoom) {
+      this.dom.btnLeaveRoom.addEventListener('click', () => {
+        blurActive();
+        this.returnToMainMenu();
+      });
+    }
+
     // Restart Button on Game Over
     this.dom.btnRestart.addEventListener('click', () => {
       blurActive();
@@ -333,7 +342,11 @@ class Game {
       soundEngine.resume();
       this.dom.gameOverModal.classList.add('hidden');
       this.dom.gameOverVideo.pause();
-      this.startGame();
+      if (this.isMultiplayer) {
+        networkManager.sendRestartGame();
+      } else {
+        this.startGame();
+      }
     });
 
     // Restart Button on Victory
@@ -345,7 +358,11 @@ class Game {
         this.dom.victoryModal.classList.add('hidden');
         this.dom.victoryVideo.pause();
         if (this.dom.victoryAudio) this.dom.victoryAudio.pause();
-        this.startGame();
+        if (this.isMultiplayer) {
+          networkManager.sendRestartGame();
+        } else {
+          this.startGame();
+        }
       });
     }
 
@@ -421,6 +438,9 @@ class Game {
     // Pointer Lock change listener to handle Escape / Unlocking
     document.addEventListener('pointerlockchange', () => {
       if (document.pointerLockElement !== this.renderer.domElement) {
+        if (this.chatOpen) return;
+        if (this.dom.settingsModal && !this.dom.settingsModal.classList.contains('hidden')) return;
+        if (this.dom.coopModal && !this.dom.coopModal.classList.contains('hidden')) return;
         if (this.state === STATE.PLAYING) {
           this.pauseGame();
         }
@@ -430,8 +450,22 @@ class Game {
     // Keyboard Hotkeys
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Escape') {
+        if (this.chatOpen) {
+          this.closeChat();
+          return;
+        }
+        if (this.dom.settingsModal && !this.dom.settingsModal.classList.contains('hidden')) {
+          this.dom.settingsModal.classList.add('hidden');
+          return;
+        }
+        if (this.dom.coopModal && !this.dom.coopModal.classList.contains('hidden')) {
+          this.dom.coopModal.classList.add('hidden');
+          return;
+        }
         if (this.state === STATE.PAUSED) {
           this.resumeGame();
+        } else if (this.state === STATE.PLAYING) {
+          this.pauseGame();
         }
       }
       if (e.code === 'KeyR') {
@@ -822,6 +856,12 @@ class Game {
     if (this.dom.victoryModal) this.dom.victoryModal.classList.add('hidden');
     this.dom.hud.classList.remove('hidden');
 
+    if (this.dom.btnResume) this.dom.btnResume.style.display = 'none';
+    if (this.dom.btnRestartPause) this.dom.btnRestartPause.style.display = 'none';
+    if (this.dom.btnLeaveRoom) this.dom.btnLeaveRoom.style.display = 'none';
+    const modeSelect = document.getElementById('main-mode-select');
+    if (modeSelect) modeSelect.style.display = 'grid';
+
     this.dom.gameOverVideo.pause();
     if (this.dom.victoryVideo) this.dom.victoryVideo.pause();
     if (this.dom.victoryAudio) this.dom.victoryAudio.pause();
@@ -843,26 +883,74 @@ class Game {
   pauseGame() {
     this.state = STATE.PAUSED;
     if (this.dom.menuTitle) this.dom.menuTitle.textContent = 'ПАУЗА';
-    if (this.dom.menuSubtitle) this.dom.menuSubtitle.textContent = 'ИГРА ПРИОСТАНОВЛЕНА';
+    if (this.dom.menuSubtitle) this.dom.menuSubtitle.textContent = this.isMultiplayer ? 'МЕНЮ КООПЕРАТИВА' : 'ИГРА ПРИОСТАНОВЛЕНА';
     if (this.dom.btnResume) this.dom.btnResume.style.display = 'block';
-    if (this.dom.btnStart) this.dom.btnStart.style.display = 'none';
-    if (this.dom.btnRestartPause) this.dom.btnRestartPause.style.display = 'block';
+
+    const modeSelect = document.getElementById('main-mode-select');
+    if (modeSelect) modeSelect.style.display = 'none';
+
+    if (this.dom.btnRestartPause) {
+      this.dom.btnRestartPause.style.display = this.isMultiplayer ? 'none' : 'block';
+    }
+    if (this.dom.btnLeaveRoom) {
+      this.dom.btnLeaveRoom.style.display = this.isMultiplayer ? 'block' : 'none';
+    }
+
     this.dom.menuOverlay.classList.remove('hidden');
 
-    if (this.dom.nextbotAudio) {
-      this.dom.nextbotAudio.pause();
+    if (!this.isMultiplayer) {
+      if (this.dom.nextbotAudio) {
+        this.dom.nextbotAudio.pause();
+      }
+      soundEngine.stopHeartbeat();
+      soundEngine.stopProceduralChaseLoop();
     }
-    soundEngine.stopHeartbeat();
-    soundEngine.stopProceduralChaseLoop();
   }
 
   resumeGame() {
     this.state = STATE.PLAYING;
     this.dom.menuOverlay.classList.add('hidden');
+    if (this.dom.btnResume) this.dom.btnResume.style.display = 'none';
+    if (this.dom.btnRestartPause) this.dom.btnRestartPause.style.display = 'none';
+    if (this.dom.btnLeaveRoom) this.dom.btnLeaveRoom.style.display = 'none';
+
     if (soundEngine.hasCustomMusic && this.dom.nextbotAudio.src) {
       this.dom.nextbotAudio.play().catch(() => {});
     }
     this.renderer.domElement.requestPointerLock();
+  }
+
+  returnToMainMenu() {
+    this.isMultiplayer = false;
+    if (networkManager.isConnected) {
+      networkManager.disconnect();
+    }
+    for (const rp of this.remotePlayers.values()) {
+      rp.destroy();
+    }
+    this.remotePlayers.clear();
+
+    this.state = STATE.MENU;
+    if (this.dom.menuTitle) this.dom.menuTitle.textContent = 'ESCAPE FROM GIRLS';
+    if (this.dom.menuSubtitle) this.dom.menuSubtitle.textContent = 'СОХРАНИ СВОЮ ДЕВСТВЕННОСТЬ';
+    if (this.dom.btnResume) this.dom.btnResume.style.display = 'none';
+    if (this.dom.btnRestartPause) this.dom.btnRestartPause.style.display = 'none';
+    if (this.dom.btnLeaveRoom) this.dom.btnLeaveRoom.style.display = 'none';
+
+    const modeSelect = document.getElementById('main-mode-select');
+    if (modeSelect) modeSelect.style.display = 'grid';
+
+    this.dom.menuOverlay.classList.remove('hidden');
+    this.dom.hud.classList.add('hidden');
+    if (this.dom.hudCoopSquad) this.dom.hudCoopSquad.classList.add('hidden');
+    if (this.dom.hudDownedBanner) this.dom.hudDownedBanner.classList.add('hidden');
+    if (this.dom.hudRevivePrompt) this.dom.hudRevivePrompt.classList.add('hidden');
+    if (this.dom.hudChatBox) this.dom.hudChatBox.classList.add('hidden');
+
+    soundEngine.stopHeartbeat();
+    soundEngine.stopProceduralChaseLoop();
+    if (this.dom.nextbotAudio) this.dom.nextbotAudio.pause();
+    if (document.exitPointerLock) document.exitPointerLock();
   }
 
   playGameOverMedia() {
@@ -1048,12 +1136,14 @@ class Game {
 
     const delta = this.clock.getDelta();
 
-    if (this.state === STATE.PLAYING) {
-      this.elapsedTime += delta;
-      this.dom.hudTimer.textContent = this.formatTime(this.elapsedTime);
+    if (this.state === STATE.PLAYING || (this.isMultiplayer && this.state === STATE.PAUSED)) {
+      if (this.state === STATE.PLAYING) {
+        this.elapsedTime += delta;
+        this.dom.hudTimer.textContent = this.formatTime(this.elapsedTime);
 
-      // Update Player
-      this.player.update(delta);
+        // Update Player
+        this.player.update(delta);
+      }
 
       // In Multiplayer: update remote avatars and send transform
       if (this.isMultiplayer) {
@@ -1061,8 +1151,8 @@ class Game {
           rp.update(delta, this.camera);
         }
 
-        const isMoving = this.player.keys.forward || this.player.keys.backward || this.player.keys.left || this.player.keys.right;
-        const wantsSprint = this.player.keys.sprint && isMoving && !this.player.isExhausted && !this.player.isDowned;
+        const isMoving = (this.state === STATE.PLAYING) && (this.player.keys.forward || this.player.keys.backward || this.player.keys.left || this.player.keys.right);
+        const wantsSprint = (this.state === STATE.PLAYING) && this.player.keys.sprint && isMoving && !this.player.isExhausted && !this.player.isDowned;
         networkManager.sendPlayerUpdate(
           this.player.position,
           this.player.yaw,
@@ -1277,7 +1367,18 @@ class Game {
       });
     }
 
+    let isConnectingToRoom = false;
     const connectToRoom = (roomId) => {
+      if (isConnectingToRoom) return;
+      isConnectingToRoom = true;
+
+      const setButtonsDisabled = (disabled) => {
+        if (this.dom.btnCoopQuick) this.dom.btnCoopQuick.disabled = disabled;
+        if (this.dom.btnCoopCreate) this.dom.btnCoopCreate.disabled = disabled;
+        if (this.dom.btnCoopJoin) this.dom.btnCoopJoin.disabled = disabled;
+      };
+      setButtonsDisabled(true);
+
       const name = (this.dom.coopNameInput ? this.dom.coopNameInput.value : 'Самурай').trim() || 'Самурай';
       this.showToast(`Подключение к комнате ${roomId}...`);
       networkManager.connect(roomId, name, this.selectedColor)
@@ -1287,7 +1388,11 @@ class Game {
         })
         .catch((err) => {
           console.error(err);
-          this.showToast('❌ Ошибка подключения к серверу коопа');
+          this.showToast('❌ ' + (err.message || 'Ошибка подключения к серверу коопа'));
+        })
+        .finally(() => {
+          isConnectingToRoom = false;
+          setButtonsDisabled(false);
         });
     };
 
@@ -1395,6 +1500,11 @@ class Game {
         // Find player info
         const info = networkManager.players.find(p => p.id === data.playerId) || { id: data.playerId, name: 'Бро' };
         rp = new RemotePlayer(this.scene, info);
+        if (data.x !== undefined && data.z !== undefined) {
+          const gy = Math.max(0, (data.y !== undefined ? data.y : 1.7) - 1.7);
+          rp.root.position.set(data.x, gy, data.z);
+          rp.targetPosition.set(data.x, gy, data.z);
+        }
         this.remotePlayers.set(data.playerId, rp);
       }
       rp.applyUpdate(data);
@@ -1520,6 +1630,7 @@ class Game {
       if (p.id !== networkManager.playerId) {
         const rp = new RemotePlayer(this.scene, p);
         const spawnP = this.map.getRandomSpawnPoint(this.player.position, 6);
+        spawnP.y = 0;
         rp.targetPosition.copy(spawnP);
         rp.root.position.copy(spawnP);
         this.remotePlayers.set(p.id, rp);

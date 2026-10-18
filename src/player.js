@@ -248,6 +248,7 @@ export class Player {
     this.position.y = this.eyeHeight;
     this.velocity.set(0, 0, 0);
     this.verticalVelocity = 0;
+    this.isGrounded = true;
     this.stamina = this.maxStamina;
     this.shieldActive = false;
     this.shieldTimeRemaining = 0;
@@ -352,7 +353,8 @@ export class Player {
     }
 
     // Gravity & Vertical Movement
-    if (!this.isGrounded) {
+    if (!this.isGrounded || this.position.y > this.eyeHeight) {
+      this.isGrounded = false;
       this.verticalVelocity += this.gravity * delta;
       this.position.y += this.verticalVelocity * delta;
 

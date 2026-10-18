@@ -142,6 +142,46 @@ function getRoomPlayerList(room) {
   return list;
 }
 
+function removePlayerFromRoom(ws, rId, pId) {
+  if (!rId || !pId) return;
+  const room = rooms.get(rId);
+  if (!room) return;
+
+  const leavingPlayer = room.players.get(pId);
+  room.players.delete(pId);
+  console.log(`[Co-op] Player ${leavingPlayer ? leavingPlayer.name : pId} left room ${rId}`);
+
+  // If host left, elect new host
+  if (room.hostId === pId) {
+    const remainingIds = Array.from(room.players.keys());
+    if (remainingIds.length > 0) {
+      room.hostId = remainingIds[0];
+      const newHost = room.players.get(room.hostId);
+      if (newHost) newHost.isHost = true;
+
+      broadcastToRoom(rId, {
+        type: 'host_migrated',
+        newHostId: room.hostId,
+        newHostName: newHost ? newHost.name : 'Тиммейт'
+      });
+    }
+  }
+
+  // Notify remaining players
+  broadcastToRoom(rId, {
+    type: 'player_left',
+    playerId: pId,
+    playerName: leavingPlayer ? leavingPlayer.name : 'Игрок',
+    players: getRoomPlayerList(room)
+  }, ws);
+
+  // Clean up empty room
+  if (room.players.size === 0) {
+    rooms.delete(rId);
+    console.log(`[Co-op] Room ${rId} destroyed (empty)`);
+  }
+}
+
 wss.on('connection', (ws) => {
   let currentRoomId = null;
   let currentPlayerId = null;
@@ -160,14 +200,30 @@ wss.on('connection', (ws) => {
       switch (type) {
         // --- 1. Join Room / Lobby ---
         case 'join_room': {
+          // If connection already has a player in a room, cleanly remove them first
+          if (currentRoomId && currentPlayerId) {
+            removePlayerFromRoom(ws, currentRoomId, currentPlayerId);
+            currentRoomId = null;
+            currentPlayerId = null;
+          }
+
           const roomId = (data.roomId || 'PUBLIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '').substring(0, 16) || 'PUBLIC';
           const playerName = (data.name || 'Самурай').trim().substring(0, 20) || 'Самурай';
           const playerColor = data.color || '#00f3ff';
 
+          const room = getOrCreateRoom(roomId);
+
+          // Room capacity check (max 4 players)
+          if (room.players.size >= 4) {
+            send({
+              type: 'error',
+              message: `Комната ${roomId} переполнена (макс. 4 игрока)!`
+            });
+            break;
+          }
+
           currentRoomId = roomId;
           currentPlayerId = generatePlayerId();
-
-          const room = getOrCreateRoom(roomId);
 
           // Assign host if none
           if (!room.hostId || !room.players.has(room.hostId)) {
@@ -468,43 +524,9 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     if (currentRoomId && currentPlayerId) {
-      const room = rooms.get(currentRoomId);
-      if (room) {
-        const leavingPlayer = room.players.get(currentPlayerId);
-        room.players.delete(currentPlayerId);
-
-        console.log(`[Co-op] Player ${leavingPlayer ? leavingPlayer.name : currentPlayerId} left room ${currentRoomId}`);
-
-        // If host left, elect new host
-        if (room.hostId === currentPlayerId) {
-          const remainingIds = Array.from(room.players.keys());
-          if (remainingIds.length > 0) {
-            room.hostId = remainingIds[0];
-            const newHost = room.players.get(room.hostId);
-            if (newHost) newHost.isHost = true;
-
-            broadcastToRoom(currentRoomId, {
-              type: 'host_migrated',
-              newHostId: room.hostId,
-              newHostName: newHost ? newHost.name : 'Тиммейт'
-            });
-          }
-        }
-
-        // Notify remaining players
-        broadcastToRoom(currentRoomId, {
-          type: 'player_left',
-          playerId: currentPlayerId,
-          playerName: leavingPlayer ? leavingPlayer.name : 'Игрок',
-          players: getRoomPlayerList(room)
-        });
-
-        // Clean up empty room
-        if (room.players.size === 0) {
-          rooms.delete(currentRoomId);
-          console.log(`[Co-op] Room ${currentRoomId} destroyed (empty)`);
-        }
-      }
+      removePlayerFromRoom(ws, currentRoomId, currentPlayerId);
+      currentRoomId = null;
+      currentPlayerId = null;
     }
   });
 });

@@ -437,4 +437,113 @@ export class GameMap {
     if (valid.length === 0) return this.spawnPoints[0];
     return valid[Math.floor(Math.random() * valid.length)].clone();
   }
+
+  // Convert World Position to Grid Cell (row, col)
+  worldToGrid(x, z) {
+    let c = Math.floor((x - this.offsetX) / this.tileSize);
+    let r = Math.floor((z - this.offsetZ) / this.tileSize);
+    c = Math.max(0, Math.min(this.gridCols - 1, c));
+    r = Math.max(0, Math.min(this.gridRows - 1, r));
+    return { r, c };
+  }
+
+  // Convert Grid Cell (row, col) to World Center Vector3
+  gridToWorld(r, c) {
+    const x = this.offsetX + c * this.tileSize + this.tileSize / 2;
+    const z = this.offsetZ + r * this.tileSize + this.tileSize / 2;
+    return new THREE.Vector3(x, 0, z);
+  }
+
+  // Find nearest corridor cell if a point is inside or near a wall
+  getNearestCorridorCell(r, c) {
+    if (this.grid[r] && this.grid[r][c] === 0) return { r, c };
+
+    let bestCell = { r, c };
+    let bestDist = 999;
+
+    for (let dr = -2; dr <= 2; dr++) {
+      for (let dc = -2; dc <= 2; dc++) {
+        const nr = r + dr;
+        const nc = c + dc;
+        if (nr >= 0 && nr < this.gridRows && nc >= 0 && nc < this.gridCols) {
+          if (this.grid[nr][nc] === 0) {
+            const d = Math.hypot(dr, dc);
+            if (d < bestDist) {
+              bestDist = d;
+              bestCell = { r: nr, c: nc };
+            }
+          }
+        }
+      }
+    }
+    return bestCell;
+  }
+
+  // Fast Breadth-First Search (BFS) pathfinder through maze corridors
+  findNextWaypoint(fromWorldPos, toWorldPos) {
+    // If there is direct line of sight between Nextbot and Target, run directly!
+    if (this.hasLineOfSight(fromWorldPos, toWorldPos)) {
+      return toWorldPos.clone();
+    }
+
+    let start = this.worldToGrid(fromWorldPos.x, fromWorldPos.z);
+    let goal = this.worldToGrid(toWorldPos.x, toWorldPos.z);
+
+    start = this.getNearestCorridorCell(start.r, start.c);
+    goal = this.getNearestCorridorCell(goal.r, goal.c);
+
+    if (start.r === goal.r && start.c === goal.c) {
+      return toWorldPos.clone();
+    }
+
+    const queue = [{ r: start.r, c: start.c, firstStep: null }];
+    const visited = new Set();
+    visited.add(`${start.r},${start.c}`);
+
+    const dirs = [
+      { dr: -1, dc: 0 },
+      { dr: 1, dc: 0 },
+      { dr: 0, dc: -1 },
+      { dr: 0, dc: 1 }
+    ];
+
+    let foundFirstStep = null;
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+
+      if (current.r === goal.r && current.c === goal.c) {
+        foundFirstStep = current.firstStep;
+        break;
+      }
+
+      for (const d of dirs) {
+        const nr = current.r + d.dr;
+        const nc = current.c + d.dc;
+        const key = `${nr},${nc}`;
+
+        if (
+          nr >= 0 && nr < this.gridRows &&
+          nc >= 0 && nc < this.gridCols &&
+          this.grid[nr][nc] === 0 &&
+          !visited.has(key)
+        ) {
+          visited.add(key);
+          const nextFirst = current.firstStep || { r: nr, c: nc };
+          queue.push({
+            r: nr,
+            c: nc,
+            firstStep: nextFirst
+          });
+        }
+      }
+    }
+
+    if (foundFirstStep) {
+      return this.gridToWorld(foundFirstStep.r, foundFirstStep.c);
+    }
+
+    // Fallback: direct line to target
+    return toWorldPos.clone();
+  }
 }

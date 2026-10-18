@@ -36,11 +36,31 @@ export class NetworkManager {
     this.onChatMessage = null;
     this.onHostMigrated = null;
     this.onError = null;
-    this.onDisconnect = null;
+    this.isConnecting = false;
   }
 
   connect(roomId = 'PUBLIC', name = 'Самурай', color = '#00f3ff') {
+    if (this.isConnecting) {
+      return Promise.reject(new Error('Уже идет подключение к комнате...'));
+    }
+
+    // Clean up existing socket connection before reconnecting
+    if (this.ws) {
+      try {
+        this.ws.onopen = null;
+        this.ws.onmessage = null;
+        this.ws.onerror = null;
+        this.ws.onclose = null;
+        this.ws.close();
+      } catch (e) {}
+      this.ws = null;
+    }
+
+    this.isConnected = false;
+    this.isConnecting = true;
+
     return new Promise((resolve, reject) => {
+      let settled = false;
       this.roomId = (roomId || 'PUBLIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '').substring(0, 16) || 'PUBLIC';
       this.playerName = name.trim().substring(0, 20) || 'Самурай';
       this.playerColor = color;
@@ -51,6 +71,7 @@ export class NetworkManager {
       try {
         this.ws = new WebSocket(wsUrl);
       } catch (err) {
+        this.isConnecting = false;
         if (this.onError) this.onError(err);
         return reject(err);
       }
@@ -71,7 +92,15 @@ export class NetworkManager {
           const msg = JSON.parse(event.data);
           this.handleMessage(msg);
           if (msg.type === 'room_joined') {
+            this.isConnecting = false;
+            settled = true;
             resolve(msg);
+          } else if (msg.type === 'error') {
+            this.isConnecting = false;
+            if (!settled) {
+              settled = true;
+              reject(new Error(msg.message || 'Ошибка подключения к комнате'));
+            }
           }
         } catch (e) {
           console.error('[Network] Error handling message:', e);
@@ -79,21 +108,33 @@ export class NetworkManager {
       };
 
       this.ws.onerror = (err) => {
+        this.isConnecting = false;
         console.error('[Network] WebSocket error:', err);
         if (this.onError) this.onError(err);
-        reject(err);
+        if (!settled) {
+          settled = true;
+          reject(err);
+        }
       };
 
       this.ws.onclose = () => {
         this.isConnected = false;
+        this.isConnecting = false;
         if (this.onDisconnect) this.onDisconnect();
       };
     });
   }
 
   disconnect() {
+    this.isConnecting = false;
     if (this.ws) {
-      this.ws.close();
+      try {
+        this.ws.onopen = null;
+        this.ws.onmessage = null;
+        this.ws.onerror = null;
+        this.ws.onclose = null;
+        this.ws.close();
+      } catch (e) {}
       this.ws = null;
     }
     this.isConnected = false;

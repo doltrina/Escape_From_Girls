@@ -27,6 +27,7 @@ export class RemotePlayer {
 
     // Root Group
     this.root = new THREE.Group();
+    this.root.position.set(0, 0, 0);
     this.initAvatarMesh();
     this.initNameplate();
     this.initFlashlight();
@@ -34,6 +35,10 @@ export class RemotePlayer {
     this.initDownedBeacon();
 
     this.scene.add(this.root);
+  }
+
+  get position() {
+    return this.root.position;
   }
 
   initAvatarMesh() {
@@ -204,7 +209,11 @@ export class RemotePlayer {
 
   applyUpdate(data) {
     if (data.x !== undefined && data.y !== undefined && data.z !== undefined) {
-      this.targetPosition.set(data.x, data.y, data.z);
+      // Local player camera eye height is 1.7m above floor (y = 0).
+      // Remote player 3D avatar has feet touching floor at y = 0.
+      // Therefore, floor level for the avatar root is Math.max(0, data.y - 1.7).
+      const groundY = Math.max(0, data.y - 1.7);
+      this.targetPosition.set(data.x, groundY, data.z);
     }
     if (data.rotY !== undefined) {
       this.targetRotationY = data.rotY;

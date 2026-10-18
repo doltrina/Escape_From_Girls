@@ -273,48 +273,29 @@ export class NextbotGirl {
       return distToPlayer;
     }
 
-    // Nextbot Navigation Logic
+    // Nextbot Navigation Logic: Use BFS corridor waypoint pathfinding
     const hasLOS = this.map.hasLineOfSight(this.position, targetPos);
-
     let moveDir = new THREE.Vector3();
 
     if (hasLOS) {
-      // Direct chase towards currentTarget
+      // Direct chase towards current target
       moveDir.copy(toTarget).normalize();
     } else {
-      // Obstacle avoidance navigation: probe forward and angled rays
-      const idealDir = toTarget.clone().normalize();
-      moveDir.copy(idealDir);
+      // Navigate via corridor waypoints
+      const waypoint = this.map.findNextWaypoint(this.position, targetPos);
+      const toWaypoint = new THREE.Vector3().subVectors(waypoint, this.position);
+      toWaypoint.y = 0;
 
-      const angles = [0, 0.45, -0.45, 0.9, -0.9, 1.4, -1.4];
-      let bestDir = null;
-
-      for (const angle of angles) {
-        const testDir = idealDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
-        const probePoint = this.position.clone().add(testDir.clone().multiplyScalar(2.0));
-        
-        let blocked = false;
-        for (const wall of this.map.walls) {
-          if (probePoint.x >= wall.minX && probePoint.x <= wall.maxX &&
-              probePoint.z >= wall.minZ && probePoint.z <= wall.maxZ) {
-            blocked = true;
-            break;
-          }
-        }
-        if (!blocked) {
-          bestDir = testDir;
-          break;
-        }
-      }
-
-      if (bestDir) {
-        moveDir.copy(bestDir);
+      if (toWaypoint.lengthSq() > 0.09) {
+        moveDir.copy(toWaypoint).normalize();
+      } else {
+        moveDir.copy(toTarget).normalize();
       }
     }
 
     // Apply movement acceleration
-    const targetVel = moveDir.multiplyScalar(this.currentSpeed);
-    this.velocity.lerp(targetVel, 8.0 * delta);
+    const targetVel = moveDir.clone().multiplyScalar(this.currentSpeed);
+    this.velocity.lerp(targetVel, 10.0 * delta);
 
     // Knockback friction decay if moving too fast
     if (this.velocity.length() > this.currentSpeed * 1.5) {
@@ -327,6 +308,35 @@ export class NextbotGirl {
 
     // Resolve wall collisions
     this.map.resolveCollision(this.position, this.radius);
+
+    // Stuck Detection & Corner Clearance
+    const actualMoved = Math.hypot(
+      this.position.x - (this.lastActualX !== undefined ? this.lastActualX : this.position.x),
+      this.position.z - (this.lastActualZ !== undefined ? this.lastActualZ : this.position.z)
+    );
+    this.lastActualX = this.position.x;
+    this.lastActualZ = this.position.z;
+
+    const actualSpeed = delta > 0.0001 ? (actualMoved / delta) : 0;
+
+    if (actualSpeed < 1.0 && this.stunTimer <= 0 && this.distractedTimer <= 0) {
+      this.stuckTimer = (this.stuckTimer || 0) + delta;
+      if (this.stuckTimer > 0.3) {
+        // Nudge along perpendicular tangent to slide around corner
+        const tangent = new THREE.Vector3(-moveDir.z, 0, moveDir.x);
+        const sign = (Math.sin(performance.now() * 0.01) > 0) ? 1 : -1;
+        this.position.add(tangent.multiplyScalar(sign * 5.0 * delta));
+        this.map.resolveCollision(this.position, this.radius);
+
+        if (this.stuckTimer > 1.2) {
+          // Tactical respawn near target corridor
+          this.aggressiveRespawn(player);
+          this.stuckTimer = 0;
+        }
+      }
+    } else {
+      this.stuckTimer = 0;
+    }
 
     // Ensure she stays within map bounds
     this.checkMapBounds(player);
@@ -346,7 +356,6 @@ export class NextbotGirl {
     }
 
     // Cylindrical billboard effect: Sprite faces player camera on Y axis only
-    // Keeps the sprite standing upright on the floor without pitching into the ground
     this.meshGroup.lookAt(player.camera.position.x, this.meshGroup.position.y, player.camera.position.z);
 
     return distToPlayer;
