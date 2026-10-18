@@ -250,6 +250,7 @@ class Game {
       goShields: document.getElementById('go-shields'),
       goRecord: document.getElementById('go-record'),
       btnRestart: document.getElementById('btn-restart-game'),
+      btnGoMenu: document.getElementById('btn-go-to-menu'),
       btnGoSettings: document.getElementById('btn-go-settings'),
 
       // Victory Modal
@@ -258,6 +259,7 @@ class Game {
       victoryFallback: document.getElementById('victory-fallback'),
       btnToggleVictorySound: document.getElementById('btn-toggle-victory-sound'),
       btnVictoryRestart: document.getElementById('btn-victory-restart'),
+      btnVictoryMenu: document.getElementById('btn-victory-to-menu'),
       btnVictorySettings: document.getElementById('btn-victory-settings'),
       vicTime: document.getElementById('vic-time'),
       vicKeys: document.getElementById('vic-keys'),
@@ -349,6 +351,14 @@ class Game {
       }
     });
 
+    // Exit to Main Menu from Game Over
+    if (this.dom.btnGoMenu) {
+      this.dom.btnGoMenu.addEventListener('click', () => {
+        blurActive();
+        this.returnToMainMenu();
+      });
+    }
+
     // Restart Button on Victory
     if (this.dom.btnVictoryRestart) {
       this.dom.btnVictoryRestart.addEventListener('click', () => {
@@ -363,6 +373,14 @@ class Game {
         } else {
           this.startGame();
         }
+      });
+    }
+
+    // Exit to Main Menu from Victory
+    if (this.dom.btnVictoryMenu) {
+      this.dom.btnVictoryMenu.addEventListener('click', () => {
+        blurActive();
+        this.returnToMainMenu();
       });
     }
 
@@ -893,7 +911,8 @@ class Game {
       this.dom.btnRestartPause.style.display = this.isMultiplayer ? 'none' : 'block';
     }
     if (this.dom.btnLeaveRoom) {
-      this.dom.btnLeaveRoom.style.display = this.isMultiplayer ? 'block' : 'none';
+      this.dom.btnLeaveRoom.style.display = 'block';
+      this.dom.btnLeaveRoom.textContent = this.isMultiplayer ? '🚪 ВЫЙТИ ИЗ КОМНАТЫ' : '🏠 В ГЛАВНОЕ МЕНЮ';
     }
 
     this.dom.menuOverlay.classList.remove('hidden');
@@ -942,12 +961,18 @@ class Game {
 
     this.dom.menuOverlay.classList.remove('hidden');
     this.dom.hud.classList.add('hidden');
+    if (this.dom.gameOverModal) this.dom.gameOverModal.classList.add('hidden');
+    if (this.dom.victoryModal) this.dom.victoryModal.classList.add('hidden');
+    if (this.dom.gameOverVideo) this.dom.gameOverVideo.pause();
+    if (this.dom.victoryVideo) this.dom.victoryVideo.pause();
+    if (this.dom.victoryAudio) this.dom.victoryAudio.pause();
     if (this.dom.hudCoopSquad) this.dom.hudCoopSquad.classList.add('hidden');
     if (this.dom.hudDownedBanner) this.dom.hudDownedBanner.classList.add('hidden');
     if (this.dom.hudRevivePrompt) this.dom.hudRevivePrompt.classList.add('hidden');
     if (this.dom.hudChatBox) this.dom.hudChatBox.classList.add('hidden');
 
     soundEngine.stopHeartbeat();
+    soundEngine.resetChaseMusic();
     soundEngine.stopProceduralChaseLoop();
     if (this.dom.nextbotAudio) this.dom.nextbotAudio.pause();
     if (document.exitPointerLock) document.exitPointerLock();
