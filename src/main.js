@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GameMap } from './map.js';
+import { CraterMap } from './craterMap.js';
 import { Player } from './player.js';
 import { NextbotGirl } from './nextbot.js';
 import { ShieldManager } from './shields.js';
@@ -20,11 +21,13 @@ const STATE = {
 
 class Game {
   constructor() {
+    window.gameInstance = this;
     this.state = STATE.MENU;
     this.elapsedTime = 0;
     this.shieldsCollected = 0;
     this.highScore = parseFloat(localStorage.getItem('virginity_record') || '0');
     this.lastShieldRepelTime = 0;
+    this.currentMapType = localStorage.getItem('selected_map') || 'crater';
 
     // Multiplayer State
     this.isMultiplayer = false;
@@ -80,21 +83,21 @@ class Game {
   }
 
   initGameEntities() {
-    // Map
-    this.map = new GameMap(this.scene);
-
     // Player
-    this.player = new Player(this.camera, this.renderer.domElement, this.map);
+    this.player = new Player(this.camera, this.renderer.domElement, null);
     this.scene.add(this.player.camera);
 
     // Nextbot Girl
-    this.girl = new NextbotGirl(this.scene, this.map, assetManager.girlTextureUrl);
+    this.girl = new NextbotGirl(this.scene, null, assetManager.girlTextureUrl);
 
     // Shield Manager
-    this.shieldManager = new ShieldManager(this.scene, this.map);
+    this.shieldManager = new ShieldManager(this.scene, null);
 
-    // Escape Goal Manager (3 Keys + Exit Door)
-    this.escapeGoal = new EscapeGoalManager(this.scene, this.map);
+    // Escape Goal Manager (3 Keys + Exit Door / Torii Gate)
+    this.escapeGoal = new EscapeGoalManager(this.scene, null);
+
+    // Load active map ('crater' or 'maze')
+    this.loadMap(this.currentMapType);
 
     this.escapeGoal.onKeysChange = (collected, total) => {
       if (this.dom && this.dom.hudKeysCount) {
@@ -102,7 +105,7 @@ class Game {
         this.dom.hudKeysBadge.classList.toggle('ready', collected >= total);
       }
       if (collected >= total) {
-        this.showToast('🔓 ВСЕ 3 КЛЮЧА СОБРАНЫ! БЕГИ К ДВЕРИ ВЫХОДА!');
+        this.showToast('🔓 ВСЕ 3 КЛЮЧА СОБРАНЫ! БЕГИ К ВЫХОДУ НА ВЕРШИНЕ!');
       } else if (collected > 0) {
         this.showToast(`🗝️ ЗОЛОТОЙ КЛЮЧ НАЙДЕН! (${collected}/${total})`);
       }
@@ -121,10 +124,20 @@ class Game {
     };
 
     this.escapeGoal.onDoorAttemptLocked = (collected, total) => {
-      this.showToast(`🔒 ДВЕРЬ ЗАПЕРТА: Нужно собрать все 3 ключа! (${collected}/${total})`);
+      this.showToast(`🔒 ВЫХОД ЗАПЕРТ: Нужно собрать все 3 ключа! (${collected}/${total})`);
+    };
+
+    this.escapeGoal.onToriiCountdown = (sec) => {
+      if (this.dom && this.dom.hudToriiCountdown && this.dom.toriiSeconds) {
+        this.dom.hudToriiCountdown.classList.remove('hidden');
+        this.dom.toriiSeconds.textContent = Math.ceil(sec);
+      }
     };
 
     this.escapeGoal.onEscapeSuccess = () => {
+      if (this.dom && this.dom.hudToriiCountdown) {
+        this.dom.hudToriiCountdown.classList.add('hidden');
+      }
       this.triggerVictory();
     };
 
@@ -146,12 +159,89 @@ class Game {
     this.player.onPassiveItemClicked = (typeId) => {
       if (typeId === 'd20_dice') {
         const count = this.player.inventory.d20_dice;
-        this.showToast(`🎲 D20 Кость (${count} шт.): Защищает пассивно при ударе девушки!`);
+        this.showToast(`🎲 D20 Кость (${count} шт.): Спасает от падения в магму и от удара девушки!`);
       }
+    };
+
+    // Volcano Crater Callbacks
+    this.player.onMagmaDeath = () => {
+      this.triggerGameOver('magma');
+    };
+
+    this.player.onRocketJump = () => {
+      this.showToast('🚀 RTX 5090: РОКЕТ-ДЖАМП!');
+    };
+
+    this.player.onDoubleJump = () => {
+      this.showToast('⚡ MONSTER ENERGY: ДВОЙНОЙ ПРЫЖОК!');
+    };
+
+    this.player.onD20MagmaSave = () => {
+      this.showToast('🎲 D20 КОСТЬ: ЧУДО-СПАСЕНИЕ ИЗ МАГМЫ!');
     };
 
     // Spawn initial positions
     this.resetPositions();
+  }
+
+  loadMap(mapType) {
+    if (this.map) {
+      if (typeof this.map.destroy === 'function') {
+        this.map.destroy();
+      } else if (this.map.walls) {
+        for (let i = this.scene.children.length - 1; i >= 0; i--) {
+          const child = this.scene.children[i];
+          if (child.isMesh && child !== this.player.camera && child !== this.girl.meshGroup && child !== this.shieldManager.playerAura) {
+            this.scene.remove(child);
+          }
+        }
+      }
+    }
+
+    if (mapType === 'crater') {
+      this.currentMapType = 'crater';
+      this.scene.background = new THREE.Color(0x150404);
+      this.scene.fog = new THREE.FogExp2(0x190503, 0.024);
+      this.map = new CraterMap(this.scene);
+      this.map.onMagmaRiseStart = () => {
+        if (this.dom && this.dom.hudMagmaWarning) {
+          this.dom.hudMagmaWarning.classList.remove('hidden');
+        }
+      };
+      soundEngine.setMapMode('crater');
+      if (this.dom && this.dom.hudAltitudeBadge) {
+        this.dom.hudAltitudeBadge.style.display = 'flex';
+      }
+    } else {
+      this.currentMapType = 'maze';
+      this.scene.background = new THREE.Color(0x06070a);
+      this.scene.fog = new THREE.FogExp2(0x06070a, 0.035);
+      this.map = new GameMap(this.scene);
+      soundEngine.setMapMode('maze');
+      if (this.dom && this.dom.hudAltitudeBadge) {
+        this.dom.hudAltitudeBadge.style.display = 'none';
+      }
+    }
+
+    if (this.player) this.player.map = this.map;
+    if (this.girl) this.girl.map = this.map;
+    if (this.shieldManager) this.shieldManager.map = this.map;
+    if (this.escapeGoal) this.escapeGoal.map = this.map;
+  }
+
+  selectMap(mapType) {
+    if (this.currentMapType === mapType) return;
+    this.loadMap(mapType);
+    localStorage.setItem('selected_map', mapType);
+
+    if (this.dom.tabMapCrater && this.dom.tabMapMaze) {
+      this.dom.tabMapCrater.classList.toggle('active', mapType === 'crater');
+      this.dom.tabMapMaze.classList.toggle('active', mapType === 'maze');
+    }
+
+    this.resetPositions();
+    const mapName = (mapType === 'crater') ? '🌋 Кратер (Огненный Паркур)' : '🏛️ Классический Лабиринт';
+    this.showToast(`🗺️ Выбрана карта: ${mapName}`);
   }
 
   resetPositions() {
@@ -167,6 +257,14 @@ class Game {
     if (this.dom && this.dom.hudKeysCount) {
       this.dom.hudKeysCount.textContent = '0';
       this.dom.hudKeysBadge.classList.remove('ready');
+    }
+
+    if (this.dom && this.dom.hudMagmaWarning) {
+      this.dom.hudMagmaWarning.classList.add('hidden');
+    }
+
+    if (this.dom && this.dom.hudToriiCountdown) {
+      this.dom.hudToriiCountdown.classList.add('hidden');
     }
 
     if (this.player.inventory) {
@@ -296,12 +394,44 @@ class Game {
       hudChatBox: document.getElementById('hud-chat-box'),
       chatLogs: document.getElementById('chat-logs'),
       chatForm: document.getElementById('chat-form'),
-      chatInput: document.getElementById('chat-input')
+      chatInput: document.getElementById('chat-input'),
+
+      // Map Selection & Volcano HUD
+      tabMapCrater: document.getElementById('tab-map-crater'),
+      tabMapMaze: document.getElementById('tab-map-maze'),
+      mapSelectionSection: document.getElementById('map-selection-section'),
+      hudToriiCountdown: document.getElementById('hud-torii-countdown'),
+      toriiSeconds: document.getElementById('torii-seconds'),
+      hudMagmaWarning: document.getElementById('hud-magma-warning'),
+      hudAltitudeBadge: document.getElementById('hud-altitude-badge'),
+      hudAltitudeValue: document.getElementById('hud-altitude-value'),
+      goTitle: document.getElementById('go-title') || document.querySelector('#game-over-modal .game-over-title'),
+      goSubtitle: document.getElementById('go-subtitle')
     };
 
     this.hasValidVideo = false;
     this.hasValidVictoryVideo = false;
     this.updateRecordDisplay();
+
+    // Sync initial map tab UI state
+    if (this.dom.tabMapCrater && this.dom.tabMapMaze) {
+      this.dom.tabMapCrater.classList.toggle('active', this.currentMapType === 'crater');
+      this.dom.tabMapMaze.classList.toggle('active', this.currentMapType === 'maze');
+    }
+
+    // Map Selection Tab Handlers
+    if (this.dom.tabMapCrater) {
+      this.dom.tabMapCrater.addEventListener('click', () => {
+        blurActive();
+        this.selectMap('crater');
+      });
+    }
+    if (this.dom.tabMapMaze) {
+      this.dom.tabMapMaze.addEventListener('click', () => {
+        blurActive();
+        this.selectMap('maze');
+      });
+    }
 
     // Start Button (First launch)
     this.dom.btnStart.addEventListener('click', () => {
@@ -874,6 +1004,10 @@ class Game {
     if (this.dom.victoryModal) this.dom.victoryModal.classList.add('hidden');
     this.dom.hud.classList.remove('hidden');
 
+    if (this.dom.mapSelectionSection) this.dom.mapSelectionSection.style.display = 'none';
+    if (this.dom.hudToriiCountdown) this.dom.hudToriiCountdown.classList.add('hidden');
+    if (this.dom.hudMagmaWarning) this.dom.hudMagmaWarning.classList.add('hidden');
+
     if (this.dom.btnResume) this.dom.btnResume.style.display = 'none';
     if (this.dom.btnRestartPause) this.dom.btnRestartPause.style.display = 'none';
     if (this.dom.btnLeaveRoom) this.dom.btnLeaveRoom.style.display = 'none';
@@ -895,7 +1029,10 @@ class Game {
     }
 
     this.renderer.domElement.requestPointerLock();
-    this.showToast('🏃 БЕГИ! СОБЕРИ 3 КЛЮЧА И НАЙДИ ВЫХОД!');
+    const startMsg = (this.currentMapType === 'crater')
+      ? '🌋 КРАТЕР: ОГНЕННЫЙ ПАРКУР! СОБЕРИ 3 КЛЮЧА И ДОБЕРИСЬ ДО ВРАТ ТОРИИ!'
+      : '🏃 БЕГИ! СОБЕРИ 3 КЛЮЧА И НАЙДИ ВЫХОД!';
+    this.showToast(startMsg);
   }
 
   pauseGame() {
@@ -906,6 +1043,7 @@ class Game {
 
     const modeSelect = document.getElementById('main-mode-select');
     if (modeSelect) modeSelect.style.display = 'none';
+    if (this.dom.mapSelectionSection) this.dom.mapSelectionSection.style.display = 'none';
 
     if (this.dom.btnRestartPause) {
       this.dom.btnRestartPause.style.display = this.isMultiplayer ? 'none' : 'block';
@@ -958,6 +1096,7 @@ class Game {
 
     const modeSelect = document.getElementById('main-mode-select');
     if (modeSelect) modeSelect.style.display = 'grid';
+    if (this.dom.mapSelectionSection) this.dom.mapSelectionSection.style.display = 'flex';
 
     this.dom.menuOverlay.classList.remove('hidden');
     this.dom.hud.classList.add('hidden');
@@ -969,6 +1108,9 @@ class Game {
     if (this.dom.hudCoopSquad) this.dom.hudCoopSquad.classList.add('hidden');
     if (this.dom.hudDownedBanner) this.dom.hudDownedBanner.classList.add('hidden');
     if (this.dom.hudRevivePrompt) this.dom.hudRevivePrompt.classList.add('hidden');
+    if (this.dom.hudToriiCountdown) this.dom.hudToriiCountdown.classList.add('hidden');
+    if (this.dom.hudMagmaWarning) this.dom.hudMagmaWarning.classList.add('hidden');
+    if (this.dom.hudChatBox) this.dom.hudChatBox.classList.add('hidden');
     if (this.dom.hudChatBox) this.dom.hudChatBox.classList.add('hidden');
 
     soundEngine.stopHeartbeat();
@@ -1035,9 +1177,13 @@ class Game {
     }
   }
 
-  triggerGameOver() {
+  triggerGameOver(reason = 'girl_caught') {
     this.state = STATE.GAMEOVER;
-    soundEngine.playGameOver();
+    if (reason === 'magma') {
+      soundEngine.playMagmaDeath();
+    } else {
+      soundEngine.playGameOver();
+    }
 
     if (document.exitPointerLock) {
       document.exitPointerLock();
@@ -1047,6 +1193,42 @@ class Game {
     soundEngine.stopProceduralChaseLoop();
     if (this.dom.nextbotAudio) {
       this.dom.nextbotAudio.pause();
+    }
+
+    if (this.dom.hudToriiCountdown) this.dom.hudToriiCountdown.classList.add('hidden');
+    if (this.dom.hudMagmaWarning) this.dom.hudMagmaWarning.classList.add('hidden');
+
+    if (reason === 'magma') {
+      if (this.dom.goTitle) {
+        this.dom.goTitle.innerHTML = '🌋 СВАРИЛСЯ В МАГМЕ!<br><span style="font-size: 0.65em; color: #ff5500;">ЖАРКИЙ КОНЕЦ</span>';
+      }
+      if (this.dom.goSubtitle) {
+        this.dom.goSubtitle.textContent = '«Ой, кажется, ты упал в лаву... А я даже не успела познакомиться!»';
+        this.dom.goSubtitle.style.color = '#ffaa33';
+      }
+      if (this.dom.gameOverFallback) {
+        this.dom.gameOverFallback.style.background = 'radial-gradient(circle at 50% 100%, #ff2200 0%, #660000 60%, #1a0000 100%)';
+        this.dom.gameOverFallback.innerHTML = `
+          <div class="magma-death-scene" style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none;">
+            <div style="font-size: 80px; filter: drop-shadow(0 0 20px #ff3300); animation: pulse 1s infinite alternate;">🌋</div>
+            <img src="${assetManager.girlTextureUrl}" style="width: 140px; height: 140px; border-radius: 50%; border: 3px solid #ff3300; box-shadow: 0 0 30px #ff0000; margin-top: 10px; object-fit: cover;" alt="Girl">
+            <div style="color: #fff; font-weight: 700; margin-top: 12px; font-size: 18px; text-shadow: 0 0 10px #000;">«Ой, кажется, я испачкалась...»</div>
+          </div>
+        `;
+      }
+    } else {
+      if (this.dom.goTitle) {
+        this.dom.goTitle.innerHTML = 'ТЫ ПОТЕРЯЛ ДЕВСТВЕННОСТЬ<br>ТЫ ПРОИГРАЛ';
+      }
+      if (this.dom.goSubtitle) {
+        this.dom.goSubtitle.textContent = 'Твоя девственность была потеряна навсегда...';
+        this.dom.goSubtitle.style.color = '#ff88a3';
+      }
+      if (this.dom.gameOverFallback) {
+        this.dom.gameOverFallback.innerHTML = '';
+        this.dom.gameOverFallback.style.background = '';
+        this.dom.gameOverFallback.style.backgroundImage = "url('./assets/romantic_scene.jpg')";
+      }
     }
 
     // High score check
@@ -1166,8 +1348,19 @@ class Game {
         this.elapsedTime += delta;
         this.dom.hudTimer.textContent = this.formatTime(this.elapsedTime);
 
+        // Update active map (rising magma, crumbling platforms, ash embers, geysers)
+        if (this.map && typeof this.map.update === 'function') {
+          this.map.update(delta);
+        }
+
         // Update Player
         this.player.update(delta);
+
+        // Update altitude display in crater
+        if (this.currentMapType === 'crater' && this.dom.hudAltitudeValue) {
+          const altMeters = Math.max(0, this.player.position.y).toFixed(0);
+          this.dom.hudAltitudeValue.textContent = `${altMeters}m`;
+        }
       }
 
       // In Multiplayer: update remote avatars and send transform

@@ -4,7 +4,7 @@ import { soundEngine } from './audio.js';
 export class EscapeGoalManager {
   constructor(scene, map) {
     this.scene = scene;
-    this.map = map;
+    this._map = null;
 
     this.totalKeys = 3;
     this.keysCollected = 0;
@@ -27,6 +27,17 @@ export class EscapeGoalManager {
     this.onEscapeSuccess = null;
     this.onDoorAttemptLocked = null;
 
+    if (map) {
+      this.map = map;
+    }
+  }
+
+  get map() {
+    return this._map;
+  }
+
+  set map(m) {
+    this._map = m;
     this.initDoor();
   }
 
@@ -122,6 +133,22 @@ export class EscapeGoalManager {
   }
 
   initDoor() {
+    if (this.doorGroup) {
+      this.scene.remove(this.doorGroup);
+      this.doorGroup = null;
+    }
+
+    if (!this.map) return;
+
+    if (this.map.isCrater) {
+      this.doorPosition.set(0, 32.7, 0);
+      return;
+    }
+
+    if (this.map.offsetX === undefined || !this.map.tileSize) {
+      return;
+    }
+
     // Locate Door at North outer wall facing south (row 0, col 10)
     // The player walks up through row 1, col 10
     const c = 10;
@@ -136,6 +163,7 @@ export class EscapeGoalManager {
 
     const doorGroup = new THREE.Group();
     doorGroup.position.set(x, 0, doorZ);
+    this.doorGroup = doorGroup;
 
     // 1. Heavy Metal Frame
     const frameMat = new THREE.MeshStandardMaterial({
@@ -252,8 +280,9 @@ export class EscapeGoalManager {
 
   updateLockLeds() {
     // 0 to 3 keys collected: illuminate corresponding LEDs green
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < this.lockLeds.length; i++) {
       const led = this.lockLeds[i];
+      if (!led) continue;
       if (i < this.keysCollected) {
         // Unlocked LED: Glowing Green
         led.material.color.setHex(0x00ff66);
@@ -267,17 +296,19 @@ export class EscapeGoalManager {
       }
     }
 
-    if (this.keysCollected >= 3) {
-      // Ready to escape! Turn door ambience to bright green/cyan
-      this.doorLight.color.setHex(0x00ff88);
-      this.doorLight.intensity = 3.5;
-      this.evacZone.material.color.setHex(0x00ff88);
-      this.evacZone.material.opacity = 0.45;
-    } else {
-      this.doorLight.color.setHex(0xff0044);
-      this.doorLight.intensity = 2.2;
-      this.evacZone.material.color.setHex(0xff0044);
-      this.evacZone.material.opacity = 0.25;
+    if (this.doorLight && this.evacZone) {
+      if (this.keysCollected >= 3) {
+        // Ready to escape! Turn door ambience to bright green/cyan
+        this.doorLight.color.setHex(0x00ff88);
+        this.doorLight.intensity = 3.5;
+        this.evacZone.material.color.setHex(0x00ff88);
+        this.evacZone.material.opacity = 0.45;
+      } else {
+        this.doorLight.color.setHex(0xff0044);
+        this.doorLight.intensity = 2.2;
+        this.evacZone.material.color.setHex(0xff0044);
+        this.evacZone.material.opacity = 0.25;
+      }
     }
   }
 
@@ -288,22 +319,41 @@ export class EscapeGoalManager {
     }
     this.keys = [];
     this.keysCollected = 0;
+    this.isToriiCountingDown = false;
+    this.toriiCountdown = 10.0;
+    this.lastBeepSec = 10;
 
-    // Define 3 tactical key coordinates:
-    // Key 1: In the deep corner DEAD END (row 20, col 1) - High Risk!
-    // Key 2: In corridor eastern sector (row 7, col 16)
-    // Key 3: In corridor western sector (row 13, col 4)
-    const keyLocations = [
-      { r: 20, c: 1, name: 'Ключ в тупике' },
-      { r: 7, c: 16, name: 'Ключ восточного крыла' },
-      { r: 13, c: 4, name: 'Ключ западного крыла' }
-    ];
+    if (!this.map) return;
+
+    let keyLocations = [];
+
+    if (this.map && this.map.isCrater) {
+      // Hide warehouse door in volcano map (Torii Gate at summit is the exit!)
+      if (this.doorGroup) {
+        this.doorGroup.visible = false;
+      }
+      this.doorPosition.set(0, 32.7, 0);
+
+      // 🌋 3-TIER VOLCANO KEYS
+      keyLocations = [
+        { pos: new THREE.Vector3(0, 2.7, 14.5), name: 'Ключ Нижнего Яруса (Внимание: Лава!)' },
+        { pos: new THREE.Vector3(8.5, 13.0, -15.5), name: 'Ключ Среднего Яруса (Прыжок над бездной)' },
+        { pos: new THREE.Vector3(-7.0, 22.2, 15.0), name: 'Ключ Верхнего Яруса (Узкий мостик)' }
+      ];
+    } else {
+      // Classic Maze coordinates
+      if (this.doorGroup) {
+        this.doorGroup.visible = true;
+      }
+      keyLocations = [
+        { pos: new THREE.Vector3(this.map.offsetX + 1 * this.map.tileSize + this.map.tileSize / 2, 1.1, this.map.offsetZ + 20 * this.map.tileSize + this.map.tileSize / 2), name: 'Ключ в тупике' },
+        { pos: new THREE.Vector3(this.map.offsetX + 16 * this.map.tileSize + this.map.tileSize / 2, 1.1, this.map.offsetZ + 7 * this.map.tileSize + this.map.tileSize / 2), name: 'Ключ восточного крыла' },
+        { pos: new THREE.Vector3(this.map.offsetX + 4 * this.map.tileSize + this.map.tileSize / 2, 1.1, this.map.offsetZ + 13 * this.map.tileSize + this.map.tileSize / 2), name: 'Ключ западного крыла' }
+      ];
+    }
 
     keyLocations.forEach((loc, idx) => {
-      const x = this.map.offsetX + loc.c * this.map.tileSize + this.map.tileSize / 2;
-      const z = this.map.offsetZ + loc.r * this.map.tileSize + this.map.tileSize / 2;
-      const pos = new THREE.Vector3(x, 1.1, z);
-
+      const pos = loc.pos;
       const { group, innerMesh, groundRing, light } = this.createKeyMesh();
       group.position.copy(pos);
       this.scene.add(group);
@@ -337,6 +387,14 @@ export class EscapeGoalManager {
       this.updateLockLeds();
       soundEngine.playKeyPickup();
 
+      // In Volcano Crater: Collecting Key 1 starts the rapid magma rise & alarm siren!
+      if (this.map && this.map.isCrater && index === 0) {
+        this.map.startMagmaRise();
+        if (window.gameInstance && window.gameInstance.showToast) {
+          window.gameInstance.showToast('🚨 ВНИМАНИЕ! КЛЮЧ АКТИВИРОВАЛ МАГМУ! ОНА ПОДНИМАЕТСЯ! БЕГИ ВВЕРХ!');
+        }
+      }
+
       if (this.onKeysChange) {
         this.onKeysChange(this.keysCollected, this.totalKeys);
       }
@@ -357,6 +415,9 @@ export class EscapeGoalManager {
     this.isDoorOpened = false;
     this.doorOpening = false;
     this.doorOpenProgress = 0;
+    this.isToriiCountingDown = false;
+    this.toriiCountdown = 10.0;
+    this.lastBeepSec = 10;
     if (this.doorPivot) {
       this.doorPivot.rotation.y = 0;
     }
@@ -377,9 +438,9 @@ export class EscapeGoalManager {
       // Pulse ground ring
       k.groundRing.material.opacity = 0.4 + Math.sin(k.hoverOffset * 2) * 0.25;
 
-      // Distance to player
-      const dist = Math.hypot(k.position.x - playerPos.x, k.position.z - playerPos.z);
-      if (dist < 1.35) {
+      // 3D Distance check (handles vertical parkour)
+      const dist = k.position.distanceTo(playerPos);
+      if (dist < 1.8) {
         // Collected by local player!
         const collected = this.collectKeyByIndex(k.index, true);
         if (collected && this.onLocalKeyCollected) {
@@ -388,9 +449,63 @@ export class EscapeGoalManager {
       }
     }
 
-    // 2. Door Proximity & Opening Animation
+    // 2. ⛩️ VOLCANO CRATER: Torii Gate 10-Second Defense Countdown
+    if (this.map && this.map.isCrater) {
+      const distToTorii = Math.hypot(this.doorPosition.x - playerPos.x, this.doorPosition.z - playerPos.z);
+      const dyTorii = Math.abs(playerPos.y - this.doorPosition.y);
+
+      if (distToTorii < 4.2 && dyTorii < 3.2) {
+        if (this.keysCollected >= this.totalKeys) {
+          if (!this.isToriiCountingDown && !this.isDoorOpened) {
+            this.isToriiCountingDown = true;
+            this.toriiCountdown = 10.0;
+            this.lastBeepSec = 10;
+            soundEngine.playToriiBeep();
+            if (window.gameInstance && window.gameInstance.showToast) {
+              window.gameInstance.showToast('⛩️ АКТИВАЦИЯ ВРАТ ТОРИИ! ПРОДЕРЖИСЬ 10 СЕКУНД!');
+            }
+          }
+        } else {
+          const now = performance.now();
+          if (now - this.lastLockedSoundTime > 2500) {
+            this.lastLockedSoundTime = now;
+            soundEngine.playDoorLocked();
+            if (this.onDoorAttemptLocked) {
+              this.onDoorAttemptLocked(this.keysCollected, this.totalKeys);
+            }
+          }
+        }
+      }
+
+      // Progress Torii countdown
+      if (this.isToriiCountingDown && !this.isDoorOpened) {
+        this.toriiCountdown -= delta;
+        const currentSec = Math.ceil(this.toriiCountdown);
+        if (currentSec !== this.lastBeepSec && currentSec > 0) {
+          this.lastBeepSec = currentSec;
+          soundEngine.playToriiBeep();
+          if (this.onToriiCountdown) {
+            this.onToriiCountdown(this.toriiCountdown);
+          }
+        }
+
+        if (this.toriiCountdown <= 0) {
+          this.isDoorOpened = true;
+          this.isToriiCountingDown = false;
+          soundEngine.playToriiActivate();
+          if (this.onLocalDoorReached) {
+            this.onLocalDoorReached();
+          }
+          if (this.onEscapeSuccess) {
+            this.onEscapeSuccess();
+          }
+        }
+      }
+      return;
+    }
+
+    // 3. Classic Maze Door Proximity & Opening Animation
     if (this.doorOpening) {
-      // Swing door open outward (rotate pivot up to -Math.PI / 2)
       this.doorOpenProgress = Math.min(1.0, this.doorOpenProgress + delta * 1.2);
       this.doorPivot.rotation.y = - (Math.PI / 2) * this.doorOpenProgress;
 
@@ -408,13 +523,11 @@ export class EscapeGoalManager {
     const distToDoor = Math.hypot(this.doorPosition.x - playerPos.x, this.doorPosition.z - playerPos.z);
     if (distToDoor < 2.4) {
       if (this.keysCollected >= this.totalKeys) {
-        // Trigger door opening sequence!
         this.triggerDoorOpenSequence();
         if (this.onLocalDoorReached) {
           this.onLocalDoorReached();
         }
       } else {
-        // Locked! Rate-limit locked sound/feedback
         const now = performance.now();
         if (now - this.lastLockedSoundTime > 2500) {
           this.lastLockedSoundTime = now;

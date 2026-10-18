@@ -72,6 +72,14 @@ export class Player {
     this.reviveHoldTime = 0;
     this.isHoldingRevive = false;
 
+    // Volcano Parkour & Abilities
+    this.canDoubleJump = true;
+    this.lastSafePlatformPos = new THREE.Vector3(0, 2.5, 16);
+    this.onMagmaDeath = null;
+    this.onRocketJump = null;
+    this.onDoubleJump = null;
+    this.onD20MagmaSave = null;
+
     // Inventory System
     this.inventory = {
       forcefield: 0,
@@ -184,6 +192,15 @@ export class Player {
           if (this.isGrounded && !this.isDowned) {
             this.verticalVelocity = this.jumpForce;
             this.isGrounded = false;
+            this.canDoubleJump = true;
+          } else if (!this.isGrounded && !this.isDowned && this.canDoubleJump) {
+            // Monster Energy allows double jump in mid-air
+            if (this.speedBoostTimeRemaining > 0) {
+              this.verticalVelocity = this.jumpForce * 1.15;
+              this.canDoubleJump = false;
+              soundEngine.playDoubleJump();
+              if (this.onDoubleJump) this.onDoubleJump();
+            }
           }
           break;
         case 'KeyE':
@@ -245,10 +262,13 @@ export class Player {
 
   spawnAt(pos) {
     this.position.copy(pos);
-    this.position.y = this.eyeHeight;
+    const spawnFloorY = (pos.y !== undefined) ? pos.y : 0;
+    this.position.y = spawnFloorY + this.eyeHeight;
+    this.lastSafePlatformPos.copy(this.position);
     this.velocity.set(0, 0, 0);
     this.verticalVelocity = 0;
     this.isGrounded = true;
+    this.canDoubleJump = true;
     this.stamina = this.maxStamina;
     this.shieldActive = false;
     this.shieldTimeRemaining = 0;
@@ -352,16 +372,56 @@ export class Player {
       this.map.resolveCollision(this.position, this.radius);
     }
 
+    // 3D Floor & Platform Collision Query
+    const floorY = (this.map && typeof this.map.getFloorHeight === 'function')
+      ? this.map.getFloorHeight(this.position.x, this.position.z, this.position.y - this.eyeHeight + 0.4, this.radius)
+      : 0;
+
+    const groundY = floorY + this.eyeHeight;
+
+    // Track safe landing position for D20 miracle rescue
+    if (this.isGrounded) {
+      if (this.map && this.map.isCrater) {
+        if (floorY > this.map.magmaLevel + 1.2) {
+          this.lastSafePlatformPos.copy(this.position);
+        }
+        if (typeof this.map.onPlayerStep === 'function') {
+          this.map.onPlayerStep(this.position.x, this.position.z, floorY);
+        }
+      } else {
+        this.lastSafePlatformPos.copy(this.position);
+      }
+    }
+
     // Gravity & Vertical Movement
-    if (!this.isGrounded || this.position.y > this.eyeHeight) {
+    if (!this.isGrounded || this.position.y > groundY + 0.05) {
       this.isGrounded = false;
       this.verticalVelocity += this.gravity * delta;
       this.position.y += this.verticalVelocity * delta;
 
-      if (this.position.y <= this.eyeHeight) {
-        this.position.y = this.eyeHeight;
+      if (this.position.y <= groundY) {
+        this.position.y = groundY;
         this.verticalVelocity = 0;
         this.isGrounded = true;
+        this.canDoubleJump = true;
+      }
+    }
+
+    // Magma Contact Detection (The Floor is Lava!)
+    if (this.map && typeof this.map.isMagmaTouch === 'function' && this.map.isMagmaTouch(this.position.y - this.eyeHeight)) {
+      if (this.inventory.d20_dice > 0 || this.extraLives > 0) {
+        // D20 Miracle Rescue!
+        this.consumeD20Life();
+        soundEngine.playD20Save();
+        this.position.copy(this.lastSafePlatformPos);
+        this.verticalVelocity = 3.5;
+        this.isGrounded = true;
+        if (this.onD20MagmaSave) this.onD20MagmaSave();
+      } else {
+        // Instant Magma Death
+        if (this.onMagmaDeath) {
+          this.onMagmaDeath();
+        }
       }
     }
 
@@ -429,13 +489,25 @@ export class Player {
 
     if (typeId === 'forcefield') {
       this.activateShield(6.0);
+      // Volcano Map Rocket Jump: blast launches player upward!
+      if (this.map && this.map.isCrater) {
+        this.verticalVelocity = 17.5;
+        this.isGrounded = false;
+        soundEngine.playRocketJump();
+        if (this.onRocketJump) this.onRocketJump();
+      }
     } else if (typeId === 'energy_drink') {
       this.activateSpeedBoost(5.0);
+      this.canDoubleJump = true;
       soundEngine.playDrinkEnergy();
     } else if (typeId === 'dakimakura') {
       soundEngine.playDropDecoy();
       if (this.onItemUsed) {
-        this.onItemUsed('dakimakura', this.position.clone());
+        // Throw decoy forward slightly ahead of player
+        const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+        const dropPos = this.position.clone().add(forward.multiplyScalar(3.5));
+        dropPos.y = Math.max(0, this.position.y - this.eyeHeight);
+        this.onItemUsed('dakimakura', dropPos);
       }
     }
 

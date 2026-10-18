@@ -55,6 +55,9 @@
         <div class="stat-badge">
           ❤️ ЖИЗНИ: <span id="hud-lives-count">1</span>
         </div>
+        <div class="stat-badge altitude-badge" id="hud-altitude-badge">
+          🌋 ВЫСОТА: <span id="hud-altitude-value">2m</span>
+        </div>
       </div>
 
       <!-- Co-op Teammates Squad HUD -->
@@ -64,6 +67,21 @@
           <!-- Dynamic team members -->
         </div>
       </div>
+    </div>
+
+    <!-- ⛩️ Torii Gate Defense Countdown Ring -->
+    <div id="hud-torii-countdown" class="torii-countdown-banner hidden">
+      <div class="torii-symbol">⛩️</div>
+      <div class="torii-text">
+        <strong id="torii-title">АКТИВАЦИЯ ВРАТ ТОРИИ</strong>
+        <p>Держи оборону вершины! Врата откроются через: <span id="torii-seconds">10</span>с</p>
+      </div>
+    </div>
+
+    <!-- 🔥 Magma Rising Warning Banner -->
+    <div id="hud-magma-warning" class="magma-warning-banner hidden">
+      <span class="magma-flame">🔥</span>
+      <span>ВНИМАНИЕ! КЛЮЧ АКТИВИРОВАЛ МАГМУ! ОНА ПОДНИМАЕТСЯ!</span>
     </div>
 
     <!-- Center HUD overlays: Revive prompt & Downed Banner -->
@@ -169,8 +187,29 @@
 
       <p class="game-tagline" id="menu-tagline">
         Она рыщет по коридорам... Если догонит — прощай, девственность!<br>
-        Найди <strong>3 золотых ключа</strong> (один спрятан в опасном тупике!) и открой бронедверь <strong>ВЫХОД</strong>, чтобы сбежать на свободу!
+        Собери <strong>3 священных ключа</strong> и открой путь на свободу!
       </p>
+      <!-- Map Selection Tabs -->
+      <div class="map-selection-card" id="map-selection-section">
+        <div class="map-selection-title">🗺️ ВЫБОР КАРТЫ:</div>
+        <div class="map-tabs-grid" id="map-tabs-grid">
+          <div class="map-tab active" id="tab-map-crater" data-map="crater">
+            <div class="map-tab-badge">НОВИНКА 🔥</div>
+            <div class="map-tab-icon">🌋</div>
+            <div class="map-tab-info">
+              <div class="map-tab-name">КРАТЕР: ОГНЕННЫЙ ПАРКУР</div>
+              <div class="map-tab-desc">3 яруса • Лава поднимается • Паук-Некстбот • Врата Тории</div>
+            </div>
+          </div>
+          <div class="map-tab" id="tab-map-maze" data-map="maze">
+            <div class="map-tab-icon">🏛️</div>
+            <div class="map-tab-info">
+              <div class="map-tab-name">КЛАССИЧЕСКИЙ ЛАБИРИНТ</div>
+              <div class="map-tab-desc">Коридоры • Броне-дверь • Хоррор Nextbot 3D</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div class="menu-action-buttons">
         <button id="btn-resume-game" class="btn-primary" style="display: none;">
@@ -369,9 +408,10 @@
     </div>
 
     <div class="game-over-content">
-      <h1 class="game-over-title">
+      <h1 class="game-over-title" id="go-title">
         ТЫ ПОТЕРЯЛ ДЕВСТВЕННОСТЬ<br>ТЫ ПРОИГРАЛ
       </h1>
+      <p class="game-over-subtitle" id="go-subtitle" style="font-size: 16px; color: #ff88a3; margin-bottom: 20px; text-shadow: 0 0 10px rgba(255,0,85,0.5);"></p>
 
       <div class="game-over-stats">
         <div class="game-over-stat-item">

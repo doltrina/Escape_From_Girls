@@ -23,10 +23,20 @@ export class NextbotGirl {
 
     // Human-scale height (2.1 meters tall, fits comfortably in 4.2m hallways)
     this.targetHeight = 2.1;
+    this.baseWidth = 1.6;
+
+    // Spider Mode & Center Leap for Volcano Crater
+    this.isLeaping = false;
+    this.leapProgress = 0;
+    this.leapDuration = 1.35;
+    this.leapStart = new THREE.Vector3();
+    this.leapTarget = new THREE.Vector3();
+    this.leapCooldown = 8.0;
 
     // Billboard mesh group
     this.meshGroup = new THREE.Group();
     this.initMesh();
+    this.initSparkTrail();
 
     // Red/pink underglow aura light
     this.auraLight = new THREE.PointLight(0xff0066, 1.8, 7, 2);
@@ -34,6 +44,32 @@ export class NextbotGirl {
     this.meshGroup.add(this.auraLight);
 
     this.scene.add(this.meshGroup);
+  }
+
+  initSparkTrail() {
+    const count = 30;
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = 0;
+      pos[i * 3 + 1] = -100;
+      pos[i * 3 + 2] = 0;
+      colors[i * 3] = 1.0;
+      colors[i * 3 + 1] = Math.random() * 0.4;
+      colors[i * 3 + 2] = 0.0;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const mat = new THREE.PointsMaterial({
+      size: 0.45,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85
+    });
+    this.sparkTrail = new THREE.Points(geo, mat);
+    this.sparkIndex = 0;
+    this.scene.add(this.sparkTrail);
   }
 
   initMesh() {
@@ -70,6 +106,7 @@ export class NextbotGirl {
         const aspect = img.width / img.height;
         // Restrict width to max 2.6m so wide photos fit nicely in hallways
         const width = Math.min(2.6, this.targetHeight * aspect);
+        this.baseWidth = width;
         this.spriteMesh.scale.set(width, this.targetHeight, 1);
         this.spriteMesh.position.y = this.targetHeight / 2;
       }
@@ -83,9 +120,11 @@ export class NextbotGirl {
 
   spawn(pos) {
     this.position.copy(pos);
-    this.position.y = 0;
+    this.position.y = (pos.y !== undefined) ? pos.y : 0;
     this.meshGroup.position.copy(this.position);
     this.velocity.set(0, 0, 0);
+    this.isLeaping = false;
+    this.leapCooldown = 8.0;
     this.currentSpeed = this.baseSpeed;
     this.speedMultiplier = 1.0;
     this.distractedTimer = 0;
@@ -235,11 +274,58 @@ export class NextbotGirl {
 
     // Distance to local player for local audio spatialization
     const toPlayer = new THREE.Vector3().subVectors(player.position, this.position);
-    toPlayer.y = 0;
     const distToPlayer = toPlayer.length();
 
     // Spatial chase music & heartbeat distance update for local player
     soundEngine.updateChaseDistance(distToPlayer, 38);
+
+    // 🌋 VOLCANO CRATER: Spark trail & heat haze shimmer effect
+    if (this.map && this.map.isCrater) {
+      if (this.sparkTrail) {
+        const posArr = this.sparkTrail.geometry.attributes.position.array;
+        const idx = (this.sparkIndex % 30) * 3;
+        posArr[idx] = this.position.x + (Math.random() - 0.5) * 0.5;
+        posArr[idx + 1] = this.position.y + 0.8 + (Math.random() - 0.5) * 0.5;
+        posArr[idx + 2] = this.position.z + (Math.random() - 0.5) * 0.5;
+        this.sparkIndex++;
+        this.sparkTrail.geometry.attributes.position.needsUpdate = true;
+      }
+
+      // Heat haze shimmer (дрожание из-за жара)
+      const haze = 1.0 + Math.sin(performance.now() * 0.016) * 0.08;
+      this.spriteMesh.scale.x = (this.baseWidth || 1.6) * haze;
+    }
+
+    // 😱 VOLCANO CRATER: Leap through center across the abyss!
+    if (this.isLeaping) {
+      this.leapProgress += delta / this.leapDuration;
+      const t = Math.min(1.0, this.leapProgress);
+      this.position.lerpVectors(this.leapStart, this.leapTarget, t);
+      const arc = Math.sin(t * Math.PI) * 11.5;
+      this.meshGroup.position.set(this.position.x, this.position.y + arc, this.position.z);
+      this.meshGroup.lookAt(player.camera.position.x, this.meshGroup.position.y, player.camera.position.z);
+
+      if (this.leapProgress >= 1.0) {
+        this.isLeaping = false;
+        this.leapCooldown = 12.0 + Math.random() * 6.0;
+        this.velocity.set(0, 0, 0);
+      }
+      return distToPlayer;
+    } else if (this.map && this.map.isCrater && this.stunTimer <= 0) {
+      this.leapCooldown -= delta;
+      // If player is on higher/mid tiers across the crater, trigger sensational center leap!
+      if (this.leapCooldown <= 0 && distToTarget > 11.0 && distToTarget < 30.0) {
+        this.isLeaping = true;
+        this.leapProgress = 0;
+        this.leapDuration = 1.35;
+        this.leapStart.copy(this.position);
+        this.leapTarget.copy(targetPos);
+        soundEngine.playNextbotLeap();
+        if (window.gameInstance && window.gameInstance.showToast) {
+          window.gameInstance.showToast('😱 ДЕВУШКА ПЕРЕПРЫГИВАЕТ ЧЕРЕЗ ЦЕНТР ВУЛКАНА!');
+        }
+      }
+    }
 
     // If currently stunned from a shield blast or D20 save
     if (this.stunTimer > 0) {
@@ -254,7 +340,7 @@ export class NextbotGirl {
       this.checkMapBounds(player);
 
       // Stun wobble / disorientation tilt
-      this.meshGroup.position.set(this.position.x, 0, this.position.z);
+      this.meshGroup.position.set(this.position.x, this.position.y, this.position.z);
       this.spriteMesh.rotation.z = Math.sin(performance.now() * 0.02) * 0.28;
       this.meshGroup.lookAt(player.camera.position.x, this.meshGroup.position.y, player.camera.position.z);
 
@@ -273,69 +359,82 @@ export class NextbotGirl {
       return distToPlayer;
     }
 
-    // Nextbot Navigation Logic: Use BFS corridor waypoint pathfinding
-    const hasLOS = this.map.hasLineOfSight(this.position, targetPos);
-    let moveDir = new THREE.Vector3();
-
-    if (hasLOS) {
-      // Direct chase towards current target
-      moveDir.copy(toTarget).normalize();
-    } else {
-      // Navigate via corridor waypoints
-      const waypoint = this.map.findNextWaypoint(this.position, targetPos);
-      const toWaypoint = new THREE.Vector3().subVectors(waypoint, this.position);
-      toWaypoint.y = 0;
-
-      if (toWaypoint.lengthSq() > 0.09) {
-        moveDir.copy(toWaypoint).normalize();
-      } else {
-        moveDir.copy(toTarget).normalize();
+    // Nextbot Navigation Logic:
+    // In Volcano Crater: SPIDER MODE (3D Wall Climbing)
+    if (this.map && this.map.isCrater) {
+      // Move horizontally towards target
+      const toTargetFlat = new THREE.Vector3(toTarget.x, 0, toTarget.z);
+      if (toTargetFlat.lengthSq() > 0.05) {
+        toTargetFlat.normalize();
+        const targetVel = toTargetFlat.multiplyScalar(this.currentSpeed);
+        this.velocity.lerp(targetVel, 8.0 * delta);
       }
-    }
 
-    // Apply movement acceleration
-    const targetVel = moveDir.clone().multiplyScalar(this.currentSpeed);
-    this.velocity.lerp(targetVel, 10.0 * delta);
+      this.position.x += this.velocity.x * delta;
+      this.position.z += this.velocity.z * delta;
+      this.map.resolveCollision(this.position, this.radius);
 
-    // Knockback friction decay if moving too fast
-    if (this.velocity.length() > this.currentSpeed * 1.5) {
-      this.velocity.multiplyScalar(0.92);
-    }
+      // 🧗 Spider Climb: Scale steep caldera walls and ledges vertically
+      const dy = (targetPos.y - 0.4) - this.position.y;
+      if (Math.abs(dy) > 0.1) {
+        const climbSpeed = 7.0;
+        this.position.y += Math.sign(dy) * Math.min(Math.abs(dy), climbSpeed * delta);
+      }
+    } else {
+      // Classic Maze BFS Waypoint Chase
+      const hasLOS = this.map.hasLineOfSight(this.position, targetPos);
+      let moveDir = new THREE.Vector3();
 
-    // Update position
-    this.position.x += this.velocity.x * delta;
-    this.position.z += this.velocity.z * delta;
+      if (hasLOS) {
+        moveDir.copy(toTarget).normalize();
+      } else {
+        const waypoint = this.map.findNextWaypoint(this.position, targetPos);
+        const toWaypoint = new THREE.Vector3().subVectors(waypoint, this.position);
+        toWaypoint.y = 0;
 
-    // Resolve wall collisions
-    this.map.resolveCollision(this.position, this.radius);
-
-    // Stuck Detection & Corner Clearance
-    const actualMoved = Math.hypot(
-      this.position.x - (this.lastActualX !== undefined ? this.lastActualX : this.position.x),
-      this.position.z - (this.lastActualZ !== undefined ? this.lastActualZ : this.position.z)
-    );
-    this.lastActualX = this.position.x;
-    this.lastActualZ = this.position.z;
-
-    const actualSpeed = delta > 0.0001 ? (actualMoved / delta) : 0;
-
-    if (actualSpeed < 1.0 && this.stunTimer <= 0 && this.distractedTimer <= 0) {
-      this.stuckTimer = (this.stuckTimer || 0) + delta;
-      if (this.stuckTimer > 0.3) {
-        // Nudge along perpendicular tangent to slide around corner
-        const tangent = new THREE.Vector3(-moveDir.z, 0, moveDir.x);
-        const sign = (Math.sin(performance.now() * 0.01) > 0) ? 1 : -1;
-        this.position.add(tangent.multiplyScalar(sign * 5.0 * delta));
-        this.map.resolveCollision(this.position, this.radius);
-
-        if (this.stuckTimer > 1.2) {
-          // Tactical respawn near target corridor
-          this.aggressiveRespawn(player);
-          this.stuckTimer = 0;
+        if (toWaypoint.lengthSq() > 0.09) {
+          moveDir.copy(toWaypoint).normalize();
+        } else {
+          moveDir.copy(toTarget).normalize();
         }
       }
-    } else {
-      this.stuckTimer = 0;
+
+      const targetVel = moveDir.clone().multiplyScalar(this.currentSpeed);
+      this.velocity.lerp(targetVel, 10.0 * delta);
+
+      if (this.velocity.length() > this.currentSpeed * 1.5) {
+        this.velocity.multiplyScalar(0.92);
+      }
+
+      this.position.x += this.velocity.x * delta;
+      this.position.z += this.velocity.z * delta;
+      this.map.resolveCollision(this.position, this.radius);
+
+      // Stuck Detection
+      const actualMoved = Math.hypot(
+        this.position.x - (this.lastActualX !== undefined ? this.lastActualX : this.position.x),
+        this.position.z - (this.lastActualZ !== undefined ? this.lastActualZ : this.position.z)
+      );
+      this.lastActualX = this.position.x;
+      this.lastActualZ = this.position.z;
+
+      const actualSpeed = delta > 0.0001 ? (actualMoved / delta) : 0;
+      if (actualSpeed < 1.0 && this.stunTimer <= 0 && this.distractedTimer <= 0) {
+        this.stuckTimer = (this.stuckTimer || 0) + delta;
+        if (this.stuckTimer > 0.3) {
+          const tangent = new THREE.Vector3(-moveDir.z, 0, moveDir.x);
+          const sign = (Math.sin(performance.now() * 0.01) > 0) ? 1 : -1;
+          this.position.add(tangent.multiplyScalar(sign * 5.0 * delta));
+          this.map.resolveCollision(this.position, this.radius);
+
+          if (this.stuckTimer > 1.2) {
+            this.aggressiveRespawn(player);
+            this.stuckTimer = 0;
+          }
+        }
+      } else {
+        this.stuckTimer = 0;
+      }
     }
 
     // Ensure she stays within map bounds
@@ -343,17 +442,16 @@ export class NextbotGirl {
 
     // Nextbot Bobbing & Wobble Animation
     const speed = this.velocity.length();
+    let verticalBob = 0;
     if (speed > 0.5) {
       this.bobTimer += delta * 12;
-      const verticalBob = Math.abs(Math.sin(this.bobTimer)) * 0.12;
-      const wobble = Math.sin(this.bobTimer * 0.7) * 0.08;
-
-      this.meshGroup.position.set(this.position.x, verticalBob, this.position.z);
-      this.spriteMesh.rotation.z = wobble;
+      verticalBob = Math.abs(Math.sin(this.bobTimer)) * 0.12;
+      this.spriteMesh.rotation.z = Math.sin(this.bobTimer * 0.7) * 0.08;
     } else {
-      this.meshGroup.position.set(this.position.x, 0, this.position.z);
       this.spriteMesh.rotation.z = 0;
     }
+
+    this.meshGroup.position.set(this.position.x, this.position.y + verticalBob, this.position.z);
 
     // Cylindrical billboard effect: Sprite faces player camera on Y axis only
     this.meshGroup.lookAt(player.camera.position.x, this.meshGroup.position.y, player.camera.position.z);

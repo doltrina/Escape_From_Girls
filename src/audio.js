@@ -646,6 +646,263 @@ class SoundEngine {
     osc.stop(now + 0.65);
   }
 
+  // Set Map Mode ('maze' or 'crater')
+  setMapMode(mode = 'maze') {
+    this.isVolcanoMode = (mode === 'crater');
+    if (this.customAudio) {
+      // In volcano, music plays slightly slowed down and pitched down ("плавящийся динамик")
+      this.customAudio.playbackRate = this.isVolcanoMode ? 0.86 : 1.0;
+    }
+  }
+
+  // 🚨 Emergency Alarm Siren (When Key 1 is picked up in Crater and Magma rises)
+  playSirenAlarm() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+
+    // Two-tone rising/falling siren wail (3 cycles)
+    for (let c = 0; c < 3; c++) {
+      const t = now + c * 0.9;
+      osc.frequency.setValueAtTime(520, t);
+      osc.frequency.exponentialRampToValueAtTime(940, t + 0.45);
+      osc.frequency.exponentialRampToValueAtTime(520, t + 0.9);
+    }
+
+    gain.gain.setValueAtTime(0.45, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 2.8);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 2.85);
+  }
+
+  // 🚀 Rocket Jump (RTX 5090 Super Jump against wall / in volcano)
+  playRocketJump() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+
+    // Concussive bass explosion
+    const boom = this.ctx.createOscillator();
+    const boomGain = this.ctx.createGain();
+    boom.type = 'triangle';
+    boom.frequency.setValueAtTime(220, now);
+    boom.frequency.exponentialRampToValueAtTime(35, now + 0.35);
+    boomGain.gain.setValueAtTime(0.9, now);
+    boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    boom.connect(boomGain);
+    boomGain.connect(this.masterGain);
+    boom.start(now);
+    boom.stop(now + 0.42);
+
+    // Rocket whistling propulsion ascent
+    const whoosh = this.ctx.createOscillator();
+    const whooshGain = this.ctx.createGain();
+    whoosh.type = 'sine';
+    whoosh.frequency.setValueAtTime(300, now + 0.05);
+    whoosh.frequency.exponentialRampToValueAtTime(1400, now + 0.45);
+    whooshGain.gain.setValueAtTime(0.001, now);
+    whooshGain.gain.linearRampToValueAtTime(0.5, now + 0.1);
+    whooshGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    whoosh.connect(whooshGain);
+    whooshGain.connect(this.masterGain);
+    whoosh.start(now + 0.05);
+    whoosh.stop(now + 0.52);
+  }
+
+  // ⚡ Double Jump (Monster Energy air jump)
+  playDoubleJump() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(450, now);
+    osc.frequency.exponentialRampToValueAtTime(1150, now + 0.22);
+
+    gain.gain.setValueAtTime(0.5, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.26);
+  }
+
+  // 🧗 Crumbling Ledge Warning (Tremor / Vibration)
+  playCrumbleWarning() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(75, now);
+    osc.frequency.linearRampToValueAtTime(95, now + 0.4);
+
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.46);
+  }
+
+  // 💥 Rock Collapse into Magma
+  playRockCollapse() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(110, now);
+    osc.frequency.exponentialRampToValueAtTime(28, now + 0.6);
+
+    gain.gain.setValueAtTime(0.65, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.68);
+  }
+
+  // 🌋 Magma Geyser Eruption
+  playGeyserErupt() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const filter = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(90, now);
+    osc.frequency.exponentialRampToValueAtTime(420, now + 0.4);
+    osc.frequency.exponentialRampToValueAtTime(60, now + 1.1);
+
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(320, now);
+
+    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.15);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc.start(now);
+    osc.stop(now + 1.2);
+  }
+
+  // 😱 Nextbot Center Leap Screech
+  playNextbotLeap() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(780, now);
+    osc.frequency.exponentialRampToValueAtTime(1450, now + 0.35);
+    osc.frequency.exponentialRampToValueAtTime(320, now + 0.9);
+
+    gain.gain.setValueAtTime(0.6, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 1.0);
+  }
+
+  // 🎲 D20 Miracle Rescue from Magma
+  playD20Save() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const notes = [440, 554.37, 659.25, 880, 1108.73, 1318.51];
+    notes.forEach((freq, idx) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+
+      gain.gain.setValueAtTime(0.35, now + idx * 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.45);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now + idx * 0.05);
+      osc.stop(now + idx * 0.05 + 0.48);
+    });
+  }
+
+  // ⛩️ Torii Gate Countdown Beep
+  playToriiBeep() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, now);
+
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.14);
+  }
+
+  // ⛩️ Torii Gate Final Activation Warp
+  playToriiActivate() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(260, now);
+    osc.frequency.exponentialRampToValueAtTime(1550, now + 0.8);
+
+    gain.gain.setValueAtTime(0.55, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.95);
+  }
+
+  // 🌋 Magma sizzle & death sound
+  playMagmaDeath() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const bufferSize = Math.floor(this.ctx.sampleRate * 1.2);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(450, now);
+    filter.frequency.exponentialRampToValueAtTime(1600, now + 0.3);
+    filter.frequency.exponentialRampToValueAtTime(200, now + 1.1);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.7, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.15);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+    noise.start(now);
+  }
+
   // Victory: Stops all chase music, heartbeat and sounds so video plays cleanly with its own audio
   playVictory() {
     this.stopHeartbeat();
@@ -662,3 +919,4 @@ class SoundEngine {
 }
 
 export const soundEngine = new SoundEngine();
+

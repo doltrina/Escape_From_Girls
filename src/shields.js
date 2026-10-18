@@ -148,7 +148,9 @@ export class ShieldManager {
     const type = SHIELD_TYPES[randomKey];
 
     const pos = this.map.getRandomSpawnPoint(nearPlayerPos, 12);
-    pos.y = 1.0;
+    if (!this.map.isCrater) {
+      pos.y = 1.0;
+    }
 
     const { group, innerMesh, ring } = this.createPickupMesh(type);
     group.position.copy(pos);
@@ -205,9 +207,10 @@ export class ShieldManager {
       p.innerMesh.rotation.x = Math.sin(p.hoverOffset * 0.5) * 0.2;
       p.group.position.y = p.position.y + Math.sin(p.hoverOffset) * 0.15;
 
-      // Distance to player
-      const dist = Math.hypot(p.position.x - pPos.x, p.position.z - pPos.z);
-      if (dist < 1.3) {
+      // 3D Distance to player
+      const distFlat = Math.hypot(p.position.x - pPos.x, p.position.z - pPos.z);
+      const distY = Math.abs(p.position.y - pPos.y);
+      if (distFlat < 1.6 && distY < 2.2) {
         // Collect into player inventory!
         player.addToInventory(p.type.id);
         if (p.type.id === 'd20_dice') {
