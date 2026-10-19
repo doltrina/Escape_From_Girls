@@ -134,12 +134,18 @@ export class ShieldManager {
     ring.position.y = -0.5;
     group.add(ring);
 
-    // Light source
-    const light = new THREE.PointLight(type.color, 1.8, 4.5, 2);
-    light.position.set(0, 0, 0);
-    group.add(light);
+    // Holographic energy glow halo (no dynamic PointLight = zero shader recompile hitches!)
+    const haloGeo = new THREE.SphereGeometry(0.32, 12, 8);
+    const haloMat = new THREE.MeshBasicMaterial({
+      color: type.color,
+      transparent: true,
+      opacity: 0.28,
+      wireframe: true
+    });
+    const halo = new THREE.Mesh(haloGeo, haloMat);
+    group.add(halo);
 
-    return { group, innerMesh: mesh, ring };
+    return { group, innerMesh: mesh, ring, halo };
   }
 
   spawnRandomPickup(nearPlayerPos = null) {
@@ -221,6 +227,13 @@ export class ShieldManager {
           onNotify(p.type);
         }
 
+        p.group.traverse((c) => {
+          if (c.geometry) c.geometry.dispose();
+          if (c.material) {
+            if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+            else c.material.dispose();
+          }
+        });
         this.scene.remove(p.group);
         this.pickups.splice(i, 1);
       }

@@ -131,13 +131,14 @@ export class Player {
   }
 
   initFlashlight() {
-    this.flashlight = new THREE.SpotLight(0xfff4e0, 2.5, 25, Math.PI / 6, 0.4, 1.2);
-    this.flashlight.position.set(0.2, -0.2, -0.1);
+    this.flashlight = new THREE.SpotLight(0xfff4e0, 2.8, 32, Math.PI / 6.5, 0.35, 1.2);
+    // Origin at the front glass bezel of the 3D tactical flashlight (in front of hand and arm!)
+    this.flashlight.position.set(0.26, -0.22, -0.62);
     this.camera.add(this.flashlight);
 
-    // Target slightly ahead
+    // Target straight ahead in the distance
     this.flashlightTarget = new THREE.Object3D();
-    this.flashlightTarget.position.set(0, 0, -5);
+    this.flashlightTarget.position.set(0.26, -0.22, -10.62);
     this.camera.add(this.flashlightTarget);
     this.flashlight.target = this.flashlightTarget;
   }
@@ -386,13 +387,41 @@ export class Player {
     if (this.keys.right) this.moveDir.add(right);
     if (this.keys.left) this.moveDir.sub(right);
 
-    if (this.moveDir.lengthSq() > 0.001) {
-      this.moveDir.normalize();
-      const targetVel = this.moveDir.clone().multiplyScalar(targetSpeed);
-      this.velocity.lerp(targetVel, this.acceleration * delta);
+    if (this.isGrounded) {
+      // 1. Grounded Movement: Full responsive ground acceleration and friction
+      if (this.moveDir.lengthSq() > 0.001) {
+        this.moveDir.normalize();
+        const targetVel = this.moveDir.clone().multiplyScalar(targetSpeed);
+        this.velocity.lerp(targetVel, this.acceleration * delta);
+      } else {
+        // Ground friction decelerate
+        this.velocity.lerp(new THREE.Vector3(0, 0, 0), this.friction * delta);
+      }
     } else {
-      // Friction decelerate
-      this.velocity.lerp(new THREE.Vector3(0, 0, 0), this.friction * delta);
+      // 2. Airborne Physics: Ballistic momentum is preserved!
+      // In mid-air, player CANNOT artificially accelerate or boost speed!
+      const currentHorizontalSpeed = Math.hypot(this.velocity.x, this.velocity.z);
+
+      if (this.moveDir.lengthSq() > 0.001) {
+        this.moveDir.normalize();
+        // Air steering: very gentle guidance (4.0 vs 45.0) without adding artificial propulsion
+        const airControl = 4.0;
+        const maxAirSpeed = Math.max(this.walkSpeed * 0.6, currentHorizontalSpeed);
+        const airTargetVel = this.moveDir.clone().multiplyScalar(maxAirSpeed);
+        this.velocity.lerp(airTargetVel, airControl * delta);
+
+        // Strict clamp: mid-air steering cannot increase velocity magnitude
+        const newSpeed = Math.hypot(this.velocity.x, this.velocity.z);
+        if (newSpeed > maxAirSpeed && newSpeed > 0.001) {
+          const factor = maxAirSpeed / newSpeed;
+          this.velocity.x *= factor;
+          this.velocity.z *= factor;
+        }
+      } else {
+        // Minimal air drag (preserves natural parabolic jump momentum across chasms)
+        const airDrag = 0.4;
+        this.velocity.lerp(new THREE.Vector3(0, 0, 0), airDrag * delta);
+      }
     }
 
     // Apply horizontal movement with sub-stepping to prevent tunneling at high speeds

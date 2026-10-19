@@ -1,6 +1,210 @@
 import * as THREE from 'three';
 import { soundEngine } from './audio.js';
 
+// =========================================================================
+// 🎨 PROCEDURAL HIGH-DETAIL CANVAS TEXTURES FOR PLAYER BODY
+// =========================================================================
+let cachedJacketTexture = null;
+let cachedPantsTexture = null;
+let cachedSneakerTexture = null;
+
+function getCyberJacketTexture() {
+  if (cachedJacketTexture) return cachedJacketTexture;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // Dark ballistic techwear fabric base
+  ctx.fillStyle = '#141822';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Carbon-fiber / ripstop diamond weave pattern
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+  ctx.lineWidth = 1;
+  for (let i = -512; i < 1024; i += 8) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i + 512, 512);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(i + 512, 0);
+    ctx.lineTo(i, 512);
+    ctx.stroke();
+  }
+
+  // Reinforced shoulder & chest ballistic armor panels
+  ctx.fillStyle = '#0e121a';
+  ctx.fillRect(40, 20, 432, 110);
+  ctx.fillRect(60, 240, 392, 140); // Kangaroo chest pouch
+
+  // Neon cyber piping & trim lines
+  ctx.strokeStyle = '#00f3ff';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(40, 130);
+  ctx.lineTo(472, 130);
+  ctx.moveTo(60, 240);
+  ctx.lineTo(452, 240);
+  ctx.stroke();
+
+  // Center zipper track with metallic teeth
+  ctx.fillStyle = '#080a0f';
+  ctx.fillRect(246, 0, 20, 512);
+
+  // Metallic zipper teeth
+  ctx.fillStyle = '#a0b0c0';
+  for (let y = 10; y < 500; y += 8) {
+    ctx.fillRect(248, y, 6, 3);
+    ctx.fillRect(258, y + 4, 6, 3);
+  }
+
+  // Cyan glowing zipper pull line
+  ctx.strokeStyle = '#00f3ff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(256, 0);
+  ctx.lineTo(256, 512);
+  ctx.stroke();
+
+  // High-Tech Cyber Stencil Badges & Decals
+  ctx.fillStyle = '#00f3ff';
+  ctx.font = 'bold 16px monospace';
+  ctx.fillText('NEO-RUNNER // MK-IV', 60, 60);
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+  ctx.font = '12px monospace';
+  ctx.fillText('TACTICAL BODYSUIT 2077', 60, 80);
+  ctx.fillText('SPEC-OPS // ANTI-GIRL SYSTEM', 60, 100);
+
+  // Hazard warning chevrons on right chest
+  ctx.fillStyle = '#ffaa00';
+  for (let h = 0; h < 3; h++) {
+    ctx.beginPath();
+    ctx.moveTo(380 + h * 24, 50);
+    ctx.lineTo(396 + h * 24, 75);
+    ctx.lineTo(380 + h * 24, 100);
+    ctx.lineTo(388 + h * 24, 100);
+    ctx.lineTo(404 + h * 24, 75);
+    ctx.lineTo(388 + h * 24, 50);
+    ctx.fill();
+  }
+
+  // Subtle ambient occlusion / gradient vignette
+  const grad = ctx.createLinearGradient(0, 0, 0, 512);
+  grad.addColorStop(0, 'rgba(0, 0, 0, 0.4)');
+  grad.addColorStop(0.5, 'rgba(0, 0, 0, 0)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0.6)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 512, 512);
+
+  cachedJacketTexture = new THREE.CanvasTexture(canvas);
+  return cachedJacketTexture;
+}
+
+function getCargoPantsTexture() {
+  if (cachedPantsTexture) return cachedPantsTexture;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // Dark charcoal tactical cargo fabric
+  ctx.fillStyle = '#161c28';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Subtle crosshatch twill
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 512; i += 6) {
+    ctx.beginPath();
+    ctx.moveTo(0, i);
+    ctx.lineTo(512, i);
+    ctx.stroke();
+  }
+
+  // Ballistic knee reinforcement panels
+  ctx.fillStyle = '#0d1118';
+  ctx.fillRect(60, 180, 160, 150);
+  ctx.fillRect(292, 180, 160, 150);
+
+  // Hexagonal knee grip texture
+  ctx.fillStyle = '#080b10';
+  for (let x = 70; x < 210; x += 16) {
+    for (let y = 190; y < 320; y += 16) {
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x + 232, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Double stitch seams
+  ctx.strokeStyle = '#00f3ff';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(50, 0); ctx.lineTo(50, 512);
+  ctx.moveTo(462, 0); ctx.lineTo(462, 512);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Tactical webbing straps
+  ctx.fillStyle = '#090c12';
+  ctx.fillRect(20, 80, 30, 220);
+  ctx.fillRect(462, 80, 30, 220);
+
+  // Subtle ambient occlusion
+  const grad = ctx.createLinearGradient(0, 0, 0, 512);
+  grad.addColorStop(0, 'rgba(0, 0, 0, 0.3)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 512, 512);
+
+  cachedPantsTexture = new THREE.CanvasTexture(canvas);
+  return cachedPantsTexture;
+}
+
+function getSneakerTexture() {
+  if (cachedSneakerTexture) return cachedSneakerTexture;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // Dark matte cyber leather
+  ctx.fillStyle = '#0c0f16';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Perforated toe box micro-dots
+  ctx.fillStyle = '#06080c';
+  for (let x = 60; x < 450; x += 14) {
+    for (let y = 300; y < 480; y += 14) {
+      ctx.beginPath();
+      ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Cyan energy bar on heel
+  ctx.fillStyle = '#00f3ff';
+  ctx.fillRect(80, 40, 352, 28);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 14px monospace';
+  ctx.fillText('// CYBER TREAD 2077 //', 140, 60);
+
+  // White geometric sole trim
+  ctx.fillStyle = '#f0f3f6';
+  ctx.fillRect(0, 480, 512, 32);
+
+  cachedSneakerTexture = new THREE.CanvasTexture(canvas);
+  return cachedSneakerTexture;
+}
+
 /**
  * 🎮 First-Person Body, Viewmodel & Advanced Player Physics Manager
  * - True First-Person Lower Body (Torso, Cargo Pants, Sneakers visible when looking down)
@@ -116,6 +320,8 @@ export class FirstPersonBody {
     // 🔦 High-Detail 3D Tactical Flashlight
     this.flashlightGroup = new THREE.Group();
     this.flashlightGroup.position.set(0, 0.02, -0.08);
+    // Hide flashlight model when switched off so empty hand remains
+    this.flashlightGroup.visible = (this.player.flashlightOn !== false);
 
     const metalMat = new THREE.MeshStandardMaterial({
       color: 0x22262d,
@@ -335,29 +541,29 @@ export class FirstPersonBody {
   initLowerBody() {
     this.lowerBodyGroup = new THREE.Group();
 
+    // Create high-detail canvas textures
+    const jacketTex = getCyberJacketTexture();
+    const pantsTex = getCargoPantsTexture();
+    const sneakerTex = getSneakerTexture();
+
     // Materials with DoubleSide to ensure no faces are ever culled or see-through!
     const torsoMat = new THREE.MeshStandardMaterial({
-      color: 0x141822,
-      roughness: 0.7,
-      metalness: 0.2,
+      map: jacketTex,
+      roughness: 0.65,
+      metalness: 0.25,
       side: THREE.DoubleSide
     });
 
     const collarMat = new THREE.MeshStandardMaterial({
-      color: 0x0f131a,
-      roughness: 0.8,
-      metalness: 0.15,
-      side: THREE.DoubleSide
-    });
-
-    const neckSealMat = new THREE.MeshBasicMaterial({
-      color: 0x080a0f,
+      color: 0x0c0f16,
+      roughness: 0.85,
       side: THREE.DoubleSide
     });
 
     const pantsMat = new THREE.MeshStandardMaterial({
-      color: 0x1a2130,
-      roughness: 0.85,
+      map: pantsTex,
+      roughness: 0.8,
+      metalness: 0.1,
       side: THREE.DoubleSide
     });
 
@@ -366,98 +572,93 @@ export class FirstPersonBody {
       side: THREE.DoubleSide
     });
 
-    // 1. Torso / Cyber Hoodie Body (Chest angled naturally forward, hips slightly back)
-    const torsoGeo = new THREE.BoxGeometry(0.42, 0.46, 0.24);
-    this.torsoMesh = new THREE.Mesh(torsoGeo, torsoMat);
-    this.torsoMesh.position.set(0, 0.96, 0.04);
-    this.torsoMesh.rotation.x = -0.05;
-    this.lowerBodyGroup.add(this.torsoMesh);
+    // Torso Group (Tilted and placed forward so camera looking down looks AT the chest, not inside the neck!)
+    this.torsoGroup = new THREE.Group();
+    this.torsoGroup.position.set(0, 0.94, -0.16);
+    this.torsoGroup.rotation.x = -0.18;
 
-    // 2. Closed Collar Ring & Inner Neck Seal (Completely eliminates internal hollow geometry!)
-    const collarGeo = new THREE.TorusGeometry(0.125, 0.028, 8, 20);
+    // 1. Torso / Cyber Hoodie Body (Upper chest broader, tapering slightly to waist)
+    const torsoGeo = new THREE.BoxGeometry(0.44, 0.48, 0.24);
+    this.torsoMesh = new THREE.Mesh(torsoGeo, torsoMat);
+    this.torsoMesh.position.set(0, 0, 0);
+    this.torsoGroup.add(this.torsoMesh);
+
+    // 2. Collar & Neck (Low profile, sloping backwards)
+    const collarGeo = new THREE.TorusGeometry(0.12, 0.025, 8, 20);
     const collarMesh = new THREE.Mesh(collarGeo, collarMat);
     collarMesh.rotation.x = Math.PI / 2;
-    collarMesh.position.set(0, 1.185, 0.035);
-    this.lowerBodyGroup.add(collarMesh);
-
-    const sealGeo = new THREE.CircleGeometry(0.12, 16);
-    const neckSeal = new THREE.Mesh(sealGeo, neckSealMat);
-    neckSeal.rotation.x = -Math.PI / 2;
-    neckSeal.position.set(0, 1.175, 0.035);
-    this.lowerBodyGroup.add(neckSeal);
+    collarMesh.position.set(0, 0.24, 0.02);
+    this.torsoGroup.add(collarMesh);
 
     // 3. Cyber Zipper on FRONT chest (facing -Z, the player's viewing direction!)
-    const zipGeo = new THREE.PlaneGeometry(0.032, 0.40);
+    const zipGeo = new THREE.PlaneGeometry(0.028, 0.44);
     const zipper = new THREE.Mesh(zipGeo, neonAccentMat);
-    zipper.position.set(0, 0.96, -0.082);
-    this.lowerBodyGroup.add(zipper);
+    zipper.position.set(0, 0, -0.122);
+    this.torsoGroup.add(zipper);
 
     // 4. Tactical Kangaroo Pocket / Pouch on front of hoodie
-    const pocketGeo = new THREE.BoxGeometry(0.26, 0.13, 0.035);
+    const pocketGeo = new THREE.BoxGeometry(0.28, 0.14, 0.04);
     const pocket = new THREE.Mesh(pocketGeo, torsoMat);
-    pocket.position.set(0, 0.84, -0.095);
-    this.lowerBodyGroup.add(pocket);
+    pocket.position.set(0, -0.12, -0.125);
+    this.torsoGroup.add(pocket);
 
-    const pocketTrimGeo = new THREE.PlaneGeometry(0.24, 0.012);
-    const pocketTrim = new THREE.Mesh(pocketTrimGeo, neonAccentMat);
-    pocketTrim.position.set(0, 0.90, -0.114);
-    this.lowerBodyGroup.add(pocketTrim);
+    this.lowerBodyGroup.add(this.torsoGroup);
 
     // 5. Pelvis / Tactical Belt
     const pelvisGeo = new THREE.BoxGeometry(0.38, 0.14, 0.22);
     const pelvis = new THREE.Mesh(pelvisGeo, pantsMat);
-    pelvis.position.set(0, 0.72, 0.03);
+    pelvis.position.set(0, 0.68, -0.12);
     this.lowerBodyGroup.add(pelvis);
 
     const buckleGeo = new THREE.BoxGeometry(0.06, 0.04, 0.02);
     const buckle = new THREE.Mesh(buckleGeo, neonAccentMat);
-    buckle.position.set(0, 0.72, -0.082);
+    buckle.position.set(0, 0.68, -0.232);
     this.lowerBodyGroup.add(buckle);
 
-    // 6. Cargo Pants Legs & Pivots (Positioned slightly forward so thighs & shoes are cleanly visible)
-    const legThighGeo = new THREE.BoxGeometry(0.15, 0.32, 0.17);
-    const legShinGeo = new THREE.BoxGeometry(0.14, 0.34, 0.16);
-    const cargoPocketGeo = new THREE.BoxGeometry(0.04, 0.11, 0.11);
+    // 6. Cargo Pants Legs & Pivots (Positioned forward so thighs & knees are in view)
+    const legThighGeo = new THREE.BoxGeometry(0.16, 0.34, 0.18);
+    const legShinGeo = new THREE.BoxGeometry(0.15, 0.36, 0.17);
+    const cargoPocketGeo = new THREE.BoxGeometry(0.045, 0.12, 0.12);
 
     // Left Leg Pivot
     this.leftLegPivot = new THREE.Group();
-    this.leftLegPivot.position.set(-0.14, 0.66, 0.02);
+    this.leftLegPivot.position.set(-0.14, 0.64, -0.10);
 
     const leftThigh = new THREE.Mesh(legThighGeo, pantsMat);
-    leftThigh.position.set(0, -0.15, -0.02);
+    leftThigh.position.set(0, -0.16, -0.02);
     this.leftLegPivot.add(leftThigh);
 
     const leftShin = new THREE.Mesh(legShinGeo, pantsMat);
-    leftShin.position.set(0, -0.45, -0.04);
+    leftShin.position.set(0, -0.46, -0.05);
     this.leftLegPivot.add(leftShin);
 
     const leftPocket = new THREE.Mesh(cargoPocketGeo, pantsMat);
-    leftPocket.position.set(-0.08, -0.22, -0.02);
+    leftPocket.position.set(-0.085, -0.22, -0.02);
     this.leftLegPivot.add(leftPocket);
 
-    this.leftShoe = this.createSneakerMesh();
-    this.leftShoe.position.set(0, -0.63, -0.04);
+    this.leftShoe = this.createSneakerMesh(sneakerTex);
+    this.leftShoe.position.set(0, -0.64, -0.06);
     this.leftLegPivot.add(this.leftShoe);
     this.lowerBodyGroup.add(this.leftLegPivot);
 
     // Right Leg Pivot
     this.rightLegPivot = new THREE.Group();
-    this.rightLegPivot.position.set(0.14, 0.66, 0.02);
+    this.rightLegPivot.position.set(0.14, 0.64, -0.10);
 
     const rightThigh = new THREE.Mesh(legThighGeo, pantsMat);
-    rightThigh.position.set(0, -0.15, -0.02);
+    rightThigh.position.set(0, -0.16, -0.02);
     this.rightLegPivot.add(rightThigh);
 
     const rightShin = new THREE.Mesh(legShinGeo, pantsMat);
-    rightShin.position.set(0, -0.45, -0.04);
+    rightShin.position.set(0, -0.46, -0.05);
     this.rightLegPivot.add(rightShin);
 
     const rightPocket = new THREE.Mesh(cargoPocketGeo, pantsMat);
-    rightPocket.position.set(0.08, -0.22, -0.02);
+    rightPocket.position.set(0.085, -0.22, -0.02);
     this.rightLegPivot.add(rightPocket);
 
-    this.rightShoe = this.createSneakerMesh();
-    this.rightShoe.position.set(0, -0.63, -0.04);
+    this.rightShoe = this.createSneakerMesh(sneakerTex);
+    this.rightShoe.position.set(0, -0.64, -0.06);
     this.rightLegPivot.add(this.rightShoe);
     this.lowerBodyGroup.add(this.rightLegPivot);
 
@@ -466,7 +667,7 @@ export class FirstPersonBody {
     }
   }
 
-  createSneakerMesh() {
+  createSneakerMesh(sneakerTex = null) {
     const group = new THREE.Group();
 
     const soleMat = new THREE.MeshStandardMaterial({
@@ -476,6 +677,7 @@ export class FirstPersonBody {
     });
     const upperMat = new THREE.MeshStandardMaterial({
       color: 0x0c0f14,
+      map: sneakerTex || getSneakerTexture(),
       roughness: 0.55,
       side: THREE.DoubleSide
     });
@@ -551,6 +753,7 @@ export class FirstPersonBody {
   }
 
   triggerFlashlightToggle(isOn) {
+    this.flashlightGroup.visible = isOn;
     this.lensMat.color.setHex(isOn ? 0xfff0c8 : 0x222222);
     soundEngine.playFlashlightClick(isOn);
 
@@ -638,7 +841,17 @@ export class FirstPersonBody {
       walkBobY = Math.sin(this.animTimer * 2.5) * 0.003;
     }
 
-    // 6. Update Right Arm & Flashlight Position
+    // Keep arms static and stable during jumps & falls (Requirement 2)
+    const isAirborne = !p.isGrounded;
+    if (isAirborne) {
+      this.swayX = THREE.MathUtils.lerp(this.swayX, 0, 15 * delta);
+      this.swayY = THREE.MathUtils.lerp(this.swayY, 0, 15 * delta);
+      walkBobX = 0;
+      walkBobY = 0;
+      this.roll = THREE.MathUtils.lerp(this.roll, 0, 12 * delta);
+    }
+
+    // 6. Update Right Arm & Flashlight Position (Removed landing dip jerk from arms)
     let flashOffsetZ = 0;
     let flashOffsetY = 0;
     if (this.flashlightClickAnim && this.flashlightClickAnim > 0) {
@@ -649,7 +862,7 @@ export class FirstPersonBody {
 
     this.rightArmGroup.position.set(
       0.26 + this.swayX + walkBobX,
-      -0.24 + this.swayY + walkBobY - this.landDip * 0.6 + flashOffsetY,
+      -0.24 + this.swayY + walkBobY + flashOffsetY,
       -0.38 + flashOffsetZ
     );
     this.rightArmGroup.rotation.set(
@@ -738,7 +951,7 @@ export class FirstPersonBody {
 
     this.leftArmGroup.position.set(
       leftArmTargetX + this.swayX - walkBobX,
-      leftArmTargetY + this.swayY - walkBobY - this.landDip * 0.6,
+      leftArmTargetY + this.swayY - walkBobY,
       leftArmTargetZ
     );
     this.leftArmGroup.rotation.set(
@@ -751,9 +964,16 @@ export class FirstPersonBody {
     if (this.lowerBodyGroup) {
       // Position lower body at ground level under player camera
       const groundPos = p.position.clone();
-      groundPos.y = (p.position.y - p.eyeHeight) - this.landDip;
+      groundPos.y = (p.position.y - p.eyeHeight);
       this.lowerBodyGroup.position.copy(groundPos);
       this.lowerBodyGroup.rotation.y = p.yaw;
+
+      // Dynamic look-down framing: when player looks down, tilt torso naturally into view!
+      if (this.torsoGroup) {
+        const lookDown = Math.max(0, Math.min(1.0, -p.pitch / 1.35));
+        this.torsoGroup.rotation.x = -0.18 - lookDown * 0.16;
+        this.torsoGroup.position.z = -0.16 - lookDown * 0.08;
+      }
 
       // Animate walking leg strides
       if (p.isGrounded && horizontalSpeed > 0.5 && !p.isDowned) {
@@ -761,9 +981,9 @@ export class FirstPersonBody {
         this.leftLegPivot.rotation.x = strideAngle;
         this.rightLegPivot.rotation.x = -strideAngle;
       } else if (!p.isGrounded) {
-        // Airborne pose: tuck knees slightly
-        this.leftLegPivot.rotation.x = THREE.MathUtils.lerp(this.leftLegPivot.rotation.x, 0.35, 8 * delta);
-        this.rightLegPivot.rotation.x = THREE.MathUtils.lerp(this.rightLegPivot.rotation.x, -0.2, 8 * delta);
+        // Airborne pose: steady legs
+        this.leftLegPivot.rotation.x = THREE.MathUtils.lerp(this.leftLegPivot.rotation.x, 0.25, 8 * delta);
+        this.rightLegPivot.rotation.x = THREE.MathUtils.lerp(this.rightLegPivot.rotation.x, -0.15, 8 * delta);
       } else {
         // Idle stance
         this.leftLegPivot.rotation.x = THREE.MathUtils.lerp(this.leftLegPivot.rotation.x, 0, 10 * delta);

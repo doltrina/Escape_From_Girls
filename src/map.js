@@ -1,7 +1,13 @@
 import * as THREE from 'three';
 
-// Procedural Canvas Texture Generators
-function createFloorTexture() {
+// Procedural Canvas Texture Caches
+let cachedFloorTexture = null;
+let cachedWallTexture = null;
+let cachedCeilingTexture = null;
+const cachedSignTextures = new Map();
+
+function getFloorTexture() {
+  if (cachedFloorTexture) return cachedFloorTexture;
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
@@ -32,14 +38,15 @@ function createFloorTexture() {
     ctx.fillRect(Math.random() * 512, Math.random() * 512, Math.random() * 4, Math.random() * 4);
   }
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(12, 12);
-  return texture;
+  cachedFloorTexture = new THREE.CanvasTexture(canvas);
+  cachedFloorTexture.wrapS = THREE.RepeatWrapping;
+  cachedFloorTexture.wrapT = THREE.RepeatWrapping;
+  cachedFloorTexture.repeat.set(12, 12);
+  return cachedFloorTexture;
 }
 
-function createWallTexture() {
+function getWallTexture() {
+  if (cachedWallTexture) return cachedWallTexture;
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
@@ -79,13 +86,14 @@ function createWallTexture() {
     ctx.fill();
   }
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  return texture;
+  cachedWallTexture = new THREE.CanvasTexture(canvas);
+  cachedWallTexture.wrapS = THREE.RepeatWrapping;
+  cachedWallTexture.wrapT = THREE.RepeatWrapping;
+  return cachedWallTexture;
 }
 
-function createCeilingTexture() {
+function getCeilingTexture() {
+  if (cachedCeilingTexture) return cachedCeilingTexture;
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 256;
@@ -102,14 +110,17 @@ function createCeilingTexture() {
   ctx.strokeRect(0, 128, 128, 128);
   ctx.strokeRect(128, 128, 128, 128);
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(12, 12);
-  return texture;
+  cachedCeilingTexture = new THREE.CanvasTexture(canvas);
+  cachedCeilingTexture.wrapS = THREE.RepeatWrapping;
+  cachedCeilingTexture.wrapT = THREE.RepeatWrapping;
+  cachedCeilingTexture.repeat.set(12, 12);
+  return cachedCeilingTexture;
 }
 
-function createSignTexture(text, bgColor = '#ff0055', textColor = '#ffffff') {
+function getSignTexture(text, bgColor = '#ff0055', textColor = '#ffffff') {
+  const key = `${text}_${bgColor}_${textColor}`;
+  if (cachedSignTextures.has(key)) return cachedSignTextures.get(key);
+
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 128;
@@ -129,12 +140,16 @@ function createSignTexture(text, bgColor = '#ff0055', textColor = '#ffffff') {
   ctx.shadowBlur = 15;
   ctx.fillText(text, 256, 64);
 
-  return new THREE.CanvasTexture(canvas);
+  const tex = new THREE.CanvasTexture(canvas);
+  cachedSignTextures.set(key, tex);
+  return tex;
 }
 
 export class GameMap {
   constructor(scene) {
     this.scene = scene;
+    this.root = new THREE.Group();
+    this.scene.add(this.root);
     this.tileSize = 4; // meters per grid tile
     this.wallHeight = 4.2;
 
@@ -182,7 +197,7 @@ export class GameMap {
     // Floor
     const floorGeo = new THREE.PlaneGeometry(this.width, this.depth);
     const floorMat = new THREE.MeshStandardMaterial({
-      map: createFloorTexture(),
+      map: getFloorTexture(),
       roughness: 0.7,
       metalness: 0.2
     });
@@ -190,24 +205,24 @@ export class GameMap {
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(0, 0, 0);
     floor.receiveShadow = true;
-    this.scene.add(floor);
+    this.root.add(floor);
 
     // Ceiling
     const ceilingGeo = new THREE.PlaneGeometry(this.width, this.depth);
     const ceilingMat = new THREE.MeshStandardMaterial({
-      map: createCeilingTexture(),
+      map: getCeilingTexture(),
       roughness: 0.9,
       metalness: 0.1
     });
     const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
     ceiling.rotation.x = Math.PI / 2;
     ceiling.position.set(0, this.wallHeight, 0);
-    this.scene.add(ceiling);
+    this.root.add(ceiling);
 
     // Walls
     const wallGeo = new THREE.BoxGeometry(this.tileSize, this.wallHeight, this.tileSize);
     const wallMat = new THREE.MeshStandardMaterial({
-      map: createWallTexture(),
+      map: getWallTexture(),
       roughness: 0.6,
       metalness: 0.3
     });
@@ -222,7 +237,7 @@ export class GameMap {
           wall.position.set(x, this.wallHeight / 2, z);
           wall.castShadow = true;
           wall.receiveShadow = true;
-          this.scene.add(wall);
+          this.root.add(wall);
 
           const openLeft = (c > 0 && this.grid[r][c - 1] === 0);
           const openRight = (c < this.gridCols - 1 && this.grid[r][c + 1] === 0);
@@ -278,12 +293,12 @@ export class GameMap {
       const fixtureMat = new THREE.MeshBasicMaterial({ color: color });
       const fixture = new THREE.Mesh(fixtureGeo, fixtureMat);
       fixture.position.set(x, this.wallHeight - 0.05, z);
-      this.scene.add(fixture);
+      this.root.add(fixture);
 
       // PointLight
       const light = new THREE.PointLight(color, 2.5, 14, 1.8);
       light.position.set(x, this.wallHeight - 0.5, z);
-      this.scene.add(light);
+      this.root.add(light);
     });
   }
 
@@ -340,14 +355,14 @@ export class GameMap {
       }
 
       const mat = new THREE.MeshBasicMaterial({
-        map: createSignTexture(def.text, def.color),
+        map: getSignTexture(def.text, def.color),
         transparent: true,
         side: THREE.FrontSide
       });
       const mesh = new THREE.Mesh(signGeo, mat);
       mesh.position.set(posX, 2.0, posZ);
       mesh.rotation.y = rotY;
-      this.scene.add(mesh);
+      this.root.add(mesh);
     }
   }
 
@@ -603,5 +618,11 @@ export class GameMap {
 
     // Fallback: direct line to target
     return toWorldPos.clone();
+  }
+
+  destroy() {
+    if (this.root && this.scene) {
+      this.scene.remove(this.root);
+    }
   }
 }
