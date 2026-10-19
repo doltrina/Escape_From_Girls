@@ -110,6 +110,7 @@ function getOrCreateRoom(roomId) {
       keysCollected: 0,
       totalKeys: 3,
       collectedKeyIndices: [],
+      mapType: 'crater',
       seed: Math.floor(Math.random() * 1000000)
     });
   }
@@ -228,6 +229,8 @@ wss.on('connection', (ws) => {
           // Assign host if none
           if (!room.hostId || !room.players.has(room.hostId)) {
             room.hostId = currentPlayerId;
+            if (data.mapType) room.mapType = data.mapType;
+            room.seed = Math.floor(Math.random() * 1000000);
           }
 
           const isHost = (currentPlayerId === room.hostId);
@@ -254,7 +257,8 @@ wss.on('connection', (ws) => {
             keysCollected: room.keysCollected,
             collectedKeyIndices: room.collectedKeyIndices,
             players: getRoomPlayerList(room),
-            seed: room.seed
+            seed: room.seed,
+            mapType: room.mapType || 'crater'
           });
 
           // Broadcast to other players in room
@@ -302,6 +306,8 @@ wss.on('connection', (ws) => {
           room.gameState = 'PLAYING';
           room.keysCollected = 0;
           room.collectedKeyIndices = [];
+          if (data.mapType) room.mapType = data.mapType;
+          if (data.seed !== undefined && data.seed !== null) room.seed = data.seed;
           for (const p of room.players.values()) {
             p.isDowned = false;
           }
@@ -309,6 +315,7 @@ wss.on('connection', (ws) => {
           broadcastToRoom(currentRoomId, {
             type: 'game_started',
             seed: room.seed,
+            mapType: room.mapType || 'crater',
             players: getRoomPlayerList(room)
           });
           break;
@@ -476,6 +483,7 @@ wss.on('connection', (ws) => {
           room.keysCollected = 0;
           room.collectedKeyIndices = [];
           room.seed = Math.floor(Math.random() * 1000000);
+          if (data.mapType) room.mapType = data.mapType;
           for (const p of room.players.values()) {
             p.isDowned = false;
           }
@@ -483,7 +491,32 @@ wss.on('connection', (ws) => {
           broadcastToRoom(currentRoomId, {
             type: 'game_restarted',
             seed: room.seed,
+            mapType: room.mapType || 'crater',
             players: getRoomPlayerList(room)
+          });
+          break;
+        }
+
+        // --- 10b. Map Type Changed by Host ---
+        case 'set_map_type': {
+          if (!currentRoomId || !currentPlayerId) return;
+          const room = rooms.get(currentRoomId);
+          if (!room || room.hostId !== currentPlayerId) return;
+          if (data.mapType) {
+            room.mapType = data.mapType;
+            broadcastToRoom(currentRoomId, {
+              type: 'map_type_changed',
+              mapType: room.mapType
+            });
+          }
+          break;
+        }
+
+        // --- 10c. Parkour Start Trigger (Volcano Co-op Sync) ---
+        case 'parkour_start': {
+          if (!currentRoomId) return;
+          broadcastToRoom(currentRoomId, {
+            type: 'parkour_started'
           });
           break;
         }

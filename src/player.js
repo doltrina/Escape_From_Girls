@@ -343,7 +343,7 @@ export class Player {
     }
   }
 
-  update(delta) {
+  update(delta, remotePlayers = []) {
     if (delta > 0.1) delta = 0.1; // Clamp delta spikes
 
     // Safeguard against NaN position / velocity spikes
@@ -464,6 +464,11 @@ export class Player {
       // Step Z and resolve collision (slide against Z walls)
       this.position.z += this.velocity.z * stepDelta;
       this.map.resolveCollision(this.position, this.radius);
+
+      // Resolve co-op teammate collisions so players don't walk through each other
+      if (remotePlayers && remotePlayers.length > 0) {
+        this.resolvePlayerCollisions(remotePlayers);
+      }
     }
 
     // 3D Floor & Platform Collision Query
@@ -553,21 +558,66 @@ export class Player {
 
     // Update Camera Position and Rotation
     // Anatomical Head/Neck Pivot:
-    // When pitching down, head rotates around neck vertebra C7 (height 1.56m, behind eyes)
-    // swinging eyes forward in a natural arc over the chest so gaze looks cleanly down the body
+    // Natural head pitch pivot: subtle forward arc (0.04m -> 0.08m) and height offset (0.14m -> 0.12m)
+    // Camera stays 17cm-20cm above collar/chest (well outside 0.03m near-clip plane)
+    // while perfectly framing the chest, zipper, belt, thighs, and sneakers in the lower view!
     const roll = (this.fpBody) ? this.fpBody.roll : 0;
     const landDip = (this.fpBody) ? this.fpBody.landDip : 0;
 
-    const neckBaseY = (this.position.y - this.eyeHeight) + this.currentEyeHeight - 0.14 - landDip + bobOffset;
-    const eyeForwardOffset = 0.05 * Math.cos(this.pitch) + 0.12 * Math.sin(-this.pitch);
-    const eyeHeightOffset = 0.14 * Math.cos(this.pitch) + 0.05 * Math.sin(this.pitch);
+    const downPitchFactor = Math.max(0, -this.pitch / (Math.PI / 2));
+    const eyeForwardOffset = 0.04 + downPitchFactor * 0.04;
+    const eyeHeightOffset = 0.14 - downPitchFactor * 0.02;
 
+    const neckBaseY = (this.position.y - this.eyeHeight) + this.currentEyeHeight - 0.14 - landDip + bobOffset;
     const camX = this.position.x - Math.sin(this.yaw) * eyeForwardOffset;
     const camY = neckBaseY + eyeHeightOffset;
     const camZ = this.position.z - Math.cos(this.yaw) * eyeForwardOffset;
 
     this.camera.position.set(camX, camY, camZ);
     this.camera.rotation.set(this.pitch, this.yaw, roll, 'YXZ');
+  }
+
+  resolvePlayerCollisions(remotePlayers) {
+    if (!remotePlayers || remotePlayers.length === 0) return;
+
+    for (const rp of remotePlayers) {
+      if (!rp || !rp.root) continue;
+      const rPos = rp.root.position;
+
+      // Vertical overlap check (both players within standing height of each other)
+      const teammateEyeY = rPos.y + this.eyeHeight;
+      const diffY = Math.abs(this.position.y - teammateEyeY);
+      if (diffY > 1.8) continue;
+
+      // Horizontal cylinder collision
+      const dx = this.position.x - rPos.x;
+      const dz = this.position.z - rPos.z;
+      const distSq = dx * dx + dz * dz;
+
+      // Downed teammates allow closer approach to revive with [E]
+      const minDist = rp.isDowned ? 0.60 : 0.88;
+      const minDistSq = minDist * minDist;
+
+      if (distSq < minDistSq && distSq > 0.00001) {
+        const dist = Math.sqrt(distSq);
+        const overlap = minDist - dist;
+        const nx = dx / dist;
+        const nz = dz / dist;
+
+        this.position.x += nx * overlap;
+        this.position.z += nz * overlap;
+
+        const velDot = this.velocity.x * nx + this.velocity.z * nz;
+        if (velDot < 0) {
+          this.velocity.x -= velDot * nx;
+          this.velocity.z -= velDot * nz;
+        }
+
+        if (this.map && typeof this.map.resolveCollision === 'function') {
+          this.map.resolveCollision(this.position, this.radius);
+        }
+      }
+    }
   }
 
   addToInventory(typeId) {

@@ -308,34 +308,46 @@ export class FirstPersonBody {
     this.torsoGroup = new THREE.Group();
     this.torsoGroup.position.set(0, 1.25, 0.01);
 
-    // Torso / Cyber Hoodie Body (Height 0.52m from pelvis to neck)
-    const torsoGeo = new THREE.BoxGeometry(0.44, 0.52, 0.24);
-    this.torsoMesh = new THREE.Mesh(torsoGeo, this.torsoMat);
-    this.torsoGroup.add(this.torsoMesh);
+    // Torso / Cyber Hoodie Body:
+    // Anatomical 2-tier design: main abdomen box + sloped upper chest & trapezius
+    // Prevents flat-table near-plane slicing under the chin when pitching camera down!
+    const lowerTorsoGeo = new THREE.BoxGeometry(0.42, 0.36, 0.23);
+    const lowerTorsoMesh = new THREE.Mesh(lowerTorsoGeo, this.torsoMat);
+    lowerTorsoMesh.position.set(0, -0.07, 0);
+    this.torsoGroup.add(lowerTorsoMesh);
 
-    // Front Central Cyber Zipper (facing front -Z)
-    const zipGeo = new THREE.PlaneGeometry(0.028, 0.48);
+    // Sloped Upper Chest / Shoulders (tapers smoothly from chest width 0.42m up to neck collar 0.24m)
+    const upperChestGeo = new THREE.CylinderGeometry(0.12, 0.21, 0.18, 14);
+    upperChestGeo.scale(1.0, 1.0, 0.65);
+    const upperChestMesh = new THREE.Mesh(upperChestGeo, this.collarMat);
+    upperChestMesh.position.set(0, 0.17, 0.01);
+    this.torsoGroup.add(upperChestMesh);
+
+    this.torsoMesh = lowerTorsoMesh;
+
+    // Front Central Cyber Zipper (facing front -Z, angled down the chest)
+    const zipGeo = new THREE.PlaneGeometry(0.028, 0.44);
     const zipper = new THREE.Mesh(zipGeo, this.cyberAccentMat);
-    zipper.position.set(0, 0.01, -0.122);
+    zipper.position.set(0, -0.01, -0.122);
     this.torsoGroup.add(zipper);
 
     // Tactical Kangaroo Pouch Pocket on front
     const pocketGeo = new THREE.BoxGeometry(0.28, 0.15, 0.04);
     const pocket = new THREE.Mesh(pocketGeo, this.torsoMat);
-    pocket.position.set(0, -0.12, -0.125);
+    pocket.position.set(0, -0.13, -0.125);
     this.torsoGroup.add(pocket);
 
-    // High Tactical Collar & Neck
-    const collarGeo = new THREE.TorusGeometry(0.11, 0.028, 8, 20);
+    // Tactical Collar Trim resting on hoodie shoulders with solid inner lining
+    const collarGeo = new THREE.TorusGeometry(0.11, 0.022, 8, 20);
     const collarMesh = new THREE.Mesh(collarGeo, this.collarMat);
     collarMesh.rotation.x = Math.PI / 2;
-    collarMesh.position.set(0, 0.26, 0.01);
+    collarMesh.position.set(0, 0.25, 0.01);
     this.torsoGroup.add(collarMesh);
 
-    const neckGeo = new THREE.CylinderGeometry(0.065, 0.072, 0.10, 14);
-    const neckMesh = new THREE.Mesh(neckGeo, this.skinMat);
-    neckMesh.position.set(0, 0.30, 0.01);
-    this.torsoGroup.add(neckMesh);
+    const collarLiningGeo = new THREE.CylinderGeometry(0.095, 0.095, 0.035, 16);
+    const collarLiningMesh = new THREE.Mesh(collarLiningGeo, this.collarMat);
+    collarLiningMesh.position.set(0, 0.252, 0.01);
+    this.torsoGroup.add(collarLiningMesh);
 
     // Folded Hoodie Hood resting behind neck
     const hoodGeo = new THREE.BoxGeometry(0.26, 0.16, 0.12);

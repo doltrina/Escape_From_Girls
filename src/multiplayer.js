@@ -37,9 +37,15 @@ export class NetworkManager {
     this.onHostMigrated = null;
     this.onError = null;
     this.isConnecting = false;
+
+    // Session Synchronization
+    this.roomSeed = null;
+    this.mapType = 'crater';
+    this.onParkourStart = null;
+    this.onMapTypeChanged = null;
   }
 
-  connect(roomId = 'PUBLIC', name = 'Самурай', color = '#00f3ff') {
+  connect(roomId = 'PUBLIC', name = 'Самурай', color = '#00f3ff', mapType = 'crater') {
     if (this.isConnecting) {
       return Promise.reject(new Error('Уже идет подключение к комнате...'));
     }
@@ -78,12 +84,14 @@ export class NetworkManager {
 
       this.ws.onopen = () => {
         this.isConnected = true;
+        this.mapType = mapType || 'crater';
         // Join room request
         this.send({
           type: 'join_room',
           roomId: this.roomId,
           name: this.playerName,
-          color: this.playerColor
+          color: this.playerColor,
+          mapType: this.mapType
         });
       };
 
@@ -156,6 +164,8 @@ export class NetworkManager {
         this.roomId = msg.roomId;
         this.isHost = msg.isHost;
         this.players = msg.players || [];
+        this.roomSeed = msg.seed;
+        if (msg.mapType) this.mapType = msg.mapType;
         if (this.onRoomJoined) this.onRoomJoined(msg);
         break;
 
@@ -176,7 +186,27 @@ export class NetworkManager {
 
       case 'game_started':
         this.players = msg.players || [];
+        if (msg.seed !== undefined) this.roomSeed = msg.seed;
+        if (msg.mapType) this.mapType = msg.mapType;
         if (this.onGameStarted) this.onGameStarted(msg);
+        break;
+
+      case 'game_restarted':
+        this.players = msg.players || [];
+        if (msg.seed !== undefined) this.roomSeed = msg.seed;
+        if (msg.mapType) this.mapType = msg.mapType;
+        if (this.onGameRestarted) this.onGameRestarted(msg);
+        break;
+
+      case 'map_type_changed':
+        if (msg.mapType) {
+          this.mapType = msg.mapType;
+          if (this.onMapTypeChanged) this.onMapTypeChanged(msg.mapType);
+        }
+        break;
+
+      case 'parkour_started':
+        if (this.onParkourStart) this.onParkourStart();
         break;
 
       case 'player_update':
@@ -259,9 +289,9 @@ export class NetworkManager {
     });
   }
 
-  sendNextbotUpdate(pos, rotY, targetId, stunTimer, distractedTimer, speed) {
+  sendNextbotUpdate(pos, rotY, targetId, stunTimer, distractedTimer, speed, magmaLevel = undefined) {
     if (!this.isConnected || !this.isHost) return;
-    this.send({
+    const payload = {
       type: 'nextbot_update',
       x: Number(pos.x.toFixed(3)),
       y: Number(pos.y.toFixed(3)),
@@ -271,7 +301,11 @@ export class NetworkManager {
       stunTimer: Number(stunTimer.toFixed(2)),
       distractedTimer: Number(distractedTimer.toFixed(2)),
       speed: Number(speed.toFixed(2))
-    });
+    };
+    if (typeof magmaLevel === 'number') {
+      payload.magmaLevel = Number(magmaLevel.toFixed(2));
+    }
+    this.send(payload);
   }
 
   sendKeyCollected(keyIndex, collectorName) {
@@ -330,15 +364,31 @@ export class NetworkManager {
     });
   }
 
-  sendStartGame() {
+  sendStartGame(mapType = null) {
     this.send({
-      type: 'start_game'
+      type: 'start_game',
+      mapType: mapType || this.mapType
     });
   }
 
-  sendRestartGame() {
+  sendRestartGame(mapType = null) {
     this.send({
-      type: 'restart_game'
+      type: 'restart_game',
+      mapType: mapType || this.mapType
+    });
+  }
+
+  sendParkourStart() {
+    this.send({
+      type: 'parkour_start'
+    });
+  }
+
+  sendMapType(mapType) {
+    this.mapType = mapType;
+    this.send({
+      type: 'set_map_type',
+      mapType
     });
   }
 

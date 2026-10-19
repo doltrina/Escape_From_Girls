@@ -63,8 +63,8 @@ class Game {
     this.scene.background = new THREE.Color(0x06070a);
     this.scene.fog = new THREE.FogExp2(0x06070a, 0.035);
 
-    // Camera
-    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+    // Camera (near plane 0.03m prevents near-clipping into first-person body)
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.03, 100);
 
     // Ambient Lighting
     const hemiLight = new THREE.HemisphereLight(0x445577, 0x111122, 0.6);
@@ -183,6 +183,9 @@ class Game {
 
     // Spawn initial positions
     this.resetPositions();
+
+    this.updateMenuTagline(this.currentMapType);
+    this.updateArtifactLegends(this.currentMapType);
   }
 
   loadMap(mapType) {
@@ -208,10 +211,13 @@ class Game {
       this.map.onMagmaRiseStart = () => {
         // Quiet rising without intrusive screen banners
       };
-      this.map.onParkourStart = () => {
+      this.map.onParkourStart = (fromNetwork = false) => {
         if (this.girl) {
           const spawnPos = this.map.getRandomSpawnPoint(this.player.position, 14);
           this.girl.awaken(spawnPos);
+        }
+        if (!fromNetwork && this.isMultiplayer) {
+          networkManager.sendParkourStart();
         }
       };
       soundEngine.setMapMode('crater');
@@ -250,14 +256,62 @@ class Game {
       this.dom.tabMapMaze.classList.toggle('active', mapType === 'maze');
     }
 
+    this.updateMenuTagline(mapType);
+    this.updateArtifactLegends(mapType);
+
+    if (this.isMultiplayer && networkManager.isHost) {
+      networkManager.sendMapType(mapType);
+    }
+
     this.resetPositions();
     const mapName = (mapType === 'crater') ? '🌋 Месячный вулкан' : '🏛️ Классический Лабиринт';
     this.showToast(`🗺️ Выбрана карта: ${mapName}`);
   }
 
-  resetPositions() {
+  updateMenuTagline(mapType = this.currentMapType) {
+    if (!this.dom.menuTagline) return;
+    if (this.state === STATE.PAUSED) {
+      if (mapType === 'crater') {
+        this.dom.menuTagline.innerHTML = '🔥 <strong>Месячные поднимаются</strong> со дна кратера!<br>Прыгай по скалам 3 ярусов, собери <strong>3 ключа</strong> и успей спастись через <strong>Врата Тории</strong> на вершине!';
+      } else {
+        this.dom.menuTagline.innerHTML = 'Она рыщет по темным коридорам лабиринта...<br>Собери <strong>3 священных ключа</strong> и открой путь на свободу!';
+      }
+    } else {
+      if (mapType === 'crater') {
+        this.dom.menuTagline.innerHTML = '🔥 <strong>Месячные поднимаются</strong> со дна кратера!<br>Прыгай по скалам 3 ярусов, собери <strong>3 священных ключа</strong> и спасись через <strong>Врата Тории</strong>!';
+      } else {
+        this.dom.menuTagline.innerHTML = 'Она рыщет по коридорам... Если догонит — прощай, девственность!<br>Собери <strong>3 священных ключа</strong> и открой путь на свободу!';
+      }
+    }
+  }
+
+  updateArtifactLegends(mapType = this.currentMapType) {
+    const isCrater = (mapType === 'crater');
+    if (this.dom.legendDescForcefield) {
+      this.dom.legendDescForcefield.textContent = isCrater
+        ? 'Отбрасывает девушку мощной ударной волной — спасает от сброса в раскаленные месячные!'
+        : 'Отталкивает девушку взрывной волной при приближении';
+    }
+    if (this.dom.legendDescEnergy) {
+      this.dom.legendDescEnergy.textContent = isCrater
+        ? 'Взрывной спринт и двойной супер-прыжок — позволяет перелетать гигантские разломы между скалами!'
+        : 'Ультра-буст скорости и бесконечная выносливость на 5с';
+    }
+    if (this.dom.legendDescDaki) {
+      this.dom.legendDescDaki.textContent = isCrater
+        ? 'Задерживает девушку на платформе на 5 сек — даёт время обогнать поднимающиеся месячные!'
+        : 'Девушка залипает на аниме-подушку на 5 секунд';
+    }
+    if (this.dom.legendDescD20) {
+      this.dom.legendDescD20.textContent = isCrater
+        ? '+1 Жизнь: воскрешает на ближайшей скале при падении в месячные или поимке!'
+        : 'Дополнительная жизнь (+1 спасение от девственности)';
+    }
+  }
+
+  resetPositions(seed = null) {
     if (this.map && typeof this.map.reset === 'function') {
-      this.map.reset();
+      this.map.reset(seed);
     }
 
     const playerSpawn = this.map.getRandomSpawnPoint();
@@ -336,6 +390,15 @@ class Game {
       menuOverlay: document.getElementById('menu-overlay'),
       menuTitle: document.getElementById('menu-title'),
       menuSubtitle: document.getElementById('menu-subtitle'),
+      menuTagline: document.getElementById('menu-tagline'),
+      legendNameForcefield: document.getElementById('legend-name-forcefield'),
+      legendDescForcefield: document.getElementById('legend-desc-forcefield'),
+      legendNameEnergy: document.getElementById('legend-name-energy_drink'),
+      legendDescEnergy: document.getElementById('legend-desc-energy_drink'),
+      legendNameDaki: document.getElementById('legend-name-dakimakura'),
+      legendDescDaki: document.getElementById('legend-desc-dakimakura'),
+      legendNameD20: document.getElementById('legend-name-d20_dice'),
+      legendDescD20: document.getElementById('legend-desc-d20_dice'),
       btnStart: document.getElementById('btn-start-game'),
       btnResume: document.getElementById('btn-resume-game'),
       pauseSecondaryGrid: document.getElementById('pause-secondary-grid'),
@@ -1026,8 +1089,13 @@ class Game {
 
     this.state = STATE.PLAYING;
     this.elapsedTime = 0;
-    this.shieldsCollected = 0;
     this.resetPositions();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('pitch')) {
+      const p = parseFloat(urlParams.get('pitch'));
+      if (!isNaN(p)) this.player.pitch = p;
+    }
 
     this.dom.menuOverlay.classList.add('hidden');
     this.dom.gameOverModal.classList.add('hidden');
@@ -1069,7 +1137,23 @@ class Game {
   pauseGame() {
     this.state = STATE.PAUSED;
     if (this.dom.menuTitle) this.dom.menuTitle.textContent = 'ПАУЗА';
-    if (this.dom.menuSubtitle) this.dom.menuSubtitle.textContent = this.isMultiplayer ? 'МЕНЮ КООПЕРАТИВА' : 'ИГРА ПРИОСТАНОВЛЕНА';
+
+    if (this.currentMapType === 'crater') {
+      if (this.dom.menuSubtitle) {
+        this.dom.menuSubtitle.textContent = this.isMultiplayer
+          ? '🌋 МЕСЯЧНЫЙ ВУЛКАН • МЕНЮ КООПЕРАТИВА'
+          : '🌋 МЕСЯЧНЫЙ ВУЛКАН • ИГРА ПРИОСТАНОВЛЕНА';
+      }
+    } else {
+      if (this.dom.menuSubtitle) {
+        this.dom.menuSubtitle.textContent = this.isMultiplayer
+          ? '🏛️ ЛАБИРИНТ • МЕНЮ КООПЕРАТИВА'
+          : '🏛️ ЛАБИРИНТ • ИГРА ПРИОСТАНОВЛЕНА';
+      }
+    }
+    this.updateMenuTagline(this.currentMapType);
+    this.updateArtifactLegends(this.currentMapType);
+
     if (this.dom.btnResume) this.dom.btnResume.style.display = 'block';
     if (this.dom.pauseSecondaryGrid) this.dom.pauseSecondaryGrid.style.display = 'grid';
 
@@ -1134,6 +1218,8 @@ class Game {
     this.state = STATE.MENU;
     if (this.dom.menuTitle) this.dom.menuTitle.textContent = 'ESCAPE FROM GIRLS';
     if (this.dom.menuSubtitle) this.dom.menuSubtitle.textContent = 'СОХРАНИ СВОЮ ДЕВСТВЕННОСТЬ';
+    this.updateMenuTagline(this.currentMapType);
+    this.updateArtifactLegends(this.currentMapType);
     if (this.dom.btnResume) this.dom.btnResume.style.display = 'none';
     if (this.dom.pauseSecondaryGrid) this.dom.pauseSecondaryGrid.style.display = 'none';
     if (this.dom.btnRestartPause) this.dom.btnRestartPause.style.display = 'none';
@@ -1398,8 +1484,9 @@ class Game {
           this.map.update(delta);
         }
 
-        // Update Player
-        this.player.update(delta);
+        // Update Player (with co-op teammate collision resolution)
+        const remoteList = this.isMultiplayer ? Array.from(this.remotePlayers.values()) : [];
+        this.player.update(delta, remoteList);
 
         // Update altitude and rising magma display in crater
         if (this.currentMapType === 'crater' && this.dom.hudAltitudeValue) {
@@ -1429,13 +1516,15 @@ class Game {
         );
 
         if (networkManager.isHost) {
+          const magmaLvl = (this.map && this.map.magmaLevel !== undefined) ? this.map.magmaLevel : undefined;
           networkManager.sendNextbotUpdate(
             this.girl.position,
             this.girl.meshGroup.rotation.y,
             'target',
             this.girl.stunTimer,
             this.girl.distractedTimer,
-            this.girl.currentSpeed
+            this.girl.currentSpeed,
+            magmaLvl
           );
         }
 
@@ -1648,7 +1737,7 @@ class Game {
 
       const name = (this.dom.coopNameInput ? this.dom.coopNameInput.value : 'Самурай').trim() || 'Самурай';
       this.showToast(`Подключение к комнате ${roomId}...`);
-      networkManager.connect(roomId, name, this.selectedColor)
+      networkManager.connect(roomId, name, this.selectedColor, this.currentMapType)
         .then(() => {
           this.dom.coopConnectView.classList.add('hidden');
           this.dom.coopRoomView.classList.remove('hidden');
@@ -1708,7 +1797,7 @@ class Game {
 
     if (this.dom.btnCoopStartGame) {
       this.dom.btnCoopStartGame.addEventListener('click', () => {
-        networkManager.sendStartGame();
+        networkManager.sendStartGame(this.currentMapType);
       });
     }
 
@@ -1735,10 +1824,18 @@ class Game {
       });
     }
 
-    // 4. WebSocket Event Listeners
     networkManager.onRoomJoined = (msg) => {
       this.dom.coopDisplayRoom.textContent = msg.roomId;
       this.renderLobbyPlayers(msg.players);
+      if (msg.mapType && msg.mapType !== this.currentMapType) {
+        this.loadMap(msg.mapType);
+        if (this.dom.tabMapCrater && this.dom.tabMapMaze) {
+          this.dom.tabMapCrater.classList.toggle('active', msg.mapType === 'crater');
+          this.dom.tabMapMaze.classList.toggle('active', msg.mapType === 'maze');
+        }
+        this.updateMenuTagline(msg.mapType);
+        this.updateArtifactLegends(msg.mapType);
+      }
     };
 
     networkManager.onPlayerJoined = (player, players) => {
@@ -1780,6 +1877,32 @@ class Game {
     networkManager.onNextbotUpdate = (data) => {
       if (!networkManager.isHost) {
         this.girl.applyNetworkUpdate(data);
+        if (data.magmaLevel !== undefined && this.map && typeof this.map.setNetworkMagmaLevel === 'function') {
+          this.map.setNetworkMagmaLevel(data.magmaLevel);
+        }
+      }
+    };
+
+    networkManager.onParkourStart = () => {
+      if (this.map && typeof this.map.triggerParkourStart === 'function') {
+        this.map.triggerParkourStart(true);
+      }
+      if (this.girl && typeof this.girl.setDormant === 'function') {
+        this.girl.setDormant(false);
+      }
+    };
+
+    networkManager.onMapTypeChanged = (mapType) => {
+      if (mapType && mapType !== this.currentMapType) {
+        this.loadMap(mapType);
+        if (this.dom.tabMapCrater && this.dom.tabMapMaze) {
+          this.dom.tabMapCrater.classList.toggle('active', mapType === 'crater');
+          this.dom.tabMapMaze.classList.toggle('active', mapType === 'maze');
+        }
+        this.updateMenuTagline(mapType);
+        this.updateArtifactLegends(mapType);
+        const mapName = (mapType === 'crater') ? '🌋 Месячный вулкан' : '🏛️ Классический Лабиринт';
+        this.showToast(`🗺️ Хост выбрал карту: ${mapName}`);
       }
     };
 
@@ -1883,8 +2006,19 @@ class Game {
     this.elapsedTime = 0;
     this.shieldsCollected = 0;
 
-    // Reset local entities
-    this.resetPositions();
+    const seed = (msg && msg.seed !== undefined) ? msg.seed : (networkManager.roomSeed || 123456);
+    const mapType = (msg && msg.mapType) ? msg.mapType : (networkManager.mapType || this.currentMapType);
+
+    if (mapType && mapType !== this.currentMapType) {
+      this.loadMap(mapType);
+      if (this.dom.tabMapCrater && this.dom.tabMapMaze) {
+        this.dom.tabMapCrater.classList.toggle('active', mapType === 'crater');
+        this.dom.tabMapMaze.classList.toggle('active', mapType === 'maze');
+      }
+    }
+
+    // Reset local entities with synchronized seed across all room players!
+    this.resetPositions(seed);
 
     // Create 3D avatars for teammates
     for (const rp of this.remotePlayers.values()) {
@@ -2080,6 +2214,13 @@ class Game {
 function initGame() {
   try {
     window.gameInstance = new Game();
+    if (new URLSearchParams(window.location.search).get('test_run') === '1') {
+      setTimeout(() => {
+        if (window.gameInstance && typeof window.gameInstance.startGame === 'function') {
+          window.gameInstance.startGame();
+        }
+      }, 150);
+    }
   } catch (err) {
     console.error('Failed to initialize game:', err);
   }

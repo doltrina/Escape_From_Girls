@@ -1,6 +1,17 @@
 import * as THREE from 'three';
 import { soundEngine } from './audio.js';
 
+// Deterministic 32-bit PRNG (Mulberry32) for synchronized procedural parkour generation across co-op clients
+export function createPRNG(seed = 123456789) {
+  let s = (Math.floor(Number(seed)) || 123456789) >>> 0;
+  return function() {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 // ============================================================================
 // 🌋 PROCEDURAL TEXTURE GENERATORS (VOLCANIC BASALT & VIVID BLOOD MAGMA)
 // ============================================================================
@@ -633,7 +644,14 @@ export class CraterMap {
   // 🧗‍♂️ AUTHENTIC VERTICAL PARKOUR GENERATOR (No More Spiral Staircase!)
   // 3 Distinct Tiers, Sprint Chasms, Balance Beams, Monoliths & Dynamic Jitter!
   // -------------------------------------------------------------
-  generateRandomParkour() {
+  generateRandomParkour(seed = null) {
+    if (seed !== null && seed !== undefined) {
+      this.currentSeed = seed;
+    } else if (this.currentSeed === undefined || this.currentSeed === null) {
+      this.currentSeed = Math.floor(Math.random() * 1000000);
+    }
+    const rng = createPRNG(this.currentSeed);
+
     // 1. Clear existing platforms & decorations
     while (this.platformsGroup.children.length > 0) {
       const child = this.platformsGroup.children[0];
@@ -663,17 +681,17 @@ export class CraterMap {
     this.addFireBrazier(-4.5, 32.7, 3);
     this.addFireBrazier(4.5, 32.7, 3);
 
-    // 4. Procedural Direction & Jitter
-    // On each launch, 50% chance to mirror the entire parkour course across the caldera!
-    const dir = (Math.random() < 0.5) ? 1 : -1;
+    // 4. Procedural Direction & Jitter (Synchronized via Seeded PRNG)
+    // 50% chance to mirror the entire parkour course across the caldera deterministically
+    const dir = (rng() < 0.5) ? 1 : -1;
     // Small random jitter offset per run for replayability
-    const jitter = () => (Math.random() - 0.5) * 0.45;
+    const jitter = () => (rng() - 0.5) * 0.45;
 
     // Helper to add parkour step with mirroring
     const addStep = (x, y, z, w, h, d, type = 'rock', isCrumble = false) => {
       const rx = (x + jitter()) * dir;
       const rz = z + jitter();
-      const ry = y + (Math.random() - 0.5) * 0.12;
+      const ry = y + (rng() - 0.5) * 0.12;
       return this.addPlatform(rx, ry, rz, w, h, d, type, isCrumble, false);
     };
 
@@ -960,15 +978,26 @@ export class CraterMap {
   // -------------------------------------------------------------
   // 🔄 PARKOUR & MAGMA ACTIVATION TRIGGER
   // -------------------------------------------------------------
-  triggerParkourStart() {
+  triggerParkourStart(fromNetwork = false) {
     if (this.hasPlayerStartedParkour) return;
     this.hasPlayerStartedParkour = true;
     this.isMagmaRising = true;
     this.magmaRisingSpeed = this.magmaBaseSpeed;
 
     if (this.onParkourStart) {
-      this.onParkourStart();
+      this.onParkourStart(fromNetwork);
     }
+  }
+
+  setNetworkMagmaLevel(targetLevel) {
+    if (typeof targetLevel !== 'number' || isNaN(targetLevel)) return;
+    if (Math.abs(this.magmaLevel - targetLevel) > 1.2) {
+      this.magmaLevel = targetLevel;
+    } else {
+      this.magmaLevel += (targetLevel - this.magmaLevel) * 0.25;
+    }
+    if (this.lavaMesh) this.lavaMesh.position.y = this.magmaLevel;
+    if (this.magmaLight) this.magmaLight.position.y = this.magmaLevel + 2.5;
   }
 
   startMagmaRise() {
@@ -1330,7 +1359,12 @@ export class CraterMap {
     });
   }
 
-  reset() {
+  reset(seed = null) {
+    if (seed !== null && seed !== undefined) {
+      this.currentSeed = seed;
+    } else {
+      this.currentSeed = Math.floor(Math.random() * 1000000);
+    }
     this.magmaLevel = this.initialMagmaLevel;
     this.isMagmaRising = false;
     this.hasPlayerStartedParkour = false;
@@ -1340,8 +1374,8 @@ export class CraterMap {
     this.lavaMesh.position.y = this.magmaLevel;
     this.magmaLight.position.y = this.magmaLevel + 2.5;
 
-    // Regenerate fresh complete randomized parkour course!
-    this.generateRandomParkour();
+    // Regenerate deterministic parkour course for this seed!
+    this.generateRandomParkour(this.currentSeed);
   }
 
   destroy() {
