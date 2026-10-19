@@ -212,7 +212,7 @@
       </div>
 
       <div class="menu-action-buttons">
-        <button id="btn-resume-game" class="btn-primary" style="display: none;">
+        <button id="btn-resume-game" class="btn-primary resume-btn" style="display: none;">
           ▶ ПРОДОЛЖИТЬ ПОБЕГ
         </button>
         <div class="mode-select-grid" id="main-mode-select">
@@ -231,12 +231,14 @@
             </div>
           </button>
         </div>
-        <button id="btn-restart-from-pause" class="btn-secondary" style="display: none;">
-          🔄 С НАЧАЛА
-        </button>
-        <button id="btn-leave-coop-room" class="btn-secondary" style="display: none;">
-          🏠 В ГЛАВНОЕ МЕНЮ
-        </button>
+        <div class="pause-secondary-grid" id="pause-secondary-grid" style="display: none;">
+          <button id="btn-restart-from-pause" class="btn-secondary">
+            🔄 С НАЧАЛА
+          </button>
+          <button id="btn-leave-coop-room" class="btn-secondary">
+            🏠 В ГЛАВНОЕ МЕНЮ
+          </button>
+        </div>
       </div>
 
       <!-- Artifacts Legend -->

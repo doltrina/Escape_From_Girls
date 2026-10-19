@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { soundEngine } from './audio.js';
+import { FirstPersonBody } from './firstPersonBody.js';
 
 export class Player {
-  constructor(camera, domElement, map) {
+  constructor(camera, domElement, scene = null, map = null) {
     this.camera = camera;
     this.domElement = domElement;
+    this.scene = scene;
     this.map = map;
 
     this.position = new THREE.Vector3(0, 1.7, 0);
@@ -93,7 +95,21 @@ export class Player {
     this.onDownedStateChange = null;
 
     this.isLocked = false;
+    this.wasPointerLocked = false;
+
+    // 🎮 True First-Person Body, Animated Hands & Viewmodel
+    this.fpBody = (this.scene) ? new FirstPersonBody(this, this.scene) : null;
+
     this.setupInputs();
+  }
+
+  setScene(scene) {
+    if (this.scene === scene) return;
+    this.scene = scene;
+    if (this.fpBody) {
+      this.fpBody.destroy();
+    }
+    this.fpBody = (this.scene) ? new FirstPersonBody(this, this.scene) : null;
   }
 
   setDowned(downed) {
@@ -129,6 +145,11 @@ export class Player {
   toggleFlashlight() {
     this.flashlightOn = !this.flashlightOn;
     this.flashlight.intensity = this.flashlightOn ? 2.5 : 0;
+    if (this.fpBody) {
+      this.fpBody.triggerFlashlightToggle(this.flashlightOn);
+    } else {
+      soundEngine.playFlashlightClick(this.flashlightOn);
+    }
   }
 
   setupInputs() {
@@ -140,7 +161,10 @@ export class Player {
     });
 
     document.addEventListener('pointerlockchange', () => {
-      this.isLocked = document.pointerLockElement === this.domElement;
+      this.isLocked = (document.pointerLockElement === this.domElement);
+      if (this.isLocked) {
+        this.wasPointerLocked = true;
+      }
     });
 
     // Mouse movement
@@ -277,6 +301,10 @@ export class Player {
     this.invulnerabilityTimer = 0;
     this.setDowned(false);
     this.currentEyeHeight = this.eyeHeight;
+    if (this.fpBody) {
+      this.fpBody.landDip = 0;
+      this.fpBody.landDipVelocity = 0;
+    }
     this.inventory = {
       forcefield: 0,
       energy_drink: 0,
@@ -290,6 +318,13 @@ export class Player {
 
   update(delta) {
     if (delta > 0.1) delta = 0.1; // Clamp delta spikes
+
+    // Safeguard against NaN position / velocity spikes
+    if (isNaN(this.position.x) || isNaN(this.position.y) || isNaN(this.position.z)) {
+      this.position.copy(this.lastSafePlatformPos);
+      this.velocity.set(0, 0, 0);
+      this.verticalVelocity = 0;
+    }
 
     // Update powerup timers
     if (this.shieldTimeRemaining > 0) {
@@ -379,10 +414,10 @@ export class Player {
 
     const groundY = floorY + this.eyeHeight;
 
-    // Track safe landing position for D20 miracle rescue
+    // Track safe landing position for D20 miracle rescue (only on stable, non-crumbling platforms)
     if (this.isGrounded) {
       if (this.map && this.map.isCrater) {
-        if (floorY > this.map.magmaLevel + 1.2) {
+        if (floorY > this.map.magmaLevel + 1.8) {
           this.lastSafePlatformPos.copy(this.position);
         }
         if (typeof this.map.onPlayerStep === 'function') {
@@ -414,7 +449,8 @@ export class Player {
         this.consumeD20Life();
         soundEngine.playD20Save();
         this.position.copy(this.lastSafePlatformPos);
-        this.verticalVelocity = 3.5;
+        this.velocity.set(0, 0, 0);
+        this.verticalVelocity = 4.0;
         this.isGrounded = true;
         if (this.onD20MagmaSave) this.onD20MagmaSave();
       } else {
@@ -442,8 +478,14 @@ export class Player {
       this.bobTimer = 0;
     }
 
+    // Update First-Person Body, Animated Viewmodel & Camera Physics
+    if (this.fpBody) {
+      this.fpBody.update(delta);
+    }
+
     // Update Camera Position and Rotation
-    const camY = (this.position.y - this.eyeHeight) + this.currentEyeHeight + bobOffset;
+    const landDip = (this.fpBody) ? this.fpBody.landDip : 0;
+    const camY = (this.position.y - this.eyeHeight) + this.currentEyeHeight + bobOffset - landDip;
     this.camera.position.set(this.position.x, camY, this.position.z);
     this.camera.rotation.order = 'YXZ';
     this.camera.rotation.y = this.yaw;
@@ -487,6 +529,11 @@ export class Player {
       this.onInventoryChange(this.inventory);
     }
 
+    // Trigger visible first-person hand animation
+    if (this.fpBody) {
+      this.fpBody.triggerItemAnimation(typeId);
+    }
+
     if (typeId === 'forcefield') {
       this.activateShield(6.0);
       // Volcano Map Rocket Jump: blast launches player upward!
@@ -521,6 +568,9 @@ export class Player {
       this.extraLives = this.inventory.d20_dice;
       this.invulnerabilityTimer = 2.5; // 2.5 seconds of safety!
       this.activateSpeedBoost(2.2); // Adrenaline burst to flee!
+      if (this.fpBody) {
+        this.fpBody.triggerItemAnimation('d20_dice');
+      }
       if (this.onInventoryChange) {
         this.onInventoryChange(this.inventory);
       }

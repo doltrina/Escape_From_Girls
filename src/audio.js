@@ -903,6 +903,63 @@ class SoundEngine {
     noise.start(now);
   }
 
+  // Tactical flashlight click sound (metallic dual-click)
+  playFlashlightClick(turnOn = true) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(turnOn ? 2400 : 1800, now);
+    osc.frequency.exponentialRampToValueAtTime(turnOn ? 800 : 600, now + 0.045);
+
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.055);
+  }
+
+  // Energy drink can opening tab fizz sound
+  playCanOpen() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    // Pop clink
+    const clink = this.ctx.createOscillator();
+    const clinkGain = this.ctx.createGain();
+    clink.type = 'sine';
+    clink.frequency.setValueAtTime(3200, now);
+    clink.frequency.exponentialRampToValueAtTime(1200, now + 0.04);
+    clinkGain.gain.setValueAtTime(0.3, now);
+    clinkGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    clink.connect(clinkGain);
+    clinkGain.connect(this.masterGain);
+    clink.start(now);
+    clink.stop(now + 0.05);
+
+    // Fizz hiss
+    const bufferSize = this.ctx.sampleRate * 0.25;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.08));
+    }
+    const hiss = this.ctx.createBufferSource();
+    hiss.buffer = buffer;
+    const hissFilter = this.ctx.createBiquadFilter();
+    hissFilter.type = 'highpass';
+    hissFilter.frequency.setValueAtTime(4500, now);
+    const hissGain = this.ctx.createGain();
+    hissGain.gain.setValueAtTime(0.22, now + 0.02);
+    hissGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+    hiss.connect(hissFilter);
+    hissFilter.connect(hissGain);
+    hissGain.connect(this.masterGain);
+    hiss.start(now + 0.015);
+  }
+
   // Victory: Stops all chase music, heartbeat and sounds so video plays cleanly with its own audio
   playVictory() {
     this.stopHeartbeat();

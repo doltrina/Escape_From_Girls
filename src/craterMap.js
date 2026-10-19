@@ -1037,66 +1037,79 @@ export class CraterMap {
   }
 
   // -------------------------------------------------------------
-  // 🛡️ SOLID 3D AABB HORIZONTAL SIDE COLLISIONS (Point 2)
-  // Prevents phasing through platform sides and falling into magma!
+  // 🛡️ SOLID 3D AABB HORIZONTAL SIDE COLLISIONS (Fixed: No random teleports!)
+  // Prevents phasing through platform sides while cleanly allowing jumps and landings
   // -------------------------------------------------------------
   resolveCollision(pos, radius = 0.45) {
+    if (isNaN(pos.x) || isNaN(pos.y) || isNaN(pos.z)) return;
+
     // 1. Keep within cylindrical caldera wall boundary
     const distFromCenter = Math.hypot(pos.x, pos.z);
-    const currentWallRadius = this.calderaRadius * (0.88 + 0.18 * (pos.y / this.calderaHeight)) - radius;
+    const safeHeight = Math.max(0, Math.min(this.calderaHeight, pos.y));
+    const currentWallRadius = this.calderaRadius * (0.88 + 0.18 * (safeHeight / this.calderaHeight)) - radius;
 
-    if (distFromCenter > currentWallRadius) {
+    if (distFromCenter > currentWallRadius && distFromCenter > 0.001) {
       const angle = Math.atan2(pos.z, pos.x);
       pos.x = Math.cos(angle) * currentWallRadius;
       pos.z = Math.sin(angle) * currentWallRadius;
     }
 
-    // 2. Solid horizontal side collision for all platforms
-    // If the player's feet (pos.y - 1.7) are below a platform's top surface,
-    // that platform is a solid physical obstacle in the horizontal X/Z plane!
+    // 2. Solid horizontal side collision for platforms
+    // Feet position relative to platform tops
     const feetY = pos.y - 1.7;
 
     for (const p of this.platforms) {
-      if (p.isFalling && p.topY < this.magmaLevel - 1) continue;
+      // Falling platforms should never exert side collision
+      if (p.isFalling) continue;
 
-      const platformBottom = p.y - p.h / 2 - 2.5;
       const platformTop = p.topY;
+      const platformBottom = p.y - p.h / 2 - 1.5;
 
-      // Only collide horizontally with sides when player is beside the platform:
-      // i.e. feet are below top surface, and body is above platform bottom.
-      if (feetY < platformTop - 0.25 && pos.y > platformBottom) {
-        const minX = p.x - p.w / 2;
-        const maxX = p.x + p.w / 2;
-        const minZ = p.z - p.d / 2;
-        const maxZ = p.z + p.d / 2;
+      // If feet are within landing/step-up range of platform top, do NOT block horizontally!
+      // Vertical collision (getFloorHeight) will catch and support the player cleanly.
+      if (feetY >= platformTop - 0.45) continue;
 
-        const closestX = Math.max(minX, Math.min(pos.x, maxX));
-        const closestZ = Math.max(minZ, Math.min(pos.z, maxZ));
+      // If player is entirely below the platform, skip
+      if (pos.y <= platformBottom) continue;
 
-        const dx = pos.x - closestX;
-        const dz = pos.z - closestZ;
-        const distSq = dx * dx + dz * dz;
+      const minX = p.x - p.w / 2;
+      const maxX = p.x + p.w / 2;
+      const minZ = p.z - p.d / 2;
+      const maxZ = p.z + p.d / 2;
 
-        if (distSq < radius * radius) {
-          if (distSq > 0.000001) {
-            const dist = Math.sqrt(distSq);
-            const overlap = radius - dist;
-            pos.x += (dx / dist) * overlap;
-            pos.z += (dz / dist) * overlap;
-          } else {
-            // Player is inside the box horizontally: push out to nearest edge
-            const dLeft = pos.x - minX;
-            const dRight = maxX - pos.x;
-            const dBottom = pos.z - minZ;
-            const dTop = maxZ - pos.z;
-            const minDist = Math.min(dLeft, dRight, dBottom, dTop);
+      const closestX = Math.max(minX, Math.min(pos.x, maxX));
+      const closestZ = Math.max(minZ, Math.min(pos.z, maxZ));
 
-            if (minDist === dLeft) pos.x = minX - radius;
-            else if (minDist === dRight) pos.x = maxX + radius;
-            else if (minDist === dBottom) pos.z = minZ - radius;
-            else pos.z = maxZ + radius;
-          }
+      const dx = pos.x - closestX;
+      const dz = pos.z - closestZ;
+      const distSq = dx * dx + dz * dz;
+
+      // Approaching from OUTSIDE the platform bounding box:
+      if (distSq > 0.0001 && distSq < radius * radius) {
+        const dist = Math.sqrt(distSq);
+        const overlap = radius - dist;
+        pos.x += (dx / dist) * overlap;
+        pos.z += (dz / dist) * overlap;
+      } else if (distSq <= 0.0001) {
+        // Player center is horizontally inside the platform footprint.
+        // If feet are near top surface (within 0.65m), allow floor collision to resolve vertically.
+        if (feetY >= platformTop - 0.65) {
+          continue;
         }
+
+        // Only if deep inside from a high-speed penetration, nudge gently to nearest edge
+        // Clamped to at most 0.15m per step to NEVER fling/teleport the player across the map!
+        const dLeft = pos.x - minX;
+        const dRight = maxX - pos.x;
+        const dBottom = pos.z - minZ;
+        const dTop = maxZ - pos.z;
+        const minDist = Math.min(dLeft, dRight, dBottom, dTop);
+
+        const nudge = Math.min(0.15, minDist + radius);
+        if (minDist === dLeft) pos.x -= nudge;
+        else if (minDist === dRight) pos.x += nudge;
+        else if (minDist === dBottom) pos.z -= nudge;
+        else pos.z += nudge;
       }
     }
   }

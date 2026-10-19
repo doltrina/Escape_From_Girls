@@ -84,8 +84,9 @@ class Game {
 
   initGameEntities() {
     // Player
-    this.player = new Player(this.camera, this.renderer.domElement, null);
+    this.player = new Player(this.camera, this.renderer.domElement, this.scene, null);
     this.scene.add(this.player.camera);
+    this.isResuming = false;
 
     // Nextbot Girl
     this.girl = new NextbotGirl(this.scene, null, assetManager.girlTextureUrl);
@@ -191,7 +192,8 @@ class Game {
       } else if (this.map.walls) {
         for (let i = this.scene.children.length - 1; i >= 0; i--) {
           const child = this.scene.children[i];
-          if (child.isMesh && child !== this.player.camera && child !== this.girl.meshGroup && child !== this.shieldManager.playerAura) {
+          const isPlayerMesh = (this.player && this.player.fpBody && this.player.fpBody.lowerBodyGroup === child);
+          if (child.isMesh && child !== this.player.camera && child !== this.girl.meshGroup && child !== this.shieldManager.playerAura && !isPlayerMesh) {
             this.scene.remove(child);
           }
         }
@@ -233,7 +235,12 @@ class Game {
       }
     }
 
-    if (this.player) this.player.map = this.map;
+    if (this.player) {
+      this.player.map = this.map;
+      if (typeof this.player.setScene === 'function') {
+        this.player.setScene(this.scene);
+      }
+    }
     if (this.girl) this.girl.map = this.map;
     if (this.shieldManager) this.shieldManager.map = this.map;
     if (this.escapeGoal) this.escapeGoal.map = this.map;
@@ -337,6 +344,7 @@ class Game {
       menuSubtitle: document.getElementById('menu-subtitle'),
       btnStart: document.getElementById('btn-start-game'),
       btnResume: document.getElementById('btn-resume-game'),
+      pauseSecondaryGrid: document.getElementById('pause-secondary-grid'),
       btnRestartPause: document.getElementById('btn-restart-from-pause'),
       btnLeaveRoom: document.getElementById('btn-leave-coop-room'),
       btnOpenSettings: document.getElementById('btn-open-settings'),
@@ -462,10 +470,16 @@ class Game {
 
     // Resume Button (from Pause)
     if (this.dom.btnResume) {
-      this.dom.btnResume.addEventListener('click', () => {
+      const handleResume = (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         blurActive();
         this.resumeGame();
-      });
+      };
+      this.dom.btnResume.addEventListener('click', handleResume);
+      this.dom.btnResume.addEventListener('pointerdown', handleResume);
     }
 
     // Restart Button from Pause menu
@@ -604,11 +618,14 @@ class Game {
 
     // Pointer Lock change listener to handle Escape / Unlocking
     document.addEventListener('pointerlockchange', () => {
-      if (document.pointerLockElement !== this.renderer.domElement) {
+      const isLocked = (document.pointerLockElement === this.renderer.domElement);
+      if (!isLocked) {
+        if (this.isResuming) return; // Prevent immediate re-pausing when resuming!
         if (this.chatOpen) return;
         if (this.dom.settingsModal && !this.dom.settingsModal.classList.contains('hidden')) return;
         if (this.dom.coopModal && !this.dom.coopModal.classList.contains('hidden')) return;
-        if (this.state === STATE.PLAYING) {
+        // Only trigger pause if player was previously locked and actively playing
+        if (this.state === STATE.PLAYING && this.player && this.player.wasPointerLocked) {
           this.pauseGame();
         }
       }
@@ -1028,6 +1045,7 @@ class Game {
     if (this.dom.hudMagmaWarning) this.dom.hudMagmaWarning.classList.add('hidden');
 
     if (this.dom.btnResume) this.dom.btnResume.style.display = 'none';
+    if (this.dom.pauseSecondaryGrid) this.dom.pauseSecondaryGrid.style.display = 'none';
     if (this.dom.btnRestartPause) this.dom.btnRestartPause.style.display = 'none';
     if (this.dom.btnLeaveRoom) this.dom.btnLeaveRoom.style.display = 'none';
     const modeSelect = document.getElementById('main-mode-select');
@@ -1059,6 +1077,7 @@ class Game {
     if (this.dom.menuTitle) this.dom.menuTitle.textContent = 'ПАУЗА';
     if (this.dom.menuSubtitle) this.dom.menuSubtitle.textContent = this.isMultiplayer ? 'МЕНЮ КООПЕРАТИВА' : 'ИГРА ПРИОСТАНОВЛЕНА';
     if (this.dom.btnResume) this.dom.btnResume.style.display = 'block';
+    if (this.dom.pauseSecondaryGrid) this.dom.pauseSecondaryGrid.style.display = 'grid';
 
     const modeSelect = document.getElementById('main-mode-select');
     if (modeSelect) modeSelect.style.display = 'none';
@@ -1085,15 +1104,27 @@ class Game {
 
   resumeGame() {
     this.state = STATE.PLAYING;
+    this.isResuming = true;
+    setTimeout(() => {
+      this.isResuming = false;
+    }, 700);
+
     this.dom.menuOverlay.classList.add('hidden');
     if (this.dom.btnResume) this.dom.btnResume.style.display = 'none';
+    if (this.dom.pauseSecondaryGrid) this.dom.pauseSecondaryGrid.style.display = 'none';
     if (this.dom.btnRestartPause) this.dom.btnRestartPause.style.display = 'none';
     if (this.dom.btnLeaveRoom) this.dom.btnLeaveRoom.style.display = 'none';
 
     if (soundEngine.hasCustomMusic && this.dom.nextbotAudio.src) {
       this.dom.nextbotAudio.play().catch(() => {});
     }
-    this.renderer.domElement.requestPointerLock();
+
+    try {
+      const lockPromise = this.renderer.domElement.requestPointerLock();
+      if (lockPromise && typeof lockPromise.catch === 'function') {
+        lockPromise.catch(() => {});
+      }
+    } catch (e) {}
   }
 
   returnToMainMenu() {
@@ -1110,6 +1141,7 @@ class Game {
     if (this.dom.menuTitle) this.dom.menuTitle.textContent = 'ESCAPE FROM GIRLS';
     if (this.dom.menuSubtitle) this.dom.menuSubtitle.textContent = 'СОХРАНИ СВОЮ ДЕВСТВЕННОСТЬ';
     if (this.dom.btnResume) this.dom.btnResume.style.display = 'none';
+    if (this.dom.pauseSecondaryGrid) this.dom.pauseSecondaryGrid.style.display = 'none';
     if (this.dom.btnRestartPause) this.dom.btnRestartPause.style.display = 'none';
     if (this.dom.btnLeaveRoom) this.dom.btnLeaveRoom.style.display = 'none';
 
