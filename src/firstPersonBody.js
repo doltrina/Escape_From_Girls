@@ -1,13 +1,15 @@
 import * as THREE from 'three';
 import { soundEngine } from './audio.js';
 
-// Procedural High-Detail Texture Caches
-let cachedJacketTexture = null;
-let cachedPantsTexture = null;
-let cachedSneakerTexture = null;
+// Procedural High-Detail Texture Caches by Accent Color
+const jacketTextureCache = new Map();
+const pantsTextureCache = new Map();
+const sneakerTextureCache = new Map();
 
-function getCyberJacketTexture() {
-  if (cachedJacketTexture) return cachedJacketTexture;
+export function getCyberJacketTexture(accentColorHex = '#00f3ff') {
+  const key = String(accentColorHex).toLowerCase();
+  if (jacketTextureCache.has(key)) return jacketTextureCache.get(key);
+
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
@@ -31,10 +33,10 @@ function getCyberJacketTexture() {
   ctx.fillRect(0, 0, 160, 220);
   ctx.fillRect(352, 0, 160, 220);
 
-  // High-contrast Neon Cyan Cyber Piping & Seams
-  ctx.strokeStyle = '#00f3ff';
+  // High-contrast Cyber Accent Piping & Seams
+  ctx.strokeStyle = accentColorHex;
   ctx.lineWidth = 2.5;
-  ctx.shadowColor = '#00f3ff';
+  ctx.shadowColor = accentColorHex;
   ctx.shadowBlur = 6;
   ctx.beginPath();
   ctx.moveTo(160, 0); ctx.lineTo(160, 220); ctx.lineTo(256, 260);
@@ -53,13 +55,13 @@ function getCyberJacketTexture() {
     ctx.fillRect(258, y + 4, 7, 3);
   }
 
-  // Neon Cyan pull tab runner
-  ctx.fillStyle = '#00f3ff';
+  // Cyber Accent pull tab runner
+  ctx.fillStyle = accentColorHex;
   ctx.fillRect(249, 140, 14, 28);
 
   // Futuristic Military Techwear Stencils & Typography
   ctx.font = 'bold 18px monospace';
-  ctx.fillStyle = '#00f3ff';
+  ctx.fillStyle = accentColorHex;
   ctx.fillText('// UNIT-01 //', 24, 70);
   ctx.fillText('EVASION PROTOCOL', 24, 95);
 
@@ -79,16 +81,20 @@ function getCyberJacketTexture() {
   }
 
   // Tactical kangaroo pocket seams
-  ctx.strokeStyle = '#00f3ff';
+  ctx.strokeStyle = accentColorHex;
   ctx.lineWidth = 2.0;
   ctx.strokeRect(170, 310, 172, 140);
 
-  cachedJacketTexture = new THREE.CanvasTexture(canvas);
-  return cachedJacketTexture;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  jacketTextureCache.set(key, texture);
+  return texture;
 }
 
-function getCargoPantsTexture() {
-  if (cachedPantsTexture) return cachedPantsTexture;
+export function getCargoPantsTexture(accentColorHex = '#00f3ff') {
+  const key = String(accentColorHex).toLowerCase();
+  if (pantsTextureCache.has(key)) return pantsTextureCache.get(key);
+
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
@@ -111,7 +117,7 @@ function getCargoPantsTexture() {
   ctx.fillRect(292, 200, 180, 180);
 
   // Hexagonal grip dots on knees
-  ctx.fillStyle = '#00f3ff';
+  ctx.fillStyle = accentColorHex;
   for (let x = 60; x <= 200; x += 22) {
     for (let y = 220; y <= 360; y += 22) {
       ctx.beginPath();
@@ -122,7 +128,7 @@ function getCargoPantsTexture() {
   }
 
   // Double stitch seams
-  ctx.strokeStyle = '#00f3ff';
+  ctx.strokeStyle = accentColorHex;
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 4]);
   ctx.beginPath();
@@ -136,12 +142,16 @@ function getCargoPantsTexture() {
   ctx.fillRect(20, 80, 30, 220);
   ctx.fillRect(462, 80, 30, 220);
 
-  cachedPantsTexture = new THREE.CanvasTexture(canvas);
-  return cachedPantsTexture;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  pantsTextureCache.set(key, texture);
+  return texture;
 }
 
-function getSneakerTexture() {
-  if (cachedSneakerTexture) return cachedSneakerTexture;
+export function getSneakerTexture(accentColorHex = '#00f3ff') {
+  const key = String(accentColorHex).toLowerCase();
+  if (sneakerTextureCache.has(key)) return sneakerTextureCache.get(key);
+
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
@@ -161,8 +171,8 @@ function getSneakerTexture() {
     }
   }
 
-  // Cyan energy bar on heel
-  ctx.fillStyle = '#00f3ff';
+  // Cyber energy bar on heel
+  ctx.fillStyle = accentColorHex;
   ctx.fillRect(80, 40, 352, 28);
 
   ctx.fillStyle = '#ffffff';
@@ -173,8 +183,10 @@ function getSneakerTexture() {
   ctx.fillStyle = '#f0f3f6';
   ctx.fillRect(0, 480, 512, 32);
 
-  cachedSneakerTexture = new THREE.CanvasTexture(canvas);
-  return cachedSneakerTexture;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  sneakerTextureCache.set(key, texture);
+  return texture;
 }
 
 /**
@@ -191,6 +203,7 @@ export class FirstPersonBody {
     this.player = player;
     this.camera = player.camera;
     this.scene = scene;
+    this.armorColorHex = (player && (player.armorColor || player.colorHex)) ? (player.armorColor || player.colorHex) : '#00f3ff';
 
     // Movement & Animation Timers
     this.animTimer = 0;
@@ -238,12 +251,12 @@ export class FirstPersonBody {
     });
 
     this.cyberAccentMat = new THREE.MeshBasicMaterial({
-      color: 0x00f3ff,
+      color: new THREE.Color(this.armorColorHex),
       side: THREE.DoubleSide
     });
 
     this.torsoMat = new THREE.MeshStandardMaterial({
-      map: getCyberJacketTexture(),
+      map: getCyberJacketTexture(this.armorColorHex),
       roughness: 0.65,
       metalness: 0.25,
       side: THREE.DoubleSide
@@ -256,7 +269,7 @@ export class FirstPersonBody {
     });
 
     this.pantsMat = new THREE.MeshStandardMaterial({
-      map: getCargoPantsTexture(),
+      map: getCargoPantsTexture(this.armorColorHex),
       roughness: 0.8,
       metalness: 0.1,
       side: THREE.DoubleSide
@@ -267,6 +280,22 @@ export class FirstPersonBody {
       roughness: 0.35,
       metalness: 0.85
     });
+  }
+
+  setArmorColor(colorHex) {
+    if (!colorHex || colorHex === this.armorColorHex) return;
+    this.armorColorHex = colorHex;
+    if (this.cyberAccentMat) {
+      this.cyberAccentMat.color.set(colorHex);
+    }
+    if (this.torsoMat) {
+      this.torsoMat.map = getCyberJacketTexture(colorHex);
+      this.torsoMat.needsUpdate = true;
+    }
+    if (this.pantsMat) {
+      this.pantsMat.map = getCargoPantsTexture(colorHex);
+      this.pantsMat.needsUpdate = true;
+    }
   }
 
   initBody() {
@@ -347,7 +376,7 @@ export class FirstPersonBody {
     const legThighGeo = new THREE.BoxGeometry(0.15, 0.40, 0.16);
     const legShinGeo = new THREE.BoxGeometry(0.14, 0.38, 0.15);
     const cargoPocketGeo = new THREE.BoxGeometry(0.045, 0.12, 0.12);
-    const sneakerTex = getSneakerTexture();
+    const sneakerTex = getSneakerTexture(this.armorColorHex);
 
     // Left Leg Pivot (Hip at Y = 0.88)
     this.leftLegPivot = new THREE.Group();
@@ -633,12 +662,12 @@ export class FirstPersonBody {
     });
     const upperMat = new THREE.MeshStandardMaterial({
       color: 0x0c0f14,
-      map: sneakerTex || getSneakerTexture(),
+      map: sneakerTex || getSneakerTexture(this.armorColorHex),
       roughness: 0.55,
       side: THREE.DoubleSide
     });
-    const neonMat = new THREE.MeshBasicMaterial({
-      color: 0x00f3ff,
+    const neonMat = this.cyberAccentMat || new THREE.MeshBasicMaterial({
+      color: new THREE.Color(this.armorColorHex),
       side: THREE.DoubleSide
     });
 

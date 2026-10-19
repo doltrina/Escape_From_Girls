@@ -98,10 +98,20 @@ export class Player {
     this.wasPointerLocked = false;
     this.skipMouseMoveFrames = 0;
 
+    // Armor accent color
+    this.armorColor = localStorage.getItem('coop_player_color') || '#00f3ff';
+
     // 🎮 True First-Person Body, Animated Hands & Viewmodel
     this.fpBody = (this.scene) ? new FirstPersonBody(this, this.scene) : null;
 
     this.setupInputs();
+  }
+
+  setArmorColor(colorHex) {
+    this.armorColor = colorHex;
+    if (this.fpBody && typeof this.fpBody.setArmorColor === 'function') {
+      this.fpBody.setArmorColor(colorHex);
+    }
   }
 
   setScene(scene) {

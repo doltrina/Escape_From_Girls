@@ -8,7 +8,7 @@ import { EscapeGoalManager } from './escapeGoal.js';
 import { soundEngine } from './audio.js';
 import { assetManager } from './customAssets.js';
 import { networkManager } from './multiplayer.js';
-import { RemotePlayer } from './remotePlayer.js';
+import { RemotePlayer } from './remotePlayer.js?v=2';
 
 // Game States
 const STATE = {
@@ -1460,7 +1460,7 @@ class Game {
         else if (type.id === 'dakimakura') hint = 'Нажми [3] бросить приманку!';
         else if (type.id === 'd20_dice') hint = 'Спас-бросок жизни активен!';
         this.showToast(`🎒 В инвентарь: ${type.name}! ${hint}`);
-      });
+      }, remoteList);
 
       // Girl Catch & Defense Check
       if (distToGirl < 1.7) {
@@ -1614,6 +1614,9 @@ class Game {
           dot.classList.add('active');
           this.selectedColor = dot.dataset.color;
           localStorage.setItem('coop_player_color', this.selectedColor);
+          if (this.player && typeof this.player.setArmorColor === 'function') {
+            this.player.setArmorColor(this.selectedColor);
+          }
         });
       });
     }
@@ -1890,11 +1893,16 @@ class Game {
     this.remotePlayers.clear();
 
     const players = msg.players || networkManager.players;
-    players.forEach((p) => {
+    players.forEach((p, idx) => {
       if (p.id !== networkManager.playerId) {
         const rp = new RemotePlayer(this.scene, p);
-        const spawnP = this.map.getRandomSpawnPoint(this.player.position, 6);
-        spawnP.y = 0;
+        let spawnP;
+        if (this.map && this.map.isCrater) {
+          spawnP = new THREE.Vector3((idx % 2 === 0 ? 1 : -1) * 2.2, 2.5, 16.0);
+        } else {
+          spawnP = this.map.getRandomSpawnPoint(this.player.position, 6);
+          spawnP.y = 0;
+        }
         rp.targetPosition.copy(spawnP);
         rp.root.position.copy(spawnP);
         this.remotePlayers.set(p.id, rp);

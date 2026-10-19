@@ -172,9 +172,27 @@ export class ShieldManager {
     const randomKey = keys[Math.floor(Math.random() * keys.length)];
     const type = SHIELD_TYPES[randomKey];
 
-    const pos = this.map.getRandomSpawnPoint(nearPlayerPos, 12);
-    if (!this.map.isCrater) {
-      pos.y = 1.0;
+    let pos;
+    if (this.map && typeof this.map.getPickupSpawnPoint === 'function') {
+      pos = this.map.getPickupSpawnPoint(nearPlayerPos);
+    } else if (this.map && typeof this.map.getRandomSpawnPoint === 'function') {
+      pos = this.map.getRandomSpawnPoint(nearPlayerPos, 12);
+      if (!this.map.isCrater) {
+        pos.y = 1.0;
+      }
+    } else {
+      pos = new THREE.Vector3(0, 1.0, 0);
+    }
+
+    // Absolute safeguard: on volcano map, NEVER spawn on starting altar (0, 2.5, 16) or within 8m!
+    if (this.map && this.map.isCrater) {
+      if (Math.hypot(pos.x, pos.z - 16) < 8.0) {
+        if (typeof this.map.getPickupSpawnPoint === 'function') {
+          pos = this.map.getPickupSpawnPoint(nearPlayerPos);
+        } else {
+          pos = new THREE.Vector3(5.0, 21.6, 17.0);
+        }
+      }
     }
 
     const { group, innerMesh, ring } = this.createPickupMesh(type);
@@ -198,13 +216,14 @@ export class ShieldManager {
     }
     this.pickups = [];
 
-    // Spawn initial set
-    for (let i = 0; i < this.maxPickups; i++) {
+    // Volcano map: 3 pickups strategically placed on mid/high tiers. Maze: maxPickups (4).
+    const count = (this.map && this.map.isCrater) ? 3 : this.maxPickups;
+    for (let i = 0; i < count; i++) {
       this.spawnRandomPickup(playerPos);
     }
   }
 
-  update(delta, player, girl, onNotify) {
+  update(delta, player, girl, onNotify, remotePlayers = []) {
     // Update player shield aura visual
     if (player.shieldActive) {
       this.playerAura.position.copy(player.position);
@@ -215,9 +234,11 @@ export class ShieldManager {
       this.playerAura.material.opacity = 0;
     }
 
-    // Periodically spawn new pickup if below max
+    // Periodically spawn new pickup if below max (Balanced: 25s for volcano, 10s for maze)
+    const maxAllowed = (this.map && this.map.isCrater) ? 3 : this.maxPickups;
+    const respawnDelay = (this.map && this.map.isCrater) ? 25.0 : 10.0;
     this.spawnTimer += delta;
-    if (this.pickups.length < this.maxPickups && this.spawnTimer > 10.0) {
+    if (this.pickups.length < maxAllowed && this.spawnTimer > respawnDelay) {
       this.spawnTimer = 0;
       this.spawnRandomPickup(player.position);
     }
@@ -232,7 +253,7 @@ export class ShieldManager {
       p.innerMesh.rotation.x = Math.sin(p.hoverOffset * 0.5) * 0.2;
       p.group.position.y = p.position.y + Math.sin(p.hoverOffset) * 0.15;
 
-      // 3D Distance to player
+      // 1. Check local player collection
       const distFlat = Math.hypot(p.position.x - pPos.x, p.position.z - pPos.z);
       const distY = Math.abs(p.position.y - pPos.y);
       if (distFlat < 1.6 && distY < 2.2) {
@@ -248,6 +269,26 @@ export class ShieldManager {
 
         this.scene.remove(p.group);
         this.pickups.splice(i, 1);
+        continue;
+      }
+
+      // 2. Check co-op teammates collection (removes picked up artifacts from shared world)
+      if (remotePlayers && remotePlayers.length > 0) {
+        let takenByTeammate = false;
+        for (const rp of remotePlayers) {
+          if (!rp || rp.isDowned) continue;
+          const rPos = (rp.root && rp.root.position) ? rp.root.position : (rp.position ? rp.position : null);
+          if (!rPos) continue;
+          const rDistFlat = Math.hypot(p.position.x - rPos.x, p.position.z - rPos.z);
+          const rDistY = Math.abs(p.position.y - (rPos.y + 0.9));
+          if (rDistFlat < 1.8 && rDistY < 2.2) {
+            this.scene.remove(p.group);
+            this.pickups.splice(i, 1);
+            takenByTeammate = true;
+            break;
+          }
+        }
+        if (takenByTeammate) continue;
       }
     }
   }

@@ -1187,7 +1187,38 @@ export class CraterMap {
     return new THREE.Vector3(0, 2.5, 16);
   }
 
+  getPlayerSpawnPoint() {
+    return new THREE.Vector3(0, 2.5, 16);
+  }
+
+  getPickupSpawnPoint(nearPlayerPos = null) {
+    // Collect stable, non-crumbling, non-falling platforms strictly above rising magma
+    // Strict safeguard: NEVER spawn on starting altar (0, 2.5, 16) or within 8m of it!
+    const validPlatforms = this.platforms.filter((p) => {
+      if (p.isStartPlatform) return false;
+      if (p.isCrumbling) return false;
+      if (p.isFalling) return false;
+      if (p.topY <= this.magmaLevel + 1.8) return false;
+      if (Math.hypot(p.x, p.z - 16) < 8.0) return false;
+      if (nearPlayerPos) {
+        const d = Math.hypot(p.x - nearPlayerPos.x, p.z - nearPlayerPos.z);
+        if (d < 4.0) return false;
+      }
+      return true;
+    });
+
+    if (validPlatforms.length > 0) {
+      const choice = validPlatforms[Math.floor(Math.random() * validPlatforms.length)];
+      return new THREE.Vector3(choice.x, choice.topY + 0.6, choice.z);
+    }
+
+    return new THREE.Vector3(5.0, 21.6, 17.0);
+  }
+
   getRandomSpawnPoint(nearPos = null, minDist = 0) {
+    if (!nearPos) {
+      return this.getPlayerSpawnPoint();
+    }
     return this.getNextbotSpawnPoint(nearPos);
   }
 
