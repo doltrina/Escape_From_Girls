@@ -96,6 +96,7 @@ export class Player {
 
     this.isLocked = false;
     this.wasPointerLocked = false;
+    this.skipMouseMoveFrames = 0;
 
     // 🎮 True First-Person Body, Animated Hands & Viewmodel
     this.fpBody = (this.scene) ? new FirstPersonBody(this, this.scene) : null;
@@ -131,14 +132,14 @@ export class Player {
   }
 
   initFlashlight() {
-    this.flashlight = new THREE.SpotLight(0xfff4e0, 2.8, 32, Math.PI / 6.5, 0.35, 1.2);
-    // Origin at the front glass bezel of the 3D tactical flashlight (in front of hand and arm!)
-    this.flashlight.position.set(0.26, -0.22, -0.62);
+    this.flashlight = new THREE.SpotLight(0xfff4e0, 2.8, 35, Math.PI / 6.0, 0.35, 1.2);
+    // Origin at the front glass bezel of the 3D tactical flashlight in front of the hand
+    this.flashlight.position.set(0.22, -0.32, -0.58);
     this.camera.add(this.flashlight);
 
     // Target straight ahead in the distance
     this.flashlightTarget = new THREE.Object3D();
-    this.flashlightTarget.position.set(0.26, -0.22, -10.62);
+    this.flashlightTarget.position.set(0.22, -0.32, -10.58);
     this.camera.add(this.flashlightTarget);
     this.flashlight.target = this.flashlightTarget;
   }
@@ -165,6 +166,8 @@ export class Player {
       this.isLocked = (document.pointerLockElement === this.domElement);
       if (this.isLocked) {
         this.wasPointerLocked = true;
+        // Skip first 2 mousemove frames to absorb the browser's cursor recentering delta spike
+        this.skipMouseMoveFrames = 2;
       }
     });
 
@@ -172,8 +175,21 @@ export class Player {
     window.addEventListener('mousemove', (e) => {
       if (!this.isLocked) return;
 
-      this.yaw -= e.movementX * this.mouseSensitivity;
-      this.pitch -= e.movementY * this.mouseSensitivity;
+      // Ignore cursor jump during pointer lock acquisition / recentering
+      if (this.skipMouseMoveFrames > 0) {
+        this.skipMouseMoveFrames--;
+        return;
+      }
+
+      // Safeguard against browser pointer lock delta spikes (frame hitches / cursor edge wrap)
+      const maxDelta = 75;
+      const rawX = (e.movementX !== undefined) ? e.movementX : (e.mozMovementX || e.webkitMovementX || 0);
+      const rawY = (e.movementY !== undefined) ? e.movementY : (e.mozMovementY || e.webkitMovementY || 0);
+      const moveX = Math.max(-maxDelta, Math.min(maxDelta, rawX));
+      const moveY = Math.max(-maxDelta, Math.min(maxDelta, rawY));
+
+      this.yaw -= moveX * this.mouseSensitivity;
+      this.pitch -= moveY * this.mouseSensitivity;
 
       // Clamp pitch to avoid neck snap (approx -85 to +85 degrees)
       const maxPitch = Math.PI / 2 - 0.05;
@@ -526,12 +542,22 @@ export class Player {
     }
 
     // Update Camera Position and Rotation
+    // Anatomical Head/Neck Pivot:
+    // When pitching down, head rotates around neck vertebra C7 (height 1.56m, behind eyes)
+    // swinging eyes forward in a natural arc over the chest so gaze looks cleanly down the body
+    const roll = (this.fpBody) ? this.fpBody.roll : 0;
     const landDip = (this.fpBody) ? this.fpBody.landDip : 0;
-    const camY = (this.position.y - this.eyeHeight) + this.currentEyeHeight + bobOffset - landDip;
-    this.camera.position.set(this.position.x, camY, this.position.z);
-    this.camera.rotation.order = 'YXZ';
-    this.camera.rotation.y = this.yaw;
-    this.camera.rotation.x = this.pitch;
+
+    const neckBaseY = (this.position.y - this.eyeHeight) + this.currentEyeHeight - 0.14 - landDip + bobOffset;
+    const eyeForwardOffset = 0.05 * Math.cos(this.pitch) + 0.12 * Math.sin(-this.pitch);
+    const eyeHeightOffset = 0.14 * Math.cos(this.pitch) + 0.05 * Math.sin(this.pitch);
+
+    const camX = this.position.x - Math.sin(this.yaw) * eyeForwardOffset;
+    const camY = neckBaseY + eyeHeightOffset;
+    const camZ = this.position.z - Math.cos(this.yaw) * eyeForwardOffset;
+
+    this.camera.position.set(camX, camY, camZ);
+    this.camera.rotation.set(this.pitch, this.yaw, roll, 'YXZ');
   }
 
   addToInventory(typeId) {

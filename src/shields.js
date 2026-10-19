@@ -31,6 +31,58 @@ export const SHIELD_TYPES = {
   }
 };
 
+// Shared cached geometries and materials (zero re-allocation / zero shader recompile hitches!)
+let pickupResources = null;
+function getPickupResources() {
+  if (pickupResources) return pickupResources;
+
+  pickupResources = {
+    forcefieldGeo: new THREE.BoxGeometry(0.8, 0.4, 0.2),
+    forcefieldMat: new THREE.MeshStandardMaterial({
+      color: 0x22252a,
+      metalness: 0.9,
+      roughness: 0.2,
+      emissive: 0x005577,
+      emissiveIntensity: 0.5
+    }),
+    fanGeo: new THREE.CylinderGeometry(0.12, 0.12, 0.05, 12),
+    fanMat: new THREE.MeshBasicMaterial({ color: 0x00f3ff }),
+
+    energyDrinkGeo: new THREE.CylinderGeometry(0.16, 0.16, 0.55, 16),
+    energyDrinkMat: new THREE.MeshStandardMaterial({
+      color: 0x111111,
+      emissive: 0x22aa00,
+      emissiveIntensity: 0.6,
+      roughness: 0.3,
+      metalness: 0.8
+    }),
+
+    dakimakuraGeo: new THREE.BoxGeometry(0.35, 0.9, 0.15),
+    dakimakuraMat: new THREE.MeshStandardMaterial({
+      color: 0xff66cc,
+      roughness: 0.8,
+      emissive: 0xff0066,
+      emissiveIntensity: 0.4
+    }),
+
+    d20Geo: new THREE.IcosahedronGeometry(0.28, 0),
+    d20Mat: new THREE.MeshStandardMaterial({
+      color: 0xffaa00,
+      wireframe: true,
+      roughness: 0.2,
+      emissive: 0xff8800,
+      emissiveIntensity: 0.8
+    }),
+
+    ringGeo: new THREE.RingGeometry(0.3, 0.5, 20),
+    haloGeo: new THREE.SphereGeometry(0.32, 10, 8),
+    ringMaterials: new Map(),
+    haloMaterials: new Map()
+  };
+
+  return pickupResources;
+}
+
 export class ShieldManager {
   constructor(scene, map) {
     this.scene = scene;
@@ -57,92 +109,59 @@ export class ShieldManager {
   }
 
   createPickupMesh(type) {
+    const res = getPickupResources();
     const group = new THREE.Group();
 
     let mesh;
     if (type.id === 'forcefield') {
-      // GPU Box with glowing fans
-      const geo = new THREE.BoxGeometry(0.8, 0.4, 0.2);
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0x22252a,
-        metalness: 0.9,
-        roughness: 0.2,
-        emissive: 0x005577,
-        emissiveIntensity: 0.5
-      });
-      mesh = new THREE.Mesh(geo, mat);
+      mesh = new THREE.Mesh(res.forcefieldGeo, res.forcefieldMat);
 
-      // Fans
-      const fanGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.05, 12);
-      const fanMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
-      const fan1 = new THREE.Mesh(fanGeo, fanMat);
+      const fan1 = new THREE.Mesh(res.fanGeo, res.fanMat);
       fan1.position.set(-0.2, 0, 0.11);
       fan1.rotation.x = Math.PI / 2;
       mesh.add(fan1);
-      const fan2 = fan1.clone();
-      fan2.position.x = 0.2;
+
+      const fan2 = new THREE.Mesh(res.fanGeo, res.fanMat);
+      fan2.position.set(0.2, 0, 0.11);
+      fan2.rotation.x = Math.PI / 2;
       mesh.add(fan2);
 
     } else if (type.id === 'energy_drink') {
-      // Can
-      const geo = new THREE.CylinderGeometry(0.16, 0.16, 0.55, 16);
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0x111111,
-        emissive: 0x22aa00,
-        emissiveIntensity: 0.6,
-        roughness: 0.3,
-        metalness: 0.8
-      });
-      mesh = new THREE.Mesh(geo, mat);
-
+      mesh = new THREE.Mesh(res.energyDrinkGeo, res.energyDrinkMat);
     } else if (type.id === 'dakimakura') {
-      // Pillowed cushion
-      const geo = new THREE.BoxGeometry(0.35, 0.9, 0.15);
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0xff66cc,
-        roughness: 0.8,
-        emissive: 0xff0066,
-        emissiveIntensity: 0.4
-      });
-      mesh = new THREE.Mesh(geo, mat);
-
+      mesh = new THREE.Mesh(res.dakimakuraGeo, res.dakimakuraMat);
     } else {
-      // D20 Icosahedron
-      const geo = new THREE.IcosahedronGeometry(0.28, 0);
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0xffaa00,
-        wireframe: true,
-        roughness: 0.2,
-        emissive: 0xff8800,
-        emissiveIntensity: 0.8
-      });
-      mesh = new THREE.Mesh(geo, mat);
+      mesh = new THREE.Mesh(res.d20Geo, res.d20Mat);
     }
 
     group.add(mesh);
 
     // Glowing ground ring
-    const ringGeo = new THREE.RingGeometry(0.3, 0.5, 24);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: type.color,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.6
-    });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
+    if (!res.ringMaterials.has(type.color)) {
+      res.ringMaterials.set(type.color, new THREE.MeshBasicMaterial({
+        color: type.color,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.6
+      }));
+    }
+    const ringMat = res.ringMaterials.get(type.color);
+    const ring = new THREE.Mesh(res.ringGeo, ringMat);
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = -0.5;
     group.add(ring);
 
     // Holographic energy glow halo (no dynamic PointLight = zero shader recompile hitches!)
-    const haloGeo = new THREE.SphereGeometry(0.32, 12, 8);
-    const haloMat = new THREE.MeshBasicMaterial({
-      color: type.color,
-      transparent: true,
-      opacity: 0.28,
-      wireframe: true
-    });
-    const halo = new THREE.Mesh(haloGeo, haloMat);
+    if (!res.haloMaterials.has(type.color)) {
+      res.haloMaterials.set(type.color, new THREE.MeshBasicMaterial({
+        color: type.color,
+        transparent: true,
+        opacity: 0.28,
+        wireframe: true
+      }));
+    }
+    const haloMat = res.haloMaterials.get(type.color);
+    const halo = new THREE.Mesh(res.haloGeo, haloMat);
     group.add(halo);
 
     return { group, innerMesh: mesh, ring, halo };
@@ -227,13 +246,6 @@ export class ShieldManager {
           onNotify(p.type);
         }
 
-        p.group.traverse((c) => {
-          if (c.geometry) c.geometry.dispose();
-          if (c.material) {
-            if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
-            else c.material.dispose();
-          }
-        });
         this.scene.remove(p.group);
         this.pickups.splice(i, 1);
       }

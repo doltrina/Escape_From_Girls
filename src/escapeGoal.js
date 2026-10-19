@@ -124,12 +124,18 @@ export class EscapeGoalManager {
     groundRing.position.y = -0.6;
     group.add(groundRing);
 
-    // Pulsing point light
-    const light = new THREE.PointLight(0xffaa00, 2.2, 5.0, 2.0);
-    light.position.set(0, 0, 0);
-    group.add(light);
+    // Glowing holographic aura halo (zero dynamic lights = zero shader recompile hitches!)
+    const auraGeo = new THREE.SphereGeometry(0.35, 12, 8);
+    const auraMat = new THREE.MeshBasicMaterial({
+      color: 0xffcc00,
+      transparent: true,
+      opacity: 0.28,
+      wireframe: true
+    });
+    const aura = new THREE.Mesh(auraGeo, auraMat);
+    group.add(aura);
 
-    return { group, innerMesh: ring, groundRing, light };
+    return { group, innerMesh: ring, groundRing, aura };
   }
 
   initDoor() {
@@ -358,7 +364,7 @@ export class EscapeGoalManager {
 
     keyLocations.forEach((loc, idx) => {
       const pos = loc.pos;
-      const { group, innerMesh, groundRing, light } = this.createKeyMesh();
+      const { group, innerMesh, groundRing, aura } = this.createKeyMesh();
       group.position.copy(pos);
       this.scene.add(group);
 
@@ -370,7 +376,7 @@ export class EscapeGoalManager {
         group,
         innerMesh,
         groundRing,
-        light,
+        aura,
         hoverOffset: Math.random() * Math.PI * 2,
         collected: false
       });
