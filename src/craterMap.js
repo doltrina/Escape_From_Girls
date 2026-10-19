@@ -388,15 +388,14 @@ export class CraterMap {
     this.depth = this.calderaRadius * 2;
     this.tileSize = 4;
 
-    // Magma (The Floor is Lava) state
-    // Requirement 2: Magma stays dormant (0.5m) until player leaps onto first parkour platform!
+    // Magma state (dormant at 0.5m until player leaps onto first platform)
     this.magmaLevel = 0.5;
     this.initialMagmaLevel = 0.5;
     this.maxMagmaLevel = 29.5;
-    this.magmaBaseSpeed = 0.20;   // steady rising speed once parkour starts
-    this.magmaRapidSpeed = 0.50;  // rapid rising speed after Key 1 alarm
+    this.magmaBaseSpeed = 0.20;
+    this.magmaRapidSpeed = 0.50;
     this.magmaRisingSpeed = this.magmaBaseSpeed;
-    this.isMagmaRising = false;   // DORMANT until player jumps off start platform!
+    this.isMagmaRising = false;
     this.hasPlayerStartedParkour = false;
     this.isRapidRise = false;
     this.magmaTime = 0;
@@ -476,7 +475,6 @@ export class CraterMap {
     });
 
     // Multi-materials array for BoxGeometry: [+X, -X, +Y (TOP), -Y (BOTTOM), +Z, -Z]
-    // All 6 faces textured with zero missing/stretched sides!
     this.rockMaterials = [
       this.rockSideMat, // 0: +X
       this.rockSideMat, // 1: -X
@@ -547,14 +545,14 @@ export class CraterMap {
     this.volcanoHemi = new THREE.HemisphereLight(0x280206, 0xff0038, 1.0);
     this.root.add(this.volcanoHemi);
 
-    // 3. Dedicated Platform Group for Procedural Regeneration (Requirement 6)
+    // 3. Dedicated Platform Group for Procedural Regeneration
     this.platformsGroup = new THREE.Group();
     this.root.add(this.platformsGroup);
 
     // 4. Build Summit Torii Gate (Permanent Landmark)
     this.buildSummitToriiGate();
 
-    // 5. Generate Initial Complete Parkour
+    // 5. Generate Initial Authentic Parkour
     this.generateRandomParkour();
 
     // 6. Volcanic Ash & Red Ruby Spark Particle System
@@ -564,7 +562,7 @@ export class CraterMap {
     this.initGeysers();
   }
 
-  // --- PLATFORM CREATION HELPER (Requirements 4 & 5: Multi-material & Crag Underbelly) ---
+  // --- PLATFORM CREATION HELPER (Multi-material & Crag Underbelly) ---
   addPlatform(x, y, z, w, h, d, type = 'rock', isCrumbling = false, isStartPlatform = false) {
     let materials = this.rockMaterials;
     if (type === 'wood') materials = this.woodMaterials;
@@ -576,8 +574,7 @@ export class CraterMap {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
 
-    // Requirement 5: "типо как кусок вулкана с ровной плоскостью для игрока"
-    // Add natural craggy tapered volcanic rock chunk underbelly below the flat box slab!
+    // Natural craggy tapered volcanic rock chunk underbelly below the flat box slab
     if (type === 'rock' || isCrumbling) {
       const cragHeight = h * 1.5 + 0.8;
       const cragGeo = new THREE.CylinderGeometry(
@@ -588,7 +585,6 @@ export class CraterMap {
         1,
         false
       );
-      // Jitter underbelly vertices for authentic jagged volcanic cliff rock silhouette
       const posAttr = cragGeo.attributes.position;
       for (let i = 0; i < posAttr.count; i++) {
         if (posAttr.getY(i) < 0) {
@@ -634,8 +630,8 @@ export class CraterMap {
   }
 
   // -------------------------------------------------------------
-  // 🧗‍♂️ COMPLETE & RANDOMIZED PARKOUR GENERATOR
-  // 28 continuous, guaranteed climbable steps connecting Altar to Summit Arena!
+  // 🧗‍♂️ AUTHENTIC VERTICAL PARKOUR GENERATOR (No More Spiral Staircase!)
+  // 3 Distinct Tiers, Sprint Chasms, Balance Beams, Monoliths & Dynamic Jitter!
   // -------------------------------------------------------------
   generateRandomParkour() {
     // 1. Clear existing platforms & decorations
@@ -667,87 +663,89 @@ export class CraterMap {
     this.addFireBrazier(-4.5, 32.7, 3);
     this.addFireBrazier(4.5, 32.7, 3);
 
-    // 4. Procedural Continuous Spiral Parkour Ascent (28 steps)
-    // Randomize spiral winding direction (Clockwise = +1, Counter-Clockwise = -1)
-    const dir = Math.random() < 0.5 ? 1 : -1;
-    let angle = Math.PI * 0.5; // Starts at southern altar (0, 16)
+    // 4. Procedural Direction & Jitter
+    // On each launch, 50% chance to mirror the entire parkour course across the caldera!
+    const dir = (Math.random() < 0.5) ? 1 : -1;
+    // Small random jitter offset per run for replayability
+    const jitter = () => (Math.random() - 0.5) * 0.45;
 
-    const totalSteps = 28;
-    let key1Platform = null;
-    let key2Platform = null;
-    let key3Platform = null;
+    // Helper to add parkour step with mirroring
+    const addStep = (x, y, z, w, h, d, type = 'rock', isCrumble = false) => {
+      const rx = (x + jitter()) * dir;
+      const rz = z + jitter();
+      const ry = y + (Math.random() - 0.5) * 0.12;
+      return this.addPlatform(rx, ry, rz, w, h, d, type, isCrumble, false);
+    };
 
-    for (let i = 0; i < totalSteps; i++) {
-      const t = i / (totalSteps - 1); // 0.0 to 1.0
+    // =========================================================================
+    // 🧗‍♂️ TIER 1: The Lower Caldera & Chasms (Platforms 1-8, Y: 2.8m -> 10.0m)
+    // =========================================================================
+    // P1: Initial broad rock outcrop
+    const p1 = addStep(-6.5, 2.8, 15.0, 5.5, 1.0, 5.0, 'rock');
+    // P2: Basalt shelf
+    const p2 = addStep(-11.5, 3.8, 12.0, 5.0, 1.0, 5.0, 'rock');
+    // P3 & P4: THE GREAT CHASM (Разлом) - sprint gap across void at same height!
+    const p3 = addStep(-16.0, 4.6, 7.5, 4.5, 1.0, 4.5, 'rock');
+    const p4 = addStep(-19.5, 4.9, 1.5, 5.0, 1.0, 5.0, 'rock');
+    // P5: Crumbling Ledge (Осыпающийся уступ)
+    const p5 = addStep(-19.0, 6.0, -4.5, 4.0, 0.8, 4.0, 'rock', true);
+    // P6: KEY 1 ALTAR PLATFORM (Golden Key 1 Altar!)
+    const p6 = addStep(-16.5, 7.0, -10.0, 5.5, 1.2, 5.5, 'rock');
+    // P7: High Stepping Pillar
+    const p7 = addStep(-12.5, 8.2, -14.5, 3.6, 1.0, 3.6, 'rock');
+    // P8: Transition Shelf into Tier 2
+    const p8 = addStep(-7.5, 9.4, -17.5, 5.0, 1.0, 4.5, 'rock');
+    this.addFireBrazier(-7.5 * dir, 9.4 + 1.1, -17.5);
 
-      // Continuous radius curve:
-      // Steps 0-8: lower rim (19.8m -> 18.5m)
-      // Steps 9-18: mid wall (18.5m -> 15.0m)
-      // Steps 19-27: contracts inward toward central summit (15.0m -> 6.5m)
-      let radius;
-      if (i < 9) {
-        radius = 19.8 - (i / 9) * 1.5 + (Math.random() - 0.5) * 0.8;
-      } else if (i < 19) {
-        radius = 18.3 - ((i - 9) / 10) * 3.5 + (Math.random() - 0.5) * 0.8;
-      } else {
-        radius = 14.8 - ((i - 19) / 9) * 8.3 + (Math.random() - 0.5) * 0.5;
-      }
+    // =========================================================================
+    // 🧗‍♂️ TIER 2: The Floating Beams & Abyss Leap (Platforms 9-17, Y: 11.0m -> 20.0m)
+    // =========================================================================
+    // P9 & P10: Narrow Charred Wood Bridge (Узкие деревянные мостки)
+    const p9 = addStep(-2.0, 10.7, -18.5, 5.5, 0.6, 2.0, 'wood');
+    const p10 = addStep(4.0, 11.9, -18.0, 5.5, 0.6, 2.0, 'wood');
+    this.addHangingChain(4.0 * dir, 11.9, -18.0, 16);
+    // P11: Chain Anchor Rock
+    const p11 = addStep(9.5, 13.1, -15.5, 4.5, 1.0, 4.5, 'rock');
+    // P12: Chasm Springboard Rock
+    const p12 = addStep(14.5, 14.2, -11.5, 4.5, 0.8, 4.5, 'rock');
+    // P13: Floating Beam over the Abyss (Sprint leap!)
+    const p13 = addStep(18.0, 15.3, -6.0, 4.0, 0.6, 2.5, 'wood');
+    // P14: KEY 2 ALTAR PLATFORM (Golden Key 2 Altar!)
+    const p14 = addStep(19.5, 16.2, 0.0, 5.5, 1.2, 5.0, 'rock');
+    this.addHangingChain(19.5 * dir, 16.2, 0.0, 16);
+    // P15: Crumbling Ledge 2
+    const p15 = addStep(18.0, 17.4, 5.5, 4.0, 0.8, 4.0, 'rock', true);
+    // P16: Step-Down Rock (Hop down)
+    const p16 = addStep(15.0, 18.2, 10.5, 4.5, 1.0, 4.5, 'rock');
+    // P17: Steep Upward Outcrop (+1.1m)
+    const p17 = addStep(10.5, 19.3, 14.5, 4.5, 1.0, 4.5, 'rock');
 
-      // Consistent forward angular progression
-      const angleStep = 0.22 + (Math.random() - 0.5) * 0.03;
-      angle += angleStep * dir;
-
-      const px = Math.cos(angle) * radius;
-      const pz = Math.sin(angle) * radius;
-
-      // Steady, climbable vertical progression from Y=2.8m to Y=31.8m
-      const targetY = 2.8 + t * (31.8 - 2.8);
-      const currentY = targetY + (Math.random() - 0.5) * 0.15;
-
-      // Platform size: wide at bottom, nimble at top
-      const pw = (i >= 19) ? (3.8 + (Math.random() - 0.5) * 0.4) : (4.4 + (Math.random() - 0.5) * 0.6);
-      const pd = (i >= 19) ? (3.8 + (Math.random() - 0.5) * 0.4) : (4.4 + (Math.random() - 0.5) * 0.6);
-      const ph = 1.0;
-
-      // Platform types:
-      // Mix in wood beams on mid tier (steps 10, 12, 14, 16)
-      const isWood = (i >= 10 && i <= 18 && i % 2 === 0);
-      // Crumbling platforms at 3 strategic challenge points
-      const isCrumble = (i === 4 || i === 13 || i === 22);
-
-      const type = isWood ? 'wood' : 'rock';
-      const p = this.addPlatform(px, currentY, pz, pw, ph, pd, type, isCrumble, false);
-
-      // Key 1: Lower Tier (Platform 6, Y ~ 8.8m)
-      if (i === 5) key1Platform = p;
-
-      // Key 2: Mid Tier (Platform 15, Y ~ 18.5m)
-      if (i === 14) {
-        key2Platform = p;
-        this.addHangingChain(px, currentY, pz, 16);
-      }
-
-      // Key 3: Upper Tier (Platform 24, Y ~ 28.0m)
-      if (i === 23) key3Platform = p;
-
-      // Decorative braziers on landmark platforms
-      if (i === 8 || i === 20) {
-        this.addFireBrazier(px, currentY + ph / 2 + 0.6, pz);
-      }
-      if (i === 10) {
-        this.addHangingChain(px, currentY, pz, 16);
-      }
-    }
+    // =========================================================================
+    // 🧗‍♂️ TIER 3: The Rim, Suspension Planks & Summit Monoliths (Platforms 18-26)
+    // =========================================================================
+    // P18: High Rim Balcony
+    const p18 = addStep(5.0, 20.5, 17.0, 5.5, 1.0, 4.5, 'rock');
+    this.addFireBrazier(5.0 * dir, 20.5 + 1.1, 17.0);
+    // P19 & P20: Narrow Suspension Planks across Rim
+    const p19 = addStep(-1.0, 21.7, 16.5, 5.0, 0.6, 1.8, 'wood');
+    const p20 = addStep(-6.5, 23.0, 14.5, 5.0, 0.6, 1.8, 'wood');
+    // P21: Crumbling Ledge 3 (Pre-Key challenge!)
+    const p21 = addStep(-11.5, 24.2, 11.0, 4.0, 0.8, 4.0, 'rock', true);
+    // P22: KEY 3 ALTAR PLATFORM (Golden Key 3 Altar!)
+    const p22 = addStep(-14.0, 25.4, 6.0, 5.5, 1.2, 5.0, 'rock');
+    // P23 & P24: Giant Basalt Monoliths zig-zagging inward to center
+    const p23 = addStep(-13.0, 26.8, 0.5, 4.5, 1.2, 4.5, 'rock');
+    const p24 = addStep(-10.5, 28.2, -4.5, 4.5, 1.2, 4.5, 'rock');
+    // P25: High Stepping Stone
+    const p25 = addStep(-6.5, 29.5, -7.5, 4.0, 1.2, 4.0, 'rock');
+    // P26: The Leap of Faith Pillar (Directly lands onto Summit Arena!)
+    const p26 = addStep(-1.5, 30.8, -7.5, 4.5, 1.2, 4.5, 'rock');
 
     // 5. Store Dynamically Synchronized Key Locations
-    const k1 = key1Platform || this.platforms[6];
-    const k2 = key2Platform || this.platforms[15];
-    const k3 = key3Platform || this.platforms[24];
-
     this.keyLocations = [
-      { pos: new THREE.Vector3(k1.x, k1.topY + 0.85, k1.z), name: 'Ключ Нижнего Яруса (Внимание: Лава!)' },
-      { pos: new THREE.Vector3(k2.x, k2.topY + 0.85, k2.z), name: 'Ключ Среднего Яруса (Прыжок над бездной)' },
-      { pos: new THREE.Vector3(k3.x, k3.topY + 0.85, k3.z), name: 'Ключ Верхнего Яруса (Узкий мостик)' }
+      { pos: new THREE.Vector3(p6.x, p6.topY + 0.85, p6.z), name: 'Ключ Нижнего Яруса (Внимание: Лава!)' },
+      { pos: new THREE.Vector3(p14.x, p14.topY + 0.85, p14.z), name: 'Ключ Среднего Яруса (Прыжок над бездной)' },
+      { pos: new THREE.Vector3(p22.x, p22.topY + 0.85, p22.z), name: 'Ключ Верхнего Яруса (Узкий мостик)' }
     ];
   }
 
@@ -960,7 +958,7 @@ export class CraterMap {
   }
 
   // -------------------------------------------------------------
-  // 🔄 PARKOUR & MAGMA ACTIVATION TRIGGER (Requirements 2 & 3)
+  // 🔄 PARKOUR & MAGMA ACTIVATION TRIGGER
   // -------------------------------------------------------------
   triggerParkourStart() {
     if (this.hasPlayerStartedParkour) return;
@@ -1038,7 +1036,12 @@ export class CraterMap {
     return y <= this.magmaLevel + 0.35;
   }
 
+  // -------------------------------------------------------------
+  // 🛡️ SOLID 3D AABB HORIZONTAL SIDE COLLISIONS (Point 2)
+  // Prevents phasing through platform sides and falling into magma!
+  // -------------------------------------------------------------
   resolveCollision(pos, radius = 0.45) {
+    // 1. Keep within cylindrical caldera wall boundary
     const distFromCenter = Math.hypot(pos.x, pos.z);
     const currentWallRadius = this.calderaRadius * (0.88 + 0.18 * (pos.y / this.calderaHeight)) - radius;
 
@@ -1046,6 +1049,55 @@ export class CraterMap {
       const angle = Math.atan2(pos.z, pos.x);
       pos.x = Math.cos(angle) * currentWallRadius;
       pos.z = Math.sin(angle) * currentWallRadius;
+    }
+
+    // 2. Solid horizontal side collision for all platforms
+    // If the player's feet (pos.y - 1.7) are below a platform's top surface,
+    // that platform is a solid physical obstacle in the horizontal X/Z plane!
+    const feetY = pos.y - 1.7;
+
+    for (const p of this.platforms) {
+      if (p.isFalling && p.topY < this.magmaLevel - 1) continue;
+
+      const platformBottom = p.y - p.h / 2 - 2.5;
+      const platformTop = p.topY;
+
+      // Only collide horizontally with sides when player is beside the platform:
+      // i.e. feet are below top surface, and body is above platform bottom.
+      if (feetY < platformTop - 0.25 && pos.y > platformBottom) {
+        const minX = p.x - p.w / 2;
+        const maxX = p.x + p.w / 2;
+        const minZ = p.z - p.d / 2;
+        const maxZ = p.z + p.d / 2;
+
+        const closestX = Math.max(minX, Math.min(pos.x, maxX));
+        const closestZ = Math.max(minZ, Math.min(pos.z, maxZ));
+
+        const dx = pos.x - closestX;
+        const dz = pos.z - closestZ;
+        const distSq = dx * dx + dz * dz;
+
+        if (distSq < radius * radius) {
+          if (distSq > 0.000001) {
+            const dist = Math.sqrt(distSq);
+            const overlap = radius - dist;
+            pos.x += (dx / dist) * overlap;
+            pos.z += (dz / dist) * overlap;
+          } else {
+            // Player is inside the box horizontally: push out to nearest edge
+            const dLeft = pos.x - minX;
+            const dRight = maxX - pos.x;
+            const dBottom = pos.z - minZ;
+            const dTop = maxZ - pos.z;
+            const minDist = Math.min(dLeft, dRight, dBottom, dTop);
+
+            if (minDist === dLeft) pos.x = minX - radius;
+            else if (minDist === dRight) pos.x = maxX + radius;
+            else if (minDist === dBottom) pos.z = minZ - radius;
+            else pos.z = maxZ + radius;
+          }
+        }
+      }
     }
   }
 
@@ -1068,22 +1120,62 @@ export class CraterMap {
     return best;
   }
 
-  getRandomSpawnPoint(nearPos = null, minDist = 0) {
+  // -------------------------------------------------------------
+  // 👧 SAFE NEXTBOT SPAWN CALCULATOR (Point 3)
+  // NEVER spawns directly in front of the player on their next jump!
+  // -------------------------------------------------------------
+  getNextbotSpawnPoint(nearPos = null) {
+    // If no player pos or near the start, awaken her at the Starting Altar (0, 2.5, 16)
+    // This is 100% BEHIND the player, chasing from the start!
     if (!nearPos) {
       return new THREE.Vector3(0, 2.5, 16);
     }
 
-    const valid = this.platforms.filter((p) => {
+    // Find the platform closest to the player
+    let playerPlatIdx = 0;
+    let minPlayerDist = 9999;
+    for (let i = 0; i < this.platforms.length; i++) {
+      const p = this.platforms[i];
       const d = Math.hypot(p.x - nearPos.x, p.z - nearPos.z);
-      return d >= minDist && p.topY > this.magmaLevel + 2;
+      if (d < minPlayerDist) {
+        minPlayerDist = d;
+        playerPlatIdx = i;
+      }
+    }
+
+    // If player is on lower platforms (idx <= 3), spawn her at Starting Altar (behind player!)
+    if (playerPlatIdx <= 3) {
+      return new THREE.Vector3(0, 2.5, 16);
+    }
+
+    // For mid-game respawns: pick a platform BEHIND the player that is above lava!
+    const behindPlatforms = this.platforms.filter((p, idx) => {
+      return idx < playerPlatIdx - 2 && p.topY > this.magmaLevel + 1.8 && !p.isFalling;
     });
 
-    if (valid.length > 0) {
-      const choice = valid[Math.floor(Math.random() * valid.length)];
+    if (behindPlatforms.length > 0) {
+      // Pick a platform behind the player to pursue from below!
+      const choice = behindPlatforms[behindPlatforms.length - 1];
+      return new THREE.Vector3(choice.x, choice.topY + 0.5, choice.z);
+    }
+
+    // Otherwise, pick a platform far across the crater (> 18m away) but NEVER in the next 6 platforms ahead!
+    const acrossPlatforms = this.platforms.filter((p, idx) => {
+      const isAhead = (idx >= playerPlatIdx && idx <= playerPlatIdx + 6);
+      const d = Math.hypot(p.x - nearPos.x, p.z - nearPos.z);
+      return !isAhead && d >= 16 && p.topY > this.magmaLevel + 2 && !p.isFalling;
+    });
+
+    if (acrossPlatforms.length > 0) {
+      const choice = acrossPlatforms[Math.floor(Math.random() * acrossPlatforms.length)];
       return new THREE.Vector3(choice.x, choice.topY + 0.5, choice.z);
     }
 
     return new THREE.Vector3(0, 2.5, 16);
+  }
+
+  getRandomSpawnPoint(nearPos = null, minDist = 0) {
+    return this.getNextbotSpawnPoint(nearPos);
   }
 
   update(delta) {
@@ -1126,7 +1218,7 @@ export class CraterMap {
         p.mesh.position.x = p.x + (Math.random() - 0.5) * 0.12;
         p.mesh.position.z = p.z + (Math.random() - 0.5) * 0.12;
 
-        if (p.stepTimer >= 2.5) {
+        if (p.stepTimer >= 2.2) {
           p.isFalling = true;
           soundEngine.playRockCollapse();
         }

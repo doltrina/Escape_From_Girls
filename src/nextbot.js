@@ -215,13 +215,15 @@ export class NextbotGirl {
   }
 
   aggressiveRespawn(player) {
-    // Choose a valid corridor position within tactical distance from player
-    const spawnPoint = this.map.getRandomSpawnPoint(player.position, 16);
+    // Choose a valid position behind or tactically away from player (never on upcoming path!)
+    const spawnPoint = (this.map && typeof this.map.getNextbotSpawnPoint === 'function')
+      ? this.map.getNextbotSpawnPoint(player.position)
+      : this.map.getRandomSpawnPoint(player.position, 16);
     this.position.copy(spawnPoint);
-    this.position.y = 0;
+    this.position.y = (spawnPoint.y !== undefined) ? spawnPoint.y : 0;
     this.meshGroup.position.copy(this.position);
     this.velocity.set(0, 0, 0);
-    this.stunTimer = 0.4; // brief recovery
+    this.stunTimer = 0.5; // brief recovery
 
     // Play ominous jumpscare scream sound
     soundEngine.playNextbotRespawn();
