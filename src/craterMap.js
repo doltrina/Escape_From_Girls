@@ -1,92 +1,83 @@
 import * as THREE from 'three';
 import { soundEngine } from './audio.js';
 
-// Procedural Canvas Texture Generators for Volcano
-function createBasaltTexture() {
+// ============================================================================
+// 🌋 PROCEDURAL TEXTURE GENERATORS (VOLCANIC BASALT & VIVID BLOOD MAGMA)
+// ============================================================================
+
+/**
+ * Vivid Blood-Red Magma Texture (Requirement 1: Ярко-красная магма)
+ * Deep arterial crimson base, glowing scarlet veins, pulsating bubbling cells and coagulated clots.
+ */
+function createBloodMagmaTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
   const ctx = canvas.getContext('2d');
 
-  // Dark charcoal volcanic rock
-  ctx.fillStyle = '#141215';
-  ctx.fillRect(0, 0, 512, 512);
-
-  // Jagged basalt facets
-  for (let i = 0; i < 400; i++) {
-    const x = Math.random() * 512;
-    const y = Math.random() * 512;
-    const size = 10 + Math.random() * 40;
-    const shade = 18 + Math.floor(Math.random() * 24);
-    ctx.fillStyle = `rgb(${shade + 4}, ${shade}, ${shade + 2})`;
-    ctx.beginPath();
-    ctx.arc(x, y, size, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Glowing orange magma fissures in rock
-  for (let c = 0; c < 8; c++) {
-    ctx.strokeStyle = 'rgba(255, 60, 0, 0.45)';
-    ctx.lineWidth = 1 + Math.random() * 2.5;
-    ctx.beginPath();
-    let cx = Math.random() * 512;
-    let cy = Math.random() * 512;
-    ctx.moveTo(cx, cy);
-    for (let s = 0; s < 6; s++) {
-      cx += (Math.random() - 0.5) * 60;
-      cy += (Math.random() - 0.5) * 60;
-      ctx.lineTo(cx, cy);
-    }
-    ctx.stroke();
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(4, 4);
-  return texture;
-}
-
-function createLavaTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
-  const ctx = canvas.getContext('2d');
-
-  // Deep molten red-orange base
-  const grad = ctx.createRadialGradient(256, 256, 50, 256, 256, 256);
-  grad.addColorStop(0, '#ffbb00');
-  grad.addColorStop(0.3, '#ff4400');
-  grad.addColorStop(0.7, '#cc1100');
-  grad.addColorStop(1, '#550500');
+  // Arterial blood scarlet radial gradient
+  const grad = ctx.createRadialGradient(256, 256, 40, 256, 256, 256);
+  grad.addColorStop(0, '#ff1a4a');     // Vivid arterial scarlet center
+  grad.addColorStop(0.28, '#ff0038');  // Bright saturated blood red
+  grad.addColorStop(0.62, '#b80024');  // Rich crimson
+  grad.addColorStop(0.85, '#660012');  // Deep clot ruby
+  grad.addColorStop(1, '#240006');     // Dark coagulated edge
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 512, 512);
 
-  // Molten crust plates & cracks
-  for (let i = 0; i < 30; i++) {
+  // Floating dark coagulated blood clots / crust islands
+  for (let i = 0; i < 45; i++) {
     const px = Math.random() * 512;
     const py = Math.random() * 512;
-    const r = 20 + Math.random() * 45;
-    ctx.fillStyle = '#220805';
+    const rx = 16 + Math.random() * 38;
+    const ry = 12 + Math.random() * 26;
+    const angle = Math.random() * Math.PI;
+    ctx.fillStyle = (Math.random() < 0.6) ? '#280007' : '#180004';
     ctx.beginPath();
-    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.ellipse(px, py, rx, ry, angle, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Golden-yellow bright hot veins
-  ctx.strokeStyle = '#fff577';
-  ctx.lineWidth = 2;
-  for (let v = 0; v < 14; v++) {
+  // Glowing scarlet / crimson arterial fissure veins
+  for (let v = 0; v < 18; v++) {
     ctx.beginPath();
     let x = Math.random() * 512;
     let y = Math.random() * 512;
     ctx.moveTo(x, y);
-    for (let s = 0; s < 4; s++) {
-      x += (Math.random() - 0.5) * 80;
-      y += (Math.random() - 0.5) * 80;
+    for (let s = 0; s < 5; s++) {
+      x += (Math.random() - 0.5) * 85;
+      y += (Math.random() - 0.5) * 85;
       ctx.lineTo(x, y);
     }
+    // High-energy scarlet glow
+    ctx.strokeStyle = '#ff3366';
+    ctx.lineWidth = 3.0;
+    ctx.shadowColor = '#ff0044';
+    ctx.shadowBlur = 8;
     ctx.stroke();
+
+    // Hot bright core
+    ctx.strokeStyle = '#ff809b';
+    ctx.lineWidth = 1.0;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // Bubbling red surface cells / highlights
+  for (let b = 0; b < 24; b++) {
+    const bx = Math.random() * 512;
+    const by = Math.random() * 512;
+    const br = 4 + Math.random() * 10;
+    ctx.fillStyle = 'rgba(255, 60, 95, 0.75)';
+    ctx.beginPath();
+    ctx.arc(bx, by, br, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Specular bubble highlight
+    ctx.fillStyle = 'rgba(255, 200, 220, 0.9)';
+    ctx.beginPath();
+    ctx.arc(bx - br * 0.3, by - br * 0.3, br * 0.28, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -96,25 +87,158 @@ function createLavaTexture() {
   return texture;
 }
 
-function createCharredWoodTexture() {
+/**
+ * Flat Stepping Slab Top Surface (Requirement 5: Ровная плоскость для игрока)
+ * Distinct outer border, clean basalt slab pavers with subtle dark grain & faint crimson fissures.
+ */
+function createVolcanoTopTexture() {
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
+  canvas.width = 512;
+  canvas.height = 512;
   const ctx = canvas.getContext('2d');
 
-  ctx.fillStyle = '#1c1614';
-  ctx.fillRect(0, 0, 256, 256);
+  // Dark charcoal basalt slab base
+  ctx.fillStyle = '#18181c';
+  ctx.fillRect(0, 0, 512, 512);
 
-  ctx.strokeStyle = '#2d2420';
+  // Outer carved stone border (makes platform edges crisp & clearly visible for parkour)
+  ctx.strokeStyle = '#32323a';
+  ctx.lineWidth = 14;
+  ctx.strokeRect(7, 7, 498, 498);
+
+  ctx.strokeStyle = '#0d0d10';
   ctx.lineWidth = 4;
-  for (let y = 0; y < 256; y += 32) {
-    ctx.strokeRect(0, y, 256, 30);
+  ctx.strokeRect(16, 16, 480, 480);
+
+  // Basalt slab grains & mineral flecks
+  for (let i = 0; i < 450; i++) {
+    const x = 20 + Math.random() * 472;
+    const y = 20 + Math.random() * 472;
+    const size = 6 + Math.random() * 22;
+    const shade = 22 + Math.floor(Math.random() * 20);
+    ctx.fillStyle = `rgb(${shade + 4}, ${shade}, ${shade + 2})`;
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, Math.PI * 2);
+    ctx.fill();
   }
 
-  // Charred burnt marks
-  for (let i = 0; i < 50; i++) {
-    ctx.fillStyle = 'rgba(10, 5, 2, 0.7)';
-    ctx.fillRect(Math.random() * 256, Math.random() * 256, Math.random() * 30, Math.random() * 10);
+  // Faint glowing red micro-fissures in rock
+  for (let c = 0; c < 6; c++) {
+    ctx.strokeStyle = 'rgba(255, 25, 45, 0.38)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    let cx = 30 + Math.random() * 452;
+    let cy = 30 + Math.random() * 452;
+    ctx.moveTo(cx, cy);
+    for (let s = 0; s < 5; s++) {
+      cx += (Math.random() - 0.5) * 50;
+      cy += (Math.random() - 0.5) * 50;
+      ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(2, 2);
+  return texture;
+}
+
+/**
+ * Stratified Volcanic Rock Cliff Side Texture (Requirement 4 & 5: Настоящий кусок вулкана)
+ * Rich vertical cliff striations, horizontal basalt layers, and cooled red magma streaks.
+ */
+function createVolcanoSideTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // Dark jagged rock cliff base
+  ctx.fillStyle = '#141316';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Horizontal geological strata bands
+  for (let y = 0; y < 512; y += 32) {
+    const bandShade = 18 + Math.floor(Math.random() * 18);
+    ctx.fillStyle = `rgb(${bandShade + 3}, ${bandShade}, ${bandShade + 2})`;
+    ctx.fillRect(0, y, 512, 28 + Math.random() * 6);
+  }
+
+  // Vertical cliff crevices & jagged fractures
+  for (let c = 0; c < 28; c++) {
+    ctx.strokeStyle = '#09080a';
+    ctx.lineWidth = 2 + Math.random() * 3.5;
+    ctx.beginPath();
+    let vx = Math.random() * 512;
+    let vy = 0;
+    ctx.moveTo(vx, vy);
+    while (vy < 512) {
+      vx += (Math.random() - 0.5) * 22;
+      vy += 20 + Math.random() * 35;
+      ctx.lineTo(vx, vy);
+    }
+    ctx.stroke();
+  }
+
+  // Glowing cooled red lava veins
+  for (let v = 0; v < 8; v++) {
+    ctx.strokeStyle = 'rgba(255, 30, 45, 0.48)';
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    let sx = Math.random() * 512;
+    let sy = Math.random() * 512;
+    ctx.moveTo(sx, sy);
+    for (let s = 0; s < 5; s++) {
+      sx += (Math.random() - 0.5) * 55;
+      sy += (Math.random() - 0.5) * 55;
+      ctx.lineTo(sx, sy);
+    }
+    ctx.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(2, 1);
+  return texture;
+}
+
+/**
+ * Crumbling Ledge Top Texture (Warning cracks & unstable crust)
+ */
+function createCrumbleTopTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#2d1b14';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Jagged fracture cracks
+  ctx.strokeStyle = '#ff3300';
+  ctx.lineWidth = 4;
+  for (let i = 0; i < 16; i++) {
+    ctx.beginPath();
+    let x = Math.random() * 512;
+    let y = Math.random() * 512;
+    ctx.moveTo(x, y);
+    for (let s = 0; s < 6; s++) {
+      x += (Math.random() - 0.5) * 90;
+      y += (Math.random() - 0.5) * 90;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  // Bright yellow-orange unstable glow spots
+  for (let i = 0; i < 20; i++) {
+    ctx.fillStyle = 'rgba(255, 120, 0, 0.7)';
+    ctx.beginPath();
+    ctx.arc(Math.random() * 512, Math.random() * 512, 8 + Math.random() * 12, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -123,25 +247,132 @@ function createCharredWoodTexture() {
   return texture;
 }
 
-// Global texture cache to prevent re-rendering canvases on every load
-let cachedBasaltTexture = null;
-let cachedLavaTexture = null;
-let cachedCharredWoodTexture = null;
+/**
+ * Crumbling Ledge Side Texture
+ */
+function createCrumbleSideTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
 
-function getBasaltTexture() {
-  if (!cachedBasaltTexture) cachedBasaltTexture = createBasaltTexture();
-  return cachedBasaltTexture;
+  ctx.fillStyle = '#22140f';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Jagged falling shards & cracks
+  ctx.strokeStyle = '#ff2200';
+  ctx.lineWidth = 3;
+  for (let i = 0; i < 14; i++) {
+    ctx.beginPath();
+    let x = Math.random() * 512;
+    let y = 0;
+    ctx.moveTo(x, y);
+    while (y < 512) {
+      x += (Math.random() - 0.5) * 35;
+      y += 30 + Math.random() * 40;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
 }
 
-function getLavaTexture() {
-  if (!cachedLavaTexture) cachedLavaTexture = createLavaTexture();
-  return cachedLavaTexture;
+/**
+ * Charred Wooden Planks (Top & Sides)
+ */
+function createWoodTopTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#201815';
+  ctx.fillRect(0, 0, 256, 256);
+
+  ctx.strokeStyle = '#2d221e';
+  ctx.lineWidth = 4;
+  for (let y = 0; y < 256; y += 32) {
+    ctx.strokeRect(0, y, 256, 30);
+  }
+
+  // Burnt marks
+  for (let i = 0; i < 35; i++) {
+    ctx.fillStyle = 'rgba(10, 6, 4, 0.75)';
+    ctx.fillRect(Math.random() * 256, Math.random() * 256, Math.random() * 40, Math.random() * 12);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
 }
 
-function getCharredWoodTexture() {
-  if (!cachedCharredWoodTexture) cachedCharredWoodTexture = createCharredWoodTexture();
-  return cachedCharredWoodTexture;
+function createWoodSideTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#150f0c';
+  ctx.fillRect(0, 0, 256, 256);
+
+  ctx.strokeStyle = '#281c16';
+  ctx.lineWidth = 3;
+  for (let x = 0; x < 256; x += 32) {
+    ctx.strokeRect(x, 0, 30, 256);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
 }
+
+// Global cached textures
+let cachedBloodMagma = null;
+let cachedVolcanoTop = null;
+let cachedVolcanoSide = null;
+let cachedCrumbleTop = null;
+let cachedCrumbleSide = null;
+let cachedWoodTop = null;
+let cachedWoodSide = null;
+
+function getBloodMagmaTexture() {
+  if (!cachedBloodMagma) cachedBloodMagma = createBloodMagmaTexture();
+  return cachedBloodMagma;
+}
+function getVolcanoTopTexture() {
+  if (!cachedVolcanoTop) cachedVolcanoTop = createVolcanoTopTexture();
+  return cachedVolcanoTop;
+}
+function getVolcanoSideTexture() {
+  if (!cachedVolcanoSide) cachedVolcanoSide = createVolcanoSideTexture();
+  return cachedVolcanoSide;
+}
+function getCrumbleTopTexture() {
+  if (!cachedCrumbleTop) cachedCrumbleTop = createCrumbleTopTexture();
+  return cachedCrumbleTop;
+}
+function getCrumbleSideTexture() {
+  if (!cachedCrumbleSide) cachedCrumbleSide = createCrumbleSideTexture();
+  return cachedCrumbleSide;
+}
+function getWoodTopTexture() {
+  if (!cachedWoodTop) cachedWoodTop = createWoodTopTexture();
+  return cachedWoodTop;
+}
+function getWoodSideTexture() {
+  if (!cachedWoodSide) cachedWoodSide = createWoodSideTexture();
+  return cachedWoodSide;
+}
+
+// ============================================================================
+// 🌋 CRATER MAP (VOLCANO PARKOUR)
+// ============================================================================
 
 export class CraterMap {
   constructor(scene) {
@@ -149,8 +380,8 @@ export class CraterMap {
     this.isCrater = true;
 
     // Dimensions
-    this.calderaRadius = 32; // meters radius of the crater
-    this.calderaHeight = 38; // meters tall from floor to summit
+    this.calderaRadius = 32;
+    this.calderaHeight = 38;
     this.offsetX = -this.calderaRadius;
     this.offsetZ = -this.calderaRadius;
     this.width = this.calderaRadius * 2;
@@ -158,13 +389,15 @@ export class CraterMap {
     this.tileSize = 4;
 
     // Magma (The Floor is Lava) state
-    this.magmaLevel = 0.5; // current Y
+    // Requirement 2: Magma stays dormant (0.5m) until player leaps onto first parkour platform!
+    this.magmaLevel = 0.5;
     this.initialMagmaLevel = 0.5;
-    this.maxMagmaLevel = 29.5; // stops just below summit
-    this.magmaBaseSpeed = 0.18; // steady rising speed from game start
-    this.magmaRapidSpeed = 0.48; // rapid rising speed after Key 1 alarm
+    this.maxMagmaLevel = 29.5;
+    this.magmaBaseSpeed = 0.20;   // steady rising speed once parkour starts
+    this.magmaRapidSpeed = 0.50;  // rapid rising speed after Key 1 alarm
     this.magmaRisingSpeed = this.magmaBaseSpeed;
-    this.isMagmaRising = true; // ALWAYS actively rising from start!
+    this.isMagmaRising = false;   // DORMANT until player jumps off start platform!
+    this.hasPlayerStartedParkour = false;
     this.isRapidRise = false;
     this.magmaTime = 0;
 
@@ -173,6 +406,7 @@ export class CraterMap {
     this.crumblingPlatforms = [];
     this.walls = [];
     this.spawnPoints = [];
+    this.keyLocations = [];
 
     // Geysers
     this.geysers = [];
@@ -184,6 +418,7 @@ export class CraterMap {
 
     // Callbacks
     this.onMagmaRiseStart = null;
+    this.onParkourStart = null;
     this.onPlayerMagmaDeath = null;
 
     this.buildVolcanoWorld();
@@ -193,88 +428,172 @@ export class CraterMap {
     this.root = new THREE.Group();
     this.scene.add(this.root);
 
-    // Materials using cached procedural textures
-    this.basaltMat = new THREE.MeshStandardMaterial({
-      map: getBasaltTexture(),
-      roughness: 0.85,
-      metalness: 0.15
+    // Materials setup with complete multi-face support
+    this.rockTopMat = new THREE.MeshStandardMaterial({
+      map: getVolcanoTopTexture(),
+      roughness: 0.82,
+      metalness: 0.18
     });
 
-    this.charredWoodMat = new THREE.MeshStandardMaterial({
-      map: getCharredWoodTexture(),
-      roughness: 0.9,
-      metalness: 0.1
+    this.rockSideMat = new THREE.MeshStandardMaterial({
+      map: getVolcanoSideTexture(),
+      roughness: 0.90,
+      metalness: 0.12
     });
 
-    this.crumbleMat = new THREE.MeshStandardMaterial({
-      color: 0x5a3d31,
-      roughness: 0.95,
-      metalness: 0.05
+    this.crumbleTopMat = new THREE.MeshStandardMaterial({
+      map: getCrumbleTopTexture(),
+      roughness: 0.88,
+      metalness: 0.10,
+      emissive: 0x551100,
+      emissiveIntensity: 0.6
     });
 
-    // 1. Crater Caldera Walls (Inverted Cone / Cylinder)
+    this.crumbleSideMat = new THREE.MeshStandardMaterial({
+      map: getCrumbleSideTexture(),
+      roughness: 0.92,
+      metalness: 0.08,
+      emissive: 0x440800,
+      emissiveIntensity: 0.5
+    });
+
+    this.woodTopMat = new THREE.MeshStandardMaterial({
+      map: getWoodTopTexture(),
+      roughness: 0.88,
+      metalness: 0.12
+    });
+
+    this.woodSideMat = new THREE.MeshStandardMaterial({
+      map: getWoodSideTexture(),
+      roughness: 0.94,
+      metalness: 0.06
+    });
+
+    // Multi-materials array for BoxGeometry: [+X, -X, +Y (TOP), -Y (BOTTOM), +Z, -Z]
+    // All 6 faces textured with zero missing/stretched sides!
+    this.rockMaterials = [
+      this.rockSideMat, // +X
+      this.rockSideMat, // -X
+      this.rockTopMat,  // +Y (TOP: flat volcanic stone slab)
+      this.rockSideMat, // -Y (BOTTOM)
+      this.rockSideMat, // +Z
+      this.rockSideMat  // -Z
+    ];
+
+    this.crumbleMaterials = [
+      this.crumbleSideMat,
+      this.crumbleSideMat,
+      this.crumbleTopMat,
+      this.crumbleSideMat,
+      this.crumbleSideMat,
+      this.crumbleSideMat
+    ];
+
+    this.woodMaterials = [
+      this.woodSideMat,
+      this.woodSideMat,
+      this.woodTopMat,
+      this.woodSideMat,
+      this.woodSideMat,
+      this.woodSideMat
+    ];
+
+    // 1. Crater Caldera Walls
     const wallGeo = new THREE.CylinderGeometry(
-      this.calderaRadius * 1.08, // Top radius (summit rim)
-      this.calderaRadius * 0.88, // Bottom radius (base)
+      this.calderaRadius * 1.08,
+      this.calderaRadius * 0.88,
       this.calderaHeight,
       32,
       1,
-      true // open ended
+      true
     );
-    // Double-sided or inside face
-    this.calderaWall = new THREE.Mesh(wallGeo, this.basaltMat);
+    this.calderaWall = new THREE.Mesh(wallGeo, this.rockSideMat);
     this.calderaWall.position.set(0, this.calderaHeight / 2, 0);
     this.calderaWall.material.side = THREE.BackSide;
     this.root.add(this.calderaWall);
 
-    // 2. Rising Magma Pool Surface with 3D Wave Undulation
+    // 2. Rising Magma Pool Surface with 3D Wave Undulation (Requirement 1: Ярко-красная кровь/магма)
     const lavaGeo = new THREE.PlaneGeometry(this.calderaRadius * 2.15, this.calderaRadius * 2.15, 28, 28);
     this.lavaMat = new THREE.MeshStandardMaterial({
-      map: getLavaTexture(),
-      emissive: 0xff3300,
-      emissiveIntensity: 0.9,
-      roughness: 0.25,
-      metalness: 0.75
+      map: getBloodMagmaTexture(),
+      color: 0xff0038,
+      emissive: 0xff002b,
+      emissiveIntensity: 1.35,
+      roughness: 0.20,
+      metalness: 0.70
     });
     this.lavaMesh = new THREE.Mesh(lavaGeo, this.lavaMat);
     this.lavaMesh.rotation.x = -Math.PI / 2;
     this.lavaMesh.position.set(0, this.magmaLevel, 0);
     this.root.add(this.lavaMesh);
 
-    // Dynamic Magma Glow Light
-    this.magmaLight = new THREE.PointLight(0xff4400, 3.5, 50, 1.2);
+    // Dynamic Vivid Blood-Red Magma Glow Light
+    this.magmaLight = new THREE.PointLight(0xff0038, 4.2, 55, 1.2);
     this.magmaLight.position.set(0, this.magmaLevel + 2.5, 0);
     this.root.add(this.magmaLight);
 
-    // Ambient Volcanic Glow
-    this.volcanoHemi = new THREE.HemisphereLight(0x220505, 0xff3300, 0.9);
+    // Ambient Volcanic Crimson Glow
+    this.volcanoHemi = new THREE.HemisphereLight(0x280206, 0xff0038, 1.0);
     this.root.add(this.volcanoHemi);
 
-    // 3. Build 3 Tiers of Platforms & Obstacles
-    this.buildTier1();
-    this.buildTier2();
-    this.buildTier3();
+    // 3. Dedicated Platform Group for Procedural Regeneration (Requirement 6)
+    this.platformsGroup = new THREE.Group();
+    this.root.add(this.platformsGroup);
+
+    // 4. Build Summit Torii Gate (Permanent Landmark)
     this.buildSummitToriiGate();
 
-    // 4. Volcanic Ash & Spark Particle System
+    // 5. Generate Initial Randomized Parkour
+    this.generateRandomParkour();
+
+    // 6. Volcanic Ash & Red Ruby Spark Particle System
     this.initAshParticles();
 
-    // 5. Geysers
+    // 7. Geysers
     this.initGeysers();
   }
 
-  // --- PLATFORM CREATION HELPER ---
-  addPlatform(x, y, z, w, h, d, type = 'rock', isCrumbling = false) {
-    let mat = this.basaltMat;
-    if (type === 'wood') mat = this.charredWoodMat;
-    if (isCrumbling) mat = this.crumbleMat;
+  // --- PLATFORM CREATION HELPER (Requirements 4 & 5: Multi-material & Crag Underbelly) ---
+  addPlatform(x, y, z, w, h, d, type = 'rock', isCrumbling = false, isStartPlatform = false) {
+    let materials = this.rockMaterials;
+    if (type === 'wood') materials = this.woodMaterials;
+    if (isCrumbling) materials = this.crumbleMaterials;
 
     const geo = new THREE.BoxGeometry(w, h, d);
-    const mesh = new THREE.Mesh(geo, mat);
+    const mesh = new THREE.Mesh(geo, materials);
     mesh.position.set(x, y, z);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    this.root.add(mesh);
+
+    // Requirement 5: "типо как кусок вулкана с ровной плоскостью для игрока"
+    // Add natural craggy tapered volcanic rock chunk underbelly below the flat box slab!
+    if (type === 'rock' || isCrumbling) {
+      const cragHeight = h * 1.6 + 0.9;
+      const cragGeo = new THREE.CylinderGeometry(
+        Math.min(w, d) * 0.44,
+        0.2 + Math.random() * 0.35,
+        cragHeight,
+        7,
+        2
+      );
+      // Jitter underbelly vertices for authentic jagged volcanic cliff rock silhouette
+      const posAttr = cragGeo.attributes.position;
+      for (let i = 0; i < posAttr.count; i++) {
+        if (posAttr.getY(i) < 0) {
+          posAttr.setX(i, posAttr.getX(i) + (Math.random() - 0.5) * 0.32);
+          posAttr.setZ(i, posAttr.getZ(i) + (Math.random() - 0.5) * 0.32);
+        }
+      }
+      cragGeo.computeVertexNormals();
+
+      const cragMat = isCrumbling ? this.crumbleSideMat : this.rockSideMat;
+      const cragMesh = new THREE.Mesh(cragGeo, cragMat);
+      cragMesh.position.y = -(h / 2 + cragHeight / 2);
+      cragMesh.rotation.y = Math.random() * Math.PI * 2;
+      mesh.add(cragMesh);
+    }
+
+    this.platformsGroup.add(mesh);
 
     const platformData = {
       mesh,
@@ -286,6 +605,7 @@ export class CraterMap {
       topY: y + h / 2,
       type,
       isCrumbling,
+      isStartPlatform,
       stepped: false,
       stepTimer: 0,
       isFalling: false,
@@ -302,85 +622,31 @@ export class CraterMap {
   }
 
   // -------------------------------------------------------------
-  // 🧗‍♂️ TIER 1: The Base (Y: 1.5m to 7.0m)
+  // 🧗‍♂️ PROCEDURAL RANDOM PARKOUR GENERATOR (Requirement 6)
+  // Generates unique platform layouts, chasms, crumbling ledges & dynamic key spawns!
   // -------------------------------------------------------------
-  buildTier1() {
-    // 1. Starting Altar / Broad Rock Platform (Player Spawns Here!)
-    const startP = this.addPlatform(0, 1.8, 16, 12, 1.2, 10, 'rock');
+  generateRandomParkour() {
+    // 1. Clear existing platforms & decorations
+    while (this.platformsGroup.children.length > 0) {
+      const child = this.platformsGroup.children[0];
+      if (child.geometry) child.geometry.dispose();
+      this.platformsGroup.remove(child);
+    }
+    this.platforms = [];
+    this.crumblingPlatforms = [];
+    this.spawnPoints = [];
+    this.keyLocations = [];
+
+    // 2. Fixed Starting Altar (Player Spawns Here!)
+    const startP = this.addPlatform(0, 1.8, 16, 11, 1.2, 9, 'rock', false, true);
     this.spawnPoints.push(new THREE.Vector3(0, 2.5, 16));
 
-    // Decorative braziers on starting platform
-    this.addFireBrazier(-4.5, 2.4, 13);
-    this.addFireBrazier(4.5, 2.4, 13);
+    // Decorative braziers on starting altar
+    this.addFireBrazier(-4.2, 2.4, 13.5);
+    this.addFireBrazier(4.2, 2.4, 13.5);
 
-    // 2. Stepped rock ledges leading westward
-    this.addPlatform(-8.5, 2.8, 14, 5, 1.0, 5, 'rock');
-    this.addPlatform(-14, 3.8, 11, 6, 1.2, 5, 'rock');
-
-    // 3. FIRST OBSTACLE: Wide Chasm (Разлом) requiring Sprint + Jump
-    // Gap is ~6.5 meters over boiling lava!
-    this.addPlatform(-19, 4.6, 3, 5, 1.2, 6, 'rock');
-
-    // 4. SECOND OBSTACLE: Crumbling Ledge (Осыпающийся уступ)!
-    // Collapses 2 seconds after stepping on it!
-    this.addPlatform(-20, 5.5, -4, 4.5, 0.8, 4.5, 'rock', true);
-
-    // 5. Landing ledge leading into Tier 2 ascent
-    this.addPlatform(-17, 6.8, -11, 6, 1.2, 6, 'rock');
-  }
-
-  // -------------------------------------------------------------
-  // 🧗‍♂️ TIER 2: The Ascent & Floating Beams (Y: 8.0m to 19.0m)
-  // -------------------------------------------------------------
-  buildTier2() {
-    // 1. Charred Wooden Beam Bridge clinging to western/northern wall
-    this.addPlatform(-12, 8.4, -16, 5, 0.6, 5, 'wood');
-    this.addPlatform(-5, 9.8, -19, 7, 0.6, 3.5, 'wood');
-
-    // 2. Hanging Chains & Iron Anchor Platform
-    this.addPlatform(4, 11.2, -18, 6, 0.8, 5, 'rock');
-    this.addHangingChain(4, 11.2, -18, 18);
-
-    // 3. Mid-air Chasm with suspended Key 2 Altar Platform!
-    // Key 2 hangs in the middle of this leap!
-    this.addPlatform(13, 12.8, -14, 5, 0.8, 5, 'wood');
-    // Mid-air stepping beam under Key 2
-    this.addPlatform(8.5, 12.2, -16, 2.5, 0.5, 2.5, 'wood');
-
-    // 4. Crumbling rock shelf on eastern wall
-    this.addPlatform(19, 14.2, -6, 4.5, 0.8, 4.5, 'rock', true);
-
-    // 5. High rock shelf with glowing crystals
-    this.addPlatform(18, 16.0, 4, 7, 1.2, 6, 'rock');
-    this.addFireBrazier(18, 16.7, 5.5);
-
-    // 6. Transition beam into Tier 3
-    this.addPlatform(13, 17.8, 12, 5, 0.6, 5, 'wood');
-  }
-
-  // -------------------------------------------------------------
-  // 🧗‍♂️ TIER 3: The Rim & Precarious Bridges (Y: 20.0m to 33.0m)
-  // -------------------------------------------------------------
-  buildTier3() {
-    // 1. High wooden balcony overlooking entire bubbling crater
-    this.addPlatform(5, 19.6, 17, 7, 0.8, 4.5, 'wood');
-
-    // 2. Narrow Suspension Bridge across southern rim (Key 3 is here!)
-    // Very narrow (1.8m width) with Nextbot cutting across!
-    this.addPlatform(-3, 21.5, 16, 7, 0.5, 2.0, 'wood');
-    this.addPlatform(-11, 23.2, 13, 6, 0.6, 2.2, 'wood');
-
-    // 3. Final crumbling stone leap before the summit stairs
-    this.addPlatform(-15, 25.0, 6, 4.2, 0.8, 4.2, 'rock', true);
-
-    // 4. Grand Basalt Stairs winding up towards the summit center
-    this.addPlatform(-13, 27.0, -2, 5, 1.0, 5, 'rock');
-    this.addPlatform(-8, 29.0, -8, 6, 1.0, 5, 'rock');
-    this.addPlatform(-2, 31.0, -6, 6, 1.0, 5, 'rock');
-
-    // 5. The Grand Summit Arena (Y = 32.5m)
-    // Octagonal / broad stone peak where the Torii Gate stands!
-    this.summitPlatform = this.addPlatform(0, 32.0, 0, 14, 1.4, 14, 'rock');
+    // 3. Fixed Summit Arena (Y = 32.0m)
+    this.summitPlatform = this.addPlatform(0, 32.0, 0, 14, 1.4, 14, 'rock', false, false);
     this.exitPosition.set(0, 32.7, 0);
 
     // Braziers flanking the Torii Gate
@@ -388,6 +654,99 @@ export class CraterMap {
     this.addFireBrazier(4.5, 32.7, -3);
     this.addFireBrazier(-4.5, 32.7, 3);
     this.addFireBrazier(4.5, 32.7, 3);
+
+    // 4. Procedural Spiral Parkour Ascent
+    // Randomize spiral winding direction (Clockwise vs Counter-Clockwise)
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    let angle = Math.PI * 0.5; // starting from southern altar (0, 16)
+    let currentY = 1.8;
+
+    // --- TIER 1: The Caldera Base (Y: 2.8m to ~7.5m, 5 platforms) ---
+    let key1Platform = null;
+    const tier1Count = 5;
+    for (let i = 0; i < tier1Count; i++) {
+      // Step angle: advance around caldera wall
+      const isChasm = (i === 2); // Guaranteed exciting sprint chasm gap!
+      const angleStep = isChasm ? (0.38 + Math.random() * 0.08) : (0.26 + Math.random() * 0.08);
+      angle += angleStep * dir;
+
+      const radius = 19.5 + (Math.random() - 0.5) * 2.8;
+      const px = Math.cos(angle) * radius;
+      const pz = Math.sin(angle) * radius;
+      currentY += 1.0 + Math.random() * 0.28; // within safe 1.4m jump height limit!
+
+      const pw = 4.4 + (Math.random() - 0.5) * 1.2;
+      const pd = 4.4 + (Math.random() - 0.5) * 1.2;
+      const isCrumble = (i === 3); // crumbling ledge obstacle
+
+      const p = this.addPlatform(px, currentY, pz, pw, 1.0, pd, 'rock', isCrumble, false);
+      if (i === 2) key1Platform = p;
+    }
+
+    // --- TIER 2: The Ascent & Floating Beams (Y: 8.8m to ~19.5m, 7 platforms) ---
+    let key2Platform = null;
+    const tier2Count = 7;
+    // 30% chance to reverse spiral direction at tier 2 for layout variety
+    const tier2Dir = (Math.random() < 0.3) ? -dir : dir;
+
+    for (let i = 0; i < tier2Count; i++) {
+      const angleStep = 0.28 + Math.random() * 0.10;
+      angle += angleStep * tier2Dir;
+
+      const radius = 17.5 + (Math.random() - 0.5) * 3.0;
+      const px = Math.cos(angle) * radius;
+      const pz = Math.sin(angle) * radius;
+      currentY += 1.1 + Math.random() * 0.25;
+
+      const isWood = (i % 2 === 1);
+      const isCrumble = (i === 4);
+      const pw = isWood ? (3.2 + Math.random() * 1.5) : (4.5 + Math.random() * 1.2);
+      const pd = isWood ? (3.2 + Math.random() * 1.5) : (4.5 + Math.random() * 1.2);
+
+      const p = this.addPlatform(px, currentY, pz, pw, isWood ? 0.6 : 0.9, pd, isWood ? 'wood' : 'rock', isCrumble, false);
+      if (i === 3) {
+        key2Platform = p;
+        this.addHangingChain(px, currentY, pz, 16);
+      }
+    }
+
+    // --- TIER 3: The Rim & Central Summit Ascent (Y: 20.8m to ~31.0m, 6 platforms) ---
+    let key3Platform = null;
+    const tier3Count = 6;
+    for (let i = 0; i < tier3Count; i++) {
+      const angleStep = 0.32 + Math.random() * 0.08;
+      angle += angleStep * tier2Dir;
+
+      // Gradually spiral inward toward the central summit at (0, 0)
+      const shrinkFactor = 1.0 - (i / tier3Count) * 0.65;
+      const radius = (15.5 + (Math.random() - 0.5) * 2.0) * shrinkFactor;
+      const px = Math.cos(angle) * radius;
+      const pz = Math.sin(angle) * radius;
+      currentY += 1.2 + Math.random() * 0.22;
+
+      const isWood = (i === 1 || i === 2);
+      const isCrumble = (i === 3);
+      const pw = isWood ? 2.4 : (4.2 + Math.random() * 1.0);
+      const pd = isWood ? 2.4 : (4.2 + Math.random() * 1.0);
+
+      const p = this.addPlatform(px, currentY, pz, pw, 0.8, pd, isWood ? 'wood' : 'rock', isCrumble, false);
+      if (i === 1) key3Platform = p;
+    }
+
+    // 5. Store Dynamically Synchronized Key Locations
+    const k1 = key1Platform || this.platforms[3];
+    const k2 = key2Platform || this.platforms[8];
+    const k3 = key3Platform || this.platforms[14];
+
+    this.keyLocations = [
+      { pos: new THREE.Vector3(k1.x, k1.topY + 0.85, k1.z), name: 'Ключ Нижнего Яруса (Внимание: Лава!)' },
+      { pos: new THREE.Vector3(k2.x, k2.topY + 0.85, k2.z), name: 'Ключ Среднего Яруса (Прыжок над бездной)' },
+      { pos: new THREE.Vector3(k3.x, k3.topY + 0.85, k3.z), name: 'Ключ Верхнего Яруса (Узкий мостик)' }
+    ];
+  }
+
+  getKeyLocations() {
+    return this.keyLocations;
   }
 
   // -------------------------------------------------------------
@@ -463,12 +822,12 @@ export class CraterMap {
     plaque.position.set(0, 5.65, 0.1);
     this.toriiGroup.add(plaque);
 
-    // Swirling Energy Vortex / Mystic Barrier in Gate Center
+    // Swirling Energy Vortex in Gate Center
     const vortexGeo = new THREE.PlaneGeometry(4.8, 5.2);
     this.vortexMat = new THREE.MeshBasicMaterial({
-      color: 0xff5500,
+      color: 0xff0044,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.55,
       side: THREE.DoubleSide
     });
     this.vortexMesh = new THREE.Mesh(vortexGeo, this.vortexMat);
@@ -476,7 +835,7 @@ export class CraterMap {
     this.toriiGroup.add(this.vortexMesh);
 
     // Torii Point Light
-    this.toriiLight = new THREE.PointLight(0xff7700, 3.0, 16, 1.5);
+    this.toriiLight = new THREE.PointLight(0xff0044, 3.2, 16, 1.5);
     this.toriiLight.position.set(0, 3.2, 0);
     this.toriiGroup.add(this.toriiLight);
 
@@ -493,18 +852,18 @@ export class CraterMap {
     const bowl = new THREE.Mesh(bowlGeo, bowlMat);
     brazierGroup.add(bowl);
 
-    // Fire flame core
+    // Fire flame core (Blood-red volcanic fire)
     const flameGeo = new THREE.ConeGeometry(0.35, 0.9, 8);
-    const flameMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+    const flameMat = new THREE.MeshBasicMaterial({ color: 0xff1a40 });
     const flame = new THREE.Mesh(flameGeo, flameMat);
     flame.position.y = 0.7;
     brazierGroup.add(flame);
 
-    const light = new THREE.PointLight(0xff6600, 1.8, 10, 2);
+    const light = new THREE.PointLight(0xff0038, 2.0, 10, 2);
     light.position.y = 1.0;
     brazierGroup.add(light);
 
-    this.root.add(brazierGroup);
+    this.platformsGroup.add(brazierGroup);
   }
 
   addHangingChain(x, startY, z, length) {
@@ -516,46 +875,43 @@ export class CraterMap {
     const chainGeo = new THREE.CylinderGeometry(0.06, 0.06, length, 8);
     const chain = new THREE.Mesh(chainGeo, chainMat);
     chain.position.set(x, startY + length / 2, z);
-    this.root.add(chain);
+    this.platformsGroup.add(chain);
   }
 
   // -------------------------------------------------------------
-  // 🌋 VOLCANIC ASH & SPARKS PARTICLES
+  // 🌋 VOLCANIC ASH & BLOOD-RED RUBY SPARKS (Requirement 1)
   // -------------------------------------------------------------
   initAshParticles() {
-    const particleCount = 180; // Optimized count for 60fps performance
+    const particleCount = 180;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const velocities = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
 
     for (let i = 0; i < particleCount; i++) {
-      // Spawn inside crater cylinder
       const angle = Math.random() * Math.PI * 2;
       const r = Math.random() * (this.calderaRadius * 0.9);
       positions[i * 3] = Math.cos(angle) * r;
       positions[i * 3 + 1] = Math.random() * this.calderaHeight;
       positions[i * 3 + 2] = Math.sin(angle) * r;
 
-      // Velocities: 70% falling dark ash, 30% rising bright fiery sparks
-      const isSpark = Math.random() < 0.35;
+      const isSpark = Math.random() < 0.40;
       if (isSpark) {
         velocities[i * 3] = (Math.random() - 0.5) * 1.5;
-        velocities[i * 3 + 1] = 1.2 + Math.random() * 2.0; // rising
+        velocities[i * 3 + 1] = 1.2 + Math.random() * 2.2;
         velocities[i * 3 + 2] = (Math.random() - 0.5) * 1.5;
 
-        // Orange/yellow spark color
+        // Vivid ruby scarlet spark color
         colors[i * 3] = 1.0;
-        colors[i * 3 + 1] = 0.4 + Math.random() * 0.5;
-        colors[i * 3 + 2] = 0.0;
+        colors[i * 3 + 1] = 0.05 + Math.random() * 0.15;
+        colors[i * 3 + 2] = 0.15;
       } else {
         velocities[i * 3] = (Math.random() - 0.5) * 0.8;
-        velocities[i * 3 + 1] = -(0.8 + Math.random() * 1.6); // falling ash
+        velocities[i * 3 + 1] = -(0.8 + Math.random() * 1.6);
         velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.8;
 
-        // Dark charcoal ash color
         const shade = 0.05 + Math.random() * 0.12;
-        colors[i * 3] = shade;
+        colors[i * 3] = shade + 0.04;
         colors[i * 3 + 1] = shade;
         colors[i * 3 + 2] = shade;
       }
@@ -585,7 +941,7 @@ export class CraterMap {
 
     const geyserGeo = new THREE.CylinderGeometry(0.6, 1.4, 14, 16);
     const geyserMat = new THREE.MeshBasicMaterial({
-      color: 0xff3300,
+      color: 0xff0038, // Vivid scarlet blood eruption
       transparent: true,
       opacity: 0.0
     });
@@ -598,11 +954,24 @@ export class CraterMap {
   }
 
   // -------------------------------------------------------------
-  // 🔄 UPDATE LOOP & LOGIC
+  // 🔄 PARKOUR & MAGMA ACTIVATION TRIGGER (Requirements 2 & 3)
   // -------------------------------------------------------------
+  triggerParkourStart() {
+    if (this.hasPlayerStartedParkour) return;
+    this.hasPlayerStartedParkour = true;
+    this.isMagmaRising = true;
+    this.magmaRisingSpeed = this.magmaBaseSpeed;
+
+    if (this.onParkourStart) {
+      this.onParkourStart();
+    }
+  }
+
   startMagmaRise() {
+    // Accelerated rise after Key 1 alarm
     this.isRapidRise = true;
     this.magmaRisingSpeed = this.magmaRapidSpeed;
+    this.isMagmaRising = true;
     soundEngine.playSirenAlarm();
     if (this.onMagmaRiseStart) {
       this.onMagmaRiseStart();
@@ -610,8 +979,8 @@ export class CraterMap {
   }
 
   onPlayerStep(x, z, footY) {
-    // Check if player stands on a crumbling platform
-    for (const p of this.crumblingPlatforms) {
+    // Check if player stands on any platform
+    for (const p of this.platforms) {
       if (p.isFalling) continue;
       const margin = 0.5;
       const inX = x >= p.x - p.w / 2 - margin && x <= p.x + p.w / 2 + margin;
@@ -619,7 +988,12 @@ export class CraterMap {
       const inY = Math.abs(footY - p.topY) < 0.6;
 
       if (inX && inZ && inY) {
-        if (!p.stepped) {
+        // Requirement 2 & 3: Stepping onto any non-start platform wakes magma & girl!
+        if (!p.isStartPlatform && !this.hasPlayerStartedParkour) {
+          this.triggerParkourStart();
+        }
+
+        if (p.isCrumbling && !p.stepped) {
           p.stepped = true;
           soundEngine.playCrumbleWarning();
         }
@@ -630,9 +1004,7 @@ export class CraterMap {
   getFloorHeight(x, z, currentY, radius = 0.45) {
     let highestFloor = -999;
 
-    // Test all platforms
     for (const p of this.platforms) {
-      // If platform has completely plunged beneath magma, it no longer supports player
       if (p.isFalling && p.topY < this.magmaLevel - 1) continue;
 
       const minX = p.x - p.w / 2 - radius * 0.7;
@@ -641,10 +1013,13 @@ export class CraterMap {
       const maxZ = p.z + p.d / 2 + radius * 0.7;
 
       if (x >= minX && x <= maxX && z >= minZ && z <= maxZ) {
-        // Player can land on top of platform if their feet are near or above platform top
         if (currentY >= p.topY - 0.45) {
           if (p.topY > highestFloor) {
             highestFloor = p.topY;
+            // Landing on a non-start platform wakes magma & girl!
+            if (!p.isStartPlatform && !this.hasPlayerStartedParkour) {
+              this.triggerParkourStart();
+            }
           }
         }
       }
@@ -658,9 +1033,7 @@ export class CraterMap {
   }
 
   resolveCollision(pos, radius = 0.45) {
-    // 1. Keep within cylindrical caldera wall boundary
     const distFromCenter = Math.hypot(pos.x, pos.z);
-    // Boundary tapers slightly with height
     const currentWallRadius = this.calderaRadius * (0.88 + 0.18 * (pos.y / this.calderaHeight)) - radius;
 
     if (distFromCenter > currentWallRadius) {
@@ -671,14 +1044,12 @@ export class CraterMap {
   }
 
   hasLineOfSight(pos1, pos2) {
-    // In crater, direct LOS exists if neither is blocked by central pillars or caldera lip
     const dy = Math.abs(pos1.y - pos2.y);
     const dxz = Math.hypot(pos1.x - pos2.x, pos1.z - pos2.z);
     return dxz < 32 && dy < 16;
   }
 
   findNextWaypoint(fromPos, toPos) {
-    // Find closest platform waypoint along vertical ascent
     let best = toPos.clone();
     let minDist = 99999;
     for (const p of this.platforms) {
@@ -693,11 +1064,9 @@ export class CraterMap {
 
   getRandomSpawnPoint(nearPos = null, minDist = 0) {
     if (!nearPos) {
-      // Starting platform
       return new THREE.Vector3(0, 2.5, 16);
     }
 
-    // Pick a platform at least minDist away
     const valid = this.platforms.filter((p) => {
       const d = Math.hypot(p.x - nearPos.x, p.z - nearPos.z);
       return d >= minDist && p.topY > this.magmaLevel + 2;
@@ -715,7 +1084,7 @@ export class CraterMap {
     if (delta > 0.1) delta = 0.1;
     this.magmaTime += delta;
 
-    // 1. Rising Magma Logic (always creeping up, accelerated on alarm!)
+    // 1. Rising Magma Logic (ONLY rises after parkour has started!)
     if (this.isMagmaRising && this.magmaLevel < this.maxMagmaLevel) {
       this.magmaLevel += this.magmaRisingSpeed * delta;
       this.lavaMesh.position.y = this.magmaLevel;
@@ -740,15 +1109,14 @@ export class CraterMap {
     if (this.lavaMat && this.lavaMat.map) {
       this.lavaMat.map.offset.x = (this.magmaTime * 0.06) % 1;
       this.lavaMat.map.offset.y = (this.magmaTime * 0.04) % 1;
-      this.lavaMat.emissiveIntensity = 0.8 + Math.sin(this.magmaTime * 4.0) * 0.3;
+      this.lavaMat.emissiveIntensity = 1.1 + Math.sin(this.magmaTime * 4.0) * 0.35;
     }
-    this.magmaLight.intensity = 3.2 + Math.sin(this.magmaTime * 6) * 0.8;
+    this.magmaLight.intensity = 3.8 + Math.sin(this.magmaTime * 6) * 0.9;
 
     // 3. Crumbling Platforms Update
     for (const p of this.crumblingPlatforms) {
       if (p.stepped && !p.isFalling) {
         p.stepTimer += delta;
-        // Violent shaking / vibration before collapse!
         p.mesh.position.x = p.x + (Math.random() - 0.5) * 0.12;
         p.mesh.position.z = p.z + (Math.random() - 0.5) * 0.12;
 
@@ -765,14 +1133,13 @@ export class CraterMap {
         p.mesh.rotation.x += delta * 1.5;
         p.mesh.rotation.z += delta * 1.2;
 
-        // Once submerged deep in magma, hide mesh
         if (p.mesh.position.y < this.magmaLevel - 6) {
           p.mesh.visible = false;
         }
       }
     }
 
-    // 4. Volcanic Ash & Spark Particles Update
+    // 4. Volcanic Ash & Ruby Spark Particles Update
     if (this.ashPoints) {
       const positions = this.ashPoints.geometry.attributes.position.array;
       const count = positions.length / 3;
@@ -782,7 +1149,6 @@ export class CraterMap {
         positions[i * 3 + 1] += this.ashVelocities[i * 3 + 1] * delta;
         positions[i * 3 + 2] += this.ashVelocities[i * 3 + 2] * delta;
 
-        // Reset particles that fell below magma or rose above rim
         if (positions[i * 3 + 1] < this.magmaLevel) {
           positions[i * 3 + 1] = this.calderaHeight - 1;
         } else if (positions[i * 3 + 1] > this.calderaHeight) {
@@ -797,8 +1163,8 @@ export class CraterMap {
 
     // 6. Torii Gate Energy Pulse
     if (this.vortexMesh && this.vortexMat) {
-      this.vortexMat.opacity = 0.4 + Math.sin(this.magmaTime * 4) * 0.25;
-      this.toriiLight.intensity = 2.5 + Math.sin(this.magmaTime * 5) * 0.8;
+      this.vortexMat.opacity = 0.45 + Math.sin(this.magmaTime * 4) * 0.25;
+      this.toriiLight.intensity = 2.8 + Math.sin(this.magmaTime * 5) * 0.8;
     }
   }
 
@@ -806,9 +1172,8 @@ export class CraterMap {
     this.geysers.forEach((g) => {
       g.timer -= delta;
       if (g.timer <= 0) {
-        // Erupt!
         g.timer = 5.0 + Math.random() * 6.0;
-        g.active = 1.4; // seconds active
+        g.active = 1.4;
         soundEngine.playGeyserErupt();
       }
 
@@ -825,24 +1190,16 @@ export class CraterMap {
 
   reset() {
     this.magmaLevel = this.initialMagmaLevel;
-    this.isMagmaRising = true;
+    this.isMagmaRising = false; // Remains dormant until player leaps!
+    this.hasPlayerStartedParkour = false;
     this.isRapidRise = false;
     this.magmaRisingSpeed = this.magmaBaseSpeed;
     this.magmaTime = 0;
     this.lavaMesh.position.y = this.magmaLevel;
     this.magmaLight.position.y = this.magmaLevel + 2.5;
 
-    // Reset crumbling platforms
-    for (const p of this.crumblingPlatforms) {
-      p.stepped = false;
-      p.stepTimer = 0;
-      p.isFalling = false;
-      p.fallSpeed = 0;
-      p.mesh.position.set(p.x, p.origY, p.z);
-      p.mesh.rotation.set(0, 0, 0);
-      p.mesh.visible = true;
-      p.topY = p.origY + p.h / 2;
-    }
+    // Requirement 6: Regenerate fresh randomized parkour course!
+    this.generateRandomParkour();
   }
 
   destroy() {

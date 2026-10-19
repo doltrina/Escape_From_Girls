@@ -334,12 +334,16 @@ export class EscapeGoalManager {
       }
       this.doorPosition.set(0, 32.7, 0);
 
-      // 🌋 3-TIER VOLCANO KEYS
-      keyLocations = [
-        { pos: new THREE.Vector3(0, 2.7, 14.5), name: 'Ключ Нижнего Яруса (Внимание: Лава!)' },
-        { pos: new THREE.Vector3(8.5, 13.0, -15.5), name: 'Ключ Среднего Яруса (Прыжок над бездной)' },
-        { pos: new THREE.Vector3(-7.0, 22.2, 15.0), name: 'Ключ Верхнего Яруса (Узкий мостик)' }
-      ];
+      // 🌋 3-TIER VOLCANO KEYS (Dynamically placed on the procedural randomized platforms!)
+      if (typeof this.map.getKeyLocations === 'function') {
+        keyLocations = this.map.getKeyLocations();
+      } else {
+        keyLocations = [
+          { pos: new THREE.Vector3(0, 2.7, 14.5), name: 'Ключ Нижнего Яруса (Внимание: Лава!)' },
+          { pos: new THREE.Vector3(8.5, 13.0, -15.5), name: 'Ключ Среднего Яруса (Прыжок над бездной)' },
+          { pos: new THREE.Vector3(-7.0, 22.2, 15.0), name: 'Ключ Верхнего Яруса (Узкий мостик)' }
+        ];
+      }
     } else {
       // Classic Maze coordinates
       if (this.doorGroup) {

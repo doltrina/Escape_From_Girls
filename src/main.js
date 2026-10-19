@@ -200,13 +200,23 @@ class Game {
 
     if (mapType === 'crater') {
       this.currentMapType = 'crater';
-      this.scene.background = new THREE.Color(0x150404);
-      this.scene.fog = new THREE.FogExp2(0x190503, 0.024);
+      this.scene.background = new THREE.Color(0x180004);
+      this.scene.fog = new THREE.FogExp2(0x220208, 0.022);
       this.map = new CraterMap(this.scene);
       this.map.onMagmaRiseStart = () => {
         if (this.dom && this.dom.hudMagmaWarning) {
           this.dom.hudMagmaWarning.classList.remove('hidden');
         }
+      };
+      this.map.onParkourStart = () => {
+        if (this.dom && this.dom.hudMagmaWarning) {
+          this.dom.hudMagmaWarning.classList.remove('hidden');
+        }
+        if (this.girl) {
+          const spawnPos = this.map.getRandomSpawnPoint(this.player.position, 14);
+          this.girl.awaken(spawnPos);
+        }
+        this.showToast('🩸 МАГМА ПРОСНУЛАСЬ! ДЕВУШКА ВЫШЛА НА ОХОТУ!');
       };
       soundEngine.setMapMode('crater');
       if (this.dom && this.dom.hudAltitudeBadge) {
@@ -254,6 +264,11 @@ class Game {
 
     const girlSpawn = this.map.getRandomSpawnPoint(playerSpawn, 18);
     this.girl.spawn(girlSpawn);
+    if (this.currentMapType === 'crater') {
+      this.girl.setDormant(true);
+    } else {
+      this.girl.setDormant(false);
+    }
 
     this.shieldManager.reset(playerSpawn);
     this.escapeGoal.reset();

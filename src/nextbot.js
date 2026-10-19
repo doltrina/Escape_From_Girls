@@ -43,6 +43,9 @@ export class NextbotGirl {
     this.auraLight.position.set(0, 0.6, 0);
     this.meshGroup.add(this.auraLight);
 
+    // Dormancy state (for Volcano Crater map until parkour starts)
+    this.isDormant = false;
+
     this.scene.add(this.meshGroup);
   }
 
@@ -131,6 +134,27 @@ export class NextbotGirl {
     this.stunTimer = 0;
   }
 
+  setDormant(dormant) {
+    this.isDormant = dormant;
+    if (this.meshGroup) this.meshGroup.visible = !dormant;
+    if (this.auraLight) this.auraLight.visible = !dormant;
+    if (this.sparkTrail) this.sparkTrail.visible = !dormant;
+    this.velocity.set(0, 0, 0);
+    this.isLeaping = false;
+  }
+
+  awaken(pos) {
+    this.setDormant(false);
+    if (pos) {
+      this.position.copy(pos);
+      this.position.y = (pos.y !== undefined) ? pos.y : 0;
+      this.meshGroup.position.copy(this.position);
+    }
+    this.velocity.set(0, 0, 0);
+    this.stunTimer = 0.5;
+    soundEngine.playNextbotRespawn();
+  }
+
   distract(duration = 5.0, decoyPosition = null) {
     this.distractedTimer = duration;
     this.decoyTarget = decoyPosition;
@@ -216,6 +240,10 @@ export class NextbotGirl {
   }
 
   update(delta, player, elapsedTime, remotePlayers = [], isHost = true) {
+    if (this.isDormant) {
+      return 999;
+    }
+
     if (delta > 0.1) delta = 0.1;
 
     // Non-host client synchronization: smoothly follow host's authoritative nextbot position
