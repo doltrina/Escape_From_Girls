@@ -224,11 +224,22 @@ export class GameMap {
           wall.receiveShadow = true;
           this.scene.add(wall);
 
+          const openLeft = (c > 0 && this.grid[r][c - 1] === 0);
+          const openRight = (c < this.gridCols - 1 && this.grid[r][c + 1] === 0);
+          const openBottom = (r > 0 && this.grid[r - 1][c] === 0);
+          const openTop = (r < this.gridRows - 1 && this.grid[r + 1][c] === 0);
+
           this.walls.push({
+            r,
+            c,
             minX: x - this.tileSize / 2,
             maxX: x + this.tileSize / 2,
             minZ: z - this.tileSize / 2,
-            maxZ: z + this.tileSize / 2
+            maxZ: z + this.tileSize / 2,
+            openLeft,
+            openRight,
+            openBottom,
+            openTop
           });
         } else {
           this.spawnPoints.push(new THREE.Vector3(x, 1, z));
@@ -340,8 +351,22 @@ export class GameMap {
     }
   }
 
-  // Robust Circle-to-AABB collision check with multi-pass relaxation & closest-face ejection
+  // Robust Circle-to-AABB collision check with boundary clamping & safe-edge sliding
+  // Completely eliminates wall-teleporting and multi-meter ejection cascades!
   resolveCollision(pos, radius = 0.5) {
+    if (!pos || isNaN(pos.x) || isNaN(pos.z)) return false;
+
+    // 1. Strictly clamp within outer perimeter of maze
+    const minBoundX = this.offsetX + radius;
+    const maxBoundX = this.offsetX + this.width - radius;
+    const minBoundZ = this.offsetZ + radius;
+    const maxBoundZ = this.offsetZ + this.depth - radius;
+
+    if (pos.x < minBoundX) pos.x = minBoundX;
+    if (pos.x > maxBoundX) pos.x = maxBoundX;
+    if (pos.z < minBoundZ) pos.z = minBoundZ;
+    if (pos.z > maxBoundZ) pos.z = maxBoundZ;
+
     let anyResolved = false;
 
     // Up to 3 relaxation passes to resolve corners and multiple adjacent walls cleanly
@@ -349,7 +374,7 @@ export class GameMap {
       let iterResolved = false;
 
       // Only check walls in the vicinity of pos (broadphase)
-      const queryRadius = radius + 0.8;
+      const queryRadius = radius + 0.6;
       for (let i = 0; i < this.walls.length; i++) {
         const w = this.walls[i];
         if (
@@ -361,29 +386,62 @@ export class GameMap {
           continue;
         }
 
-        // If center has penetrated inside the wall box, eject along the shallowest face
+        // Case A: Circle center is INSIDE the solid wall box
         if (pos.x >= w.minX && pos.x <= w.maxX && pos.z >= w.minZ && pos.z <= w.maxZ) {
           iterResolved = true;
           anyResolved = true;
+
           const dLeft = pos.x - w.minX;
           const dRight = w.maxX - pos.x;
           const dBottom = pos.z - w.minZ;
           const dTop = w.maxZ - pos.z;
-          const minDist = Math.min(dLeft, dRight, dBottom, dTop);
 
-          if (minDist === dLeft) {
-            pos.x = w.minX - radius;
-          } else if (minDist === dRight) {
-            pos.x = w.maxX + radius;
-          } else if (minDist === dBottom) {
-            pos.z = w.minZ - radius;
+          // Only consider open corridor faces! Never eject into an adjacent solid wall!
+          let bestDist = 9999;
+          let pushAxis = null;
+          let pushSign = 0;
+
+          if (w.openLeft && dLeft < bestDist) {
+            bestDist = dLeft;
+            pushAxis = 'x';
+            pushSign = -1;
+          }
+          if (w.openRight && dRight < bestDist) {
+            bestDist = dRight;
+            pushAxis = 'x';
+            pushSign = 1;
+          }
+          if (w.openBottom && dBottom < bestDist) {
+            bestDist = dBottom;
+            pushAxis = 'z';
+            pushSign = -1;
+          }
+          if (w.openTop && dTop < bestDist) {
+            bestDist = dTop;
+            pushAxis = 'z';
+            pushSign = 1;
+          }
+
+          if (!pushAxis) {
+            const minDist = Math.min(dLeft, dRight, dBottom, dTop);
+            if (minDist === dLeft) { pushAxis = 'x'; pushSign = -1; bestDist = dLeft; }
+            else if (minDist === dRight) { pushAxis = 'x'; pushSign = 1; bestDist = dRight; }
+            else if (minDist === dBottom) { pushAxis = 'z'; pushSign = -1; bestDist = dBottom; }
+            else { pushAxis = 'z'; pushSign = 1; bestDist = dTop; }
+          }
+
+          // Displace gently towards the open face: CLAMP to at most 0.18m per step
+          // so we NEVER fling/teleport the player across corridors!
+          const pushAmount = Math.min(0.18, bestDist + radius);
+          if (pushAxis === 'x') {
+            pos.x += pushSign * pushAmount;
           } else {
-            pos.z = w.maxZ + radius;
+            pos.z += pushSign * pushAmount;
           }
           continue;
         }
 
-        // Find closest point on AABB to circle center
+        // Case B: Circle center is outside, but overlapping the box (standard Circle-vs-AABB)
         const closestX = Math.max(w.minX, Math.min(pos.x, w.maxX));
         const closestZ = Math.max(w.minZ, Math.min(pos.z, w.maxZ));
 
@@ -395,7 +453,7 @@ export class GameMap {
           iterResolved = true;
           anyResolved = true;
           const dist = Math.sqrt(distSq);
-          const overlap = radius - dist;
+          const overlap = Math.min(0.18, radius - dist);
           pos.x += (dx / dist) * overlap;
           pos.z += (dz / dist) * overlap;
         }

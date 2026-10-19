@@ -51,36 +51,54 @@ export class FirstPersonBody {
     this.viewmodelRoot.position.set(0, 0, 0);
     this.camera.add(this.viewmodelRoot);
 
-    // Materials
+    // Materials with DoubleSide to ensure no polygons are ever culled
     this.skinMat = new THREE.MeshStandardMaterial({
       color: 0xffd1b3,
       roughness: 0.75,
-      metalness: 0.1
+      metalness: 0.1,
+      side: THREE.DoubleSide
     });
 
     this.sleeveMat = new THREE.MeshStandardMaterial({
       color: 0x111622,
       roughness: 0.65,
-      metalness: 0.25
+      metalness: 0.25,
+      side: THREE.DoubleSide
     });
 
     this.cyberAccentMat = new THREE.MeshStandardMaterial({
       color: 0x00f3ff,
       emissive: 0x00c8e6,
       emissiveIntensity: 0.8,
-      roughness: 0.3
+      roughness: 0.3,
+      side: THREE.DoubleSide
     });
 
     // 1. RIGHT ARM & TACTICAL FLASHLIGHT
     this.rightArmGroup = new THREE.Group();
     this.rightArmGroup.position.set(0.26, -0.24, -0.38);
 
-    // Right Forearm & Sleeve
+    // Right Forearm Sleeve
     const sleeveGeo = new THREE.CylinderGeometry(0.045, 0.055, 0.35, 12);
     const sleeveMesh = new THREE.Mesh(sleeveGeo, this.sleeveMat);
     sleeveMesh.rotation.x = Math.PI / 2.6;
     sleeveMesh.position.set(0, -0.06, 0.12);
     this.rightArmGroup.add(sleeveMesh);
+
+    // Right Upper Arm Sleeve (Anchored behind the camera so arm is never detached!)
+    const upperArmGeo = new THREE.CylinderGeometry(0.052, 0.064, 0.52, 12);
+    const rightUpperArm = new THREE.Mesh(upperArmGeo, this.sleeveMat);
+    rightUpperArm.rotation.x = Math.PI / 2.3;
+    rightUpperArm.rotation.y = 0.12;
+    rightUpperArm.position.set(0.03, -0.16, 0.40);
+    this.rightArmGroup.add(rightUpperArm);
+
+    // Right Shoulder Cap
+    const capGeo = new THREE.CircleGeometry(0.064, 12);
+    const rightShoulderCap = new THREE.Mesh(capGeo, this.sleeveMat);
+    rightShoulderCap.rotation.x = Math.PI / 2.3;
+    rightShoulderCap.position.set(0.03, -0.28, 0.65);
+    this.rightArmGroup.add(rightShoulderCap);
 
     // Cyber trim ring on wrist
     const trimGeo = new THREE.TorusGeometry(0.047, 0.006, 8, 16);
@@ -148,11 +166,25 @@ export class FirstPersonBody {
     this.leftArmGroup = new THREE.Group();
     this.leftArmGroup.position.set(-0.26, -0.27, -0.36);
 
+    // Left Forearm Sleeve
     const leftSleeveMesh = sleeveMesh.clone();
     leftSleeveMesh.rotation.x = Math.PI / 2.5;
     leftSleeveMesh.rotation.y = 0.1;
     leftSleeveMesh.position.set(0, -0.06, 0.12);
     this.leftArmGroup.add(leftSleeveMesh);
+
+    // Left Upper Arm Sleeve (Anchored behind the camera so arm is never detached!)
+    const leftUpperArm = new THREE.Mesh(upperArmGeo, this.sleeveMat);
+    leftUpperArm.rotation.x = Math.PI / 2.3;
+    leftUpperArm.rotation.y = -0.12;
+    leftUpperArm.position.set(-0.03, -0.16, 0.40);
+    this.leftArmGroup.add(leftUpperArm);
+
+    // Left Shoulder Cap
+    const leftShoulderCap = new THREE.Mesh(capGeo, this.sleeveMat);
+    leftShoulderCap.rotation.x = Math.PI / 2.3;
+    leftShoulderCap.position.set(-0.03, -0.28, 0.65);
+    this.leftArmGroup.add(leftShoulderCap);
 
     const leftTrimMesh = trimMesh.clone();
     leftTrimMesh.rotation.x = Math.PI / 2.5;
@@ -303,54 +335,129 @@ export class FirstPersonBody {
   initLowerBody() {
     this.lowerBodyGroup = new THREE.Group();
 
-    // 1. Torso / Cyber Hoodie (slanted slightly back so player looking down sees chest & zipper)
-    const torsoGeo = new THREE.BoxGeometry(0.48, 0.55, 0.30);
+    // Materials with DoubleSide to ensure no faces are ever culled or see-through!
     const torsoMat = new THREE.MeshStandardMaterial({
       color: 0x141822,
       roughness: 0.7,
-      metalness: 0.2
+      metalness: 0.2,
+      side: THREE.DoubleSide
     });
-    this.torsoMesh = new THREE.Mesh(torsoGeo, torsoMat);
-    this.torsoMesh.position.set(0, 0.96, -0.04);
-    this.lowerBodyGroup.add(this.torsoMesh);
 
-    // Cyber Zipper / Chest Light
-    const zipGeo = new THREE.PlaneGeometry(0.035, 0.48);
-    const zipMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
-    const zipper = new THREE.Mesh(zipGeo, zipMat);
-    zipper.position.set(0, 0.96, 0.115);
-    this.lowerBodyGroup.add(zipper);
+    const collarMat = new THREE.MeshStandardMaterial({
+      color: 0x0f131a,
+      roughness: 0.8,
+      metalness: 0.15,
+      side: THREE.DoubleSide
+    });
 
-    // 2. Cargo Pants Legs
-    const legGeo = new THREE.BoxGeometry(0.17, 0.65, 0.18);
+    const neckSealMat = new THREE.MeshBasicMaterial({
+      color: 0x080a0f,
+      side: THREE.DoubleSide
+    });
+
     const pantsMat = new THREE.MeshStandardMaterial({
       color: 0x1a2130,
-      roughness: 0.85
+      roughness: 0.85,
+      side: THREE.DoubleSide
     });
+
+    const neonAccentMat = new THREE.MeshBasicMaterial({
+      color: 0x00f3ff,
+      side: THREE.DoubleSide
+    });
+
+    // 1. Torso / Cyber Hoodie Body (Chest angled naturally forward, hips slightly back)
+    const torsoGeo = new THREE.BoxGeometry(0.42, 0.46, 0.24);
+    this.torsoMesh = new THREE.Mesh(torsoGeo, torsoMat);
+    this.torsoMesh.position.set(0, 0.96, 0.04);
+    this.torsoMesh.rotation.x = -0.05;
+    this.lowerBodyGroup.add(this.torsoMesh);
+
+    // 2. Closed Collar Ring & Inner Neck Seal (Completely eliminates internal hollow geometry!)
+    const collarGeo = new THREE.TorusGeometry(0.125, 0.028, 8, 20);
+    const collarMesh = new THREE.Mesh(collarGeo, collarMat);
+    collarMesh.rotation.x = Math.PI / 2;
+    collarMesh.position.set(0, 1.185, 0.035);
+    this.lowerBodyGroup.add(collarMesh);
+
+    const sealGeo = new THREE.CircleGeometry(0.12, 16);
+    const neckSeal = new THREE.Mesh(sealGeo, neckSealMat);
+    neckSeal.rotation.x = -Math.PI / 2;
+    neckSeal.position.set(0, 1.175, 0.035);
+    this.lowerBodyGroup.add(neckSeal);
+
+    // 3. Cyber Zipper on FRONT chest (facing -Z, the player's viewing direction!)
+    const zipGeo = new THREE.PlaneGeometry(0.032, 0.40);
+    const zipper = new THREE.Mesh(zipGeo, neonAccentMat);
+    zipper.position.set(0, 0.96, -0.082);
+    this.lowerBodyGroup.add(zipper);
+
+    // 4. Tactical Kangaroo Pocket / Pouch on front of hoodie
+    const pocketGeo = new THREE.BoxGeometry(0.26, 0.13, 0.035);
+    const pocket = new THREE.Mesh(pocketGeo, torsoMat);
+    pocket.position.set(0, 0.84, -0.095);
+    this.lowerBodyGroup.add(pocket);
+
+    const pocketTrimGeo = new THREE.PlaneGeometry(0.24, 0.012);
+    const pocketTrim = new THREE.Mesh(pocketTrimGeo, neonAccentMat);
+    pocketTrim.position.set(0, 0.90, -0.114);
+    this.lowerBodyGroup.add(pocketTrim);
+
+    // 5. Pelvis / Tactical Belt
+    const pelvisGeo = new THREE.BoxGeometry(0.38, 0.14, 0.22);
+    const pelvis = new THREE.Mesh(pelvisGeo, pantsMat);
+    pelvis.position.set(0, 0.72, 0.03);
+    this.lowerBodyGroup.add(pelvis);
+
+    const buckleGeo = new THREE.BoxGeometry(0.06, 0.04, 0.02);
+    const buckle = new THREE.Mesh(buckleGeo, neonAccentMat);
+    buckle.position.set(0, 0.72, -0.082);
+    this.lowerBodyGroup.add(buckle);
+
+    // 6. Cargo Pants Legs & Pivots (Positioned slightly forward so thighs & shoes are cleanly visible)
+    const legThighGeo = new THREE.BoxGeometry(0.15, 0.32, 0.17);
+    const legShinGeo = new THREE.BoxGeometry(0.14, 0.34, 0.16);
+    const cargoPocketGeo = new THREE.BoxGeometry(0.04, 0.11, 0.11);
 
     // Left Leg Pivot
     this.leftLegPivot = new THREE.Group();
-    this.leftLegPivot.position.set(-0.16, 0.68, 0);
-    const leftLeg = new THREE.Mesh(legGeo, pantsMat);
-    leftLeg.position.y = -0.32;
-    this.leftLegPivot.add(leftLeg);
+    this.leftLegPivot.position.set(-0.14, 0.66, 0.02);
 
-    // Left Sneaker
+    const leftThigh = new THREE.Mesh(legThighGeo, pantsMat);
+    leftThigh.position.set(0, -0.15, -0.02);
+    this.leftLegPivot.add(leftThigh);
+
+    const leftShin = new THREE.Mesh(legShinGeo, pantsMat);
+    leftShin.position.set(0, -0.45, -0.04);
+    this.leftLegPivot.add(leftShin);
+
+    const leftPocket = new THREE.Mesh(cargoPocketGeo, pantsMat);
+    leftPocket.position.set(-0.08, -0.22, -0.02);
+    this.leftLegPivot.add(leftPocket);
+
     this.leftShoe = this.createSneakerMesh();
-    this.leftShoe.position.set(0, -0.66, 0.04);
+    this.leftShoe.position.set(0, -0.63, -0.04);
     this.leftLegPivot.add(this.leftShoe);
     this.lowerBodyGroup.add(this.leftLegPivot);
 
     // Right Leg Pivot
     this.rightLegPivot = new THREE.Group();
-    this.rightLegPivot.position.set(0.16, 0.68, 0);
-    const rightLeg = new THREE.Mesh(legGeo, pantsMat);
-    rightLeg.position.y = -0.32;
-    this.rightLegPivot.add(rightLeg);
+    this.rightLegPivot.position.set(0.14, 0.66, 0.02);
 
-    // Right Sneaker
+    const rightThigh = new THREE.Mesh(legThighGeo, pantsMat);
+    rightThigh.position.set(0, -0.15, -0.02);
+    this.rightLegPivot.add(rightThigh);
+
+    const rightShin = new THREE.Mesh(legShinGeo, pantsMat);
+    rightShin.position.set(0, -0.45, -0.04);
+    this.rightLegPivot.add(rightShin);
+
+    const rightPocket = new THREE.Mesh(cargoPocketGeo, pantsMat);
+    rightPocket.position.set(0.08, -0.22, -0.02);
+    this.rightLegPivot.add(rightPocket);
+
     this.rightShoe = this.createSneakerMesh();
-    this.rightShoe.position.set(0, -0.66, 0.04);
+    this.rightShoe.position.set(0, -0.63, -0.04);
     this.rightLegPivot.add(this.rightShoe);
     this.lowerBodyGroup.add(this.rightLegPivot);
 
@@ -362,24 +469,55 @@ export class FirstPersonBody {
   createSneakerMesh() {
     const group = new THREE.Group();
 
-    // Sole (white rubber)
-    const soleGeo = new THREE.BoxGeometry(0.16, 0.05, 0.28);
-    const soleMat = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.6 });
+    const soleMat = new THREE.MeshStandardMaterial({
+      color: 0xf2f2f2,
+      roughness: 0.5,
+      side: THREE.DoubleSide
+    });
+    const upperMat = new THREE.MeshStandardMaterial({
+      color: 0x0c0f14,
+      roughness: 0.55,
+      side: THREE.DoubleSide
+    });
+    const neonMat = new THREE.MeshBasicMaterial({
+      color: 0x00f3ff,
+      side: THREE.DoubleSide
+    });
+
+    // Sole (white rubber) - centered, facing -Z forward
+    const soleGeo = new THREE.BoxGeometry(0.14, 0.05, 0.28);
     const sole = new THREE.Mesh(soleGeo, soleMat);
+    sole.position.set(0, 0.025, -0.03);
     group.add(sole);
 
     // Shoe Upper (Black cyber sneaker)
-    const upperGeo = new THREE.BoxGeometry(0.15, 0.08, 0.24);
-    const upperMat = new THREE.MeshStandardMaterial({ color: 0x0a0c10, roughness: 0.5 });
+    const upperGeo = new THREE.BoxGeometry(0.13, 0.07, 0.22);
     const upper = new THREE.Mesh(upperGeo, upperMat);
-    upper.position.set(0, 0.06, -0.01);
+    upper.position.set(0, 0.07, -0.02);
     group.add(upper);
 
-    // Neon Accent Stripe on heel
-    const heelStripeGeo = new THREE.BoxGeometry(0.152, 0.03, 0.02);
-    const heelStripeMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
-    const stripe = new THREE.Mesh(heelStripeGeo, heelStripeMat);
-    stripe.position.set(0, 0.05, -0.125);
+    // Toe Cap (Front facing -Z!)
+    const toeGeo = new THREE.BoxGeometry(0.12, 0.05, 0.08);
+    const toe = new THREE.Mesh(toeGeo, upperMat);
+    toe.position.set(0, 0.06, -0.13);
+    group.add(toe);
+
+    // Cyan Neon Laces / Accent on top of tongue
+    const lacesGeo = new THREE.PlaneGeometry(0.05, 0.08);
+    const laces = new THREE.Mesh(lacesGeo, neonMat);
+    laces.rotation.x = -Math.PI / 2.8;
+    laces.position.set(0, 0.11, -0.04);
+    group.add(laces);
+
+    // Heel Counter & Neon Accent (Back facing +Z!)
+    const heelGeo = new THREE.BoxGeometry(0.132, 0.07, 0.04);
+    const heel = new THREE.Mesh(heelGeo, upperMat);
+    heel.position.set(0, 0.07, +0.07);
+    group.add(heel);
+
+    const heelStripeGeo = new THREE.BoxGeometry(0.134, 0.025, 0.015);
+    const stripe = new THREE.Mesh(heelStripeGeo, neonMat);
+    stripe.position.set(0, 0.06, +0.092);
     group.add(stripe);
 
     return group;
@@ -520,7 +658,7 @@ export class FirstPersonBody {
       this.roll * 0.5
     );
 
-    // 7. Update Left Arm & Artifact Animations
+    // 7. Update Left Arm & Artifact Animations (Arm stays firmly anchored to shoulder!)
     let leftArmTargetX = -0.26;
     let leftArmTargetY = -0.27;
     let leftArmTargetZ = -0.36;
@@ -533,13 +671,15 @@ export class FirstPersonBody {
       const progress = Math.min(1.0, this.itemAnimTime / this.itemAnimDuration);
 
       if (this.activeItemAnim === 'forcefield') {
-        // Raise RTX 5090 in front of camera, spin fans, expand shockwave
-        const raisePhase = Math.sin(progress * Math.PI);
-        leftArmTargetX = -0.06;
-        leftArmTargetY = -0.12 + raisePhase * 0.08;
-        leftArmTargetZ = -0.30;
-        leftArmRotX = -0.4;
-        leftArmRotY = -0.3;
+        // Raise RTX 5090 in front of chest/camera, spin fans, expand shockwave
+        // Arm pivots from shoulder and stays firmly attached
+        const raise = Math.sin(progress * Math.PI);
+        leftArmTargetX = -0.26 + raise * 0.10; // raises inward towards -0.16
+        leftArmTargetY = -0.27 + raise * 0.13; // raises to -0.14
+        leftArmTargetZ = -0.36 + raise * 0.03; // stays close to chest at -0.33!
+        leftArmRotX = -0.40 * raise;
+        leftArmRotY = -0.25 * raise;
+        leftArmRotZ = 0.18 * raise;
 
         // Spin fans rapidly
         this.rtxFan1.rotation.z += 45 * delta;
@@ -552,24 +692,33 @@ export class FirstPersonBody {
       } else if (this.activeItemAnim === 'energy_drink') {
         // Bring can to mouth / camera, tilt back to chug
         const raise = Math.sin(progress * Math.PI);
-        leftArmTargetX = -0.08;
-        leftArmTargetY = -0.14 + raise * 0.12;
-        leftArmTargetZ = -0.26;
-        leftArmRotX = -0.7 * raise;
-        leftArmRotZ = 0.3 * raise;
+        leftArmTargetX = -0.26 + raise * 0.12; // brings can inward to -0.14
+        leftArmTargetY = -0.27 + raise * 0.15; // raises up to mouth level -0.12
+        leftArmTargetZ = -0.36 + raise * 0.06; // brings can to -0.30
+        leftArmRotX = -0.65 * raise;
+        leftArmRotZ = 0.28 * raise;
       } else if (this.activeItemAnim === 'dakimakura') {
-        // Thrust forward in throw
+        // Toss pillow: hand raises, winds up and tosses forward while arm remains attached!
         const throwP = Math.sin(progress * Math.PI);
-        leftArmTargetX = -0.10;
-        leftArmTargetY = -0.16;
-        leftArmTargetZ = -0.38 - throwP * 0.22;
-        leftArmRotX = throwP * 0.5;
+        leftArmTargetX = -0.26 + throwP * 0.08;
+        leftArmTargetY = -0.27 + throwP * 0.10;
+        leftArmTargetZ = -0.36 - throwP * 0.03; // at most -0.39, firmly connected to shoulder!
+        leftArmRotX = 0.35 * throwP;
+        leftArmRotZ = -0.15 * throwP;
+
+        // Toss pillow forward out of hand
+        this.pillowMesh.position.z = -throwP * 0.35;
+        this.pillowMesh.position.y = throwP * 0.05;
+        this.pillowMesh.scale.setScalar(Math.max(0.01, 1 - throwP * 0.7));
+        this.pillowMesh.rotation.x = throwP * 2.5;
       } else if (this.activeItemAnim === 'd20_dice') {
         // Roll glowing D20 in palm
         const rollPhase = Math.sin(progress * Math.PI);
-        leftArmTargetX = -0.12;
-        leftArmTargetY = -0.16 + rollPhase * 0.06;
-        leftArmTargetZ = -0.28;
+        leftArmTargetX = -0.26 + rollPhase * 0.08;
+        leftArmTargetY = -0.27 + rollPhase * 0.10;
+        leftArmTargetZ = -0.36 + rollPhase * 0.02;
+        leftArmRotX = -0.25 * rollPhase;
+        leftArmRotZ = 0.22 * rollPhase;
         this.d20Mesh.rotation.x += 8 * delta;
         this.d20Mesh.rotation.y += 12 * delta;
       }
@@ -579,6 +728,9 @@ export class FirstPersonBody {
         this.rtxMesh.visible = false;
         this.canMesh.visible = false;
         this.pillowMesh.visible = false;
+        this.pillowMesh.position.set(0, 0, 0);
+        this.pillowMesh.scale.set(1, 1, 1);
+        this.pillowMesh.rotation.set(0, 0, 0);
         this.d20Mesh.visible = false;
         this.waveMat.opacity = 0;
       }

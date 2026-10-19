@@ -402,7 +402,11 @@ export class Player {
     const stepDelta = delta / subSteps;
 
     for (let s = 0; s < subSteps; s++) {
+      // Step X and resolve collision (slide against X walls)
       this.position.x += this.velocity.x * stepDelta;
+      this.map.resolveCollision(this.position, this.radius);
+
+      // Step Z and resolve collision (slide against Z walls)
       this.position.z += this.velocity.z * stepDelta;
       this.map.resolveCollision(this.position, this.radius);
     }
@@ -440,6 +444,15 @@ export class Player {
         this.isGrounded = true;
         this.canDoubleJump = true;
       }
+    }
+
+    // Safety net: in case player ever falls below floor on standard maze map
+    if (this.map && !this.map.isCrater && this.position.y < -2.0) {
+      this.position.copy(this.lastSafePlatformPos);
+      this.position.y = this.eyeHeight;
+      this.velocity.set(0, 0, 0);
+      this.verticalVelocity = 0;
+      this.isGrounded = true;
     }
 
     // Magma Contact Detection (The Floor is Lava!)
