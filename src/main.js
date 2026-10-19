@@ -160,7 +160,7 @@ class Game {
     this.player.onPassiveItemClicked = (typeId) => {
       if (typeId === 'd20_dice') {
         const count = this.player.inventory.d20_dice;
-        this.showToast(`🎲 D20 Кость (${count} шт.): Спасает от падения в магму и от удара девушки!`);
+        this.showToast(`🎲 D20 Кость (${count} шт.): Спасает от падения в месячные и от удара девушки!`);
       }
     };
 
@@ -178,7 +178,7 @@ class Game {
     };
 
     this.player.onD20MagmaSave = () => {
-      this.showToast('🎲 D20 КОСТЬ: ЧУДО-СПАСЕНИЕ ИЗ МАГМЫ!');
+      this.showToast('🎲 D20 КОСТЬ: ЧУДО-СПАСЕНИЕ ИЗ МЕСЯЧНЫХ!');
     };
 
     // Spawn initial positions
@@ -206,19 +206,13 @@ class Game {
       this.scene.fog = new THREE.FogExp2(0x220208, 0.022);
       this.map = new CraterMap(this.scene);
       this.map.onMagmaRiseStart = () => {
-        if (this.dom && this.dom.hudMagmaWarning) {
-          this.dom.hudMagmaWarning.classList.remove('hidden');
-        }
+        // Quiet rising without intrusive screen banners
       };
       this.map.onParkourStart = () => {
-        if (this.dom && this.dom.hudMagmaWarning) {
-          this.dom.hudMagmaWarning.classList.remove('hidden');
-        }
         if (this.girl) {
           const spawnPos = this.map.getRandomSpawnPoint(this.player.position, 14);
           this.girl.awaken(spawnPos);
         }
-        this.showToast('🩸 МАГМА ПРОСНУЛАСЬ! ДЕВУШКА ВЫШЛА НА ОХОТУ!');
       };
       soundEngine.setMapMode('crater');
       if (this.dom && this.dom.hudAltitudeBadge) {
@@ -257,7 +251,7 @@ class Game {
     }
 
     this.resetPositions();
-    const mapName = (mapType === 'crater') ? '🌋 Кратер (Огненный Паркур)' : '🏛️ Классический Лабиринт';
+    const mapName = (mapType === 'crater') ? '🌋 Месячный вулкан' : '🏛️ Классический Лабиринт';
     this.showToast(`🗺️ Выбрана карта: ${mapName}`);
   }
 
@@ -1067,7 +1061,7 @@ class Game {
 
     this.renderer.domElement.requestPointerLock();
     const startMsg = (this.currentMapType === 'crater')
-      ? '🌋 КРАТЕР: ОГНЕННЫЙ ПАРКУР! СОБЕРИ 3 КЛЮЧА И ДОБЕРИСЬ ДО ВРАТ ТОРИИ!'
+      ? '🌋 МЕСЯЧНЫЙ ВУЛКАН! СОБЕРИ 3 КЛЮЧА И ДОБЕРИСЬ ДО ВРАТ ТОРИИ!'
       : '🏃 БЕГИ! СОБЕРИ 3 КЛЮЧА И НАЙДИ ВЫХОД!';
     this.showToast(startMsg);
   }
@@ -1251,11 +1245,11 @@ class Game {
 
     if (reason === 'magma') {
       if (this.dom.goTitle) {
-        this.dom.goTitle.innerHTML = '🌋 СВАРИЛСЯ В МАГМЕ!<br><span style="font-size: 0.65em; color: #ff5500;">ЖАРКИЙ КОНЕЦ</span>';
+        this.dom.goTitle.innerHTML = '🩸 УТОНУЛ В МЕСЯЧНЫХ!<br><span style="font-size: 0.65em; color: #ff0055;">КРОВАВЫЙ КОНЕЦ</span>';
       }
       if (this.dom.goSubtitle) {
-        this.dom.goSubtitle.textContent = '«Ой, кажется, ты упал в лаву... А я даже не успела познакомиться!»';
-        this.dom.goSubtitle.style.color = '#ffaa33';
+        this.dom.goSubtitle.textContent = '«Ой, кажется, ты упал в месячные... А я даже не успела познакомиться!»';
+        this.dom.goSubtitle.style.color = '#ff4466';
       }
       if (this.dom.gameOverFallback) {
         this.dom.gameOverFallback.style.background = 'radial-gradient(circle at 50% 100%, #ff2200 0%, #660000 60%, #1a0000 100%)';
@@ -1411,7 +1405,7 @@ class Game {
         if (this.currentMapType === 'crater' && this.dom.hudAltitudeValue) {
           const altMeters = Math.max(0, this.player.position.y).toFixed(0);
           const magmaMeters = this.map && this.map.magmaLevel !== undefined ? this.map.magmaLevel.toFixed(1) : '0';
-          this.dom.hudAltitudeValue.textContent = `${altMeters}m (Лава: ${magmaMeters}m)`;
+          this.dom.hudAltitudeValue.textContent = `${altMeters}m (Месячные: ${magmaMeters}m)`;
         }
       }
 

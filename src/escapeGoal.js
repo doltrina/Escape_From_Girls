@@ -345,7 +345,7 @@ export class EscapeGoalManager {
         keyLocations = this.map.getKeyLocations();
       } else {
         keyLocations = [
-          { pos: new THREE.Vector3(0, 2.7, 14.5), name: 'Ключ Нижнего Яруса (Внимание: Лава!)' },
+          { pos: new THREE.Vector3(0, 2.7, 14.5), name: 'Ключ Нижнего Яруса (Внимание: Месячные!)' },
           { pos: new THREE.Vector3(8.5, 13.0, -15.5), name: 'Ключ Среднего Яруса (Прыжок над бездной)' },
           { pos: new THREE.Vector3(-7.0, 22.2, 15.0), name: 'Ключ Верхнего Яруса (Узкий мостик)' }
         ];
@@ -400,9 +400,6 @@ export class EscapeGoalManager {
       // In Volcano Crater: Collecting Key 1 starts the rapid magma rise & alarm siren!
       if (this.map && this.map.isCrater && index === 0) {
         this.map.startMagmaRise();
-        if (window.gameInstance && window.gameInstance.showToast) {
-          window.gameInstance.showToast('🚨 ВНИМАНИЕ! КЛЮЧ АКТИВИРОВАЛ МАГМУ! ОНА ПОДНИМАЕТСЯ! БЕГИ ВВЕРХ!');
-        }
       }
 
       if (this.onKeysChange) {
@@ -471,9 +468,6 @@ export class EscapeGoalManager {
             this.toriiCountdown = 10.0;
             this.lastBeepSec = 10;
             soundEngine.playToriiBeep();
-            if (window.gameInstance && window.gameInstance.showToast) {
-              window.gameInstance.showToast('⛩️ АКТИВАЦИЯ ВРАТ ТОРИИ! ПРОДЕРЖИСЬ 10 СЕКУНД!');
-            }
           }
         } else {
           const now = performance.now();

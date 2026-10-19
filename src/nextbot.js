@@ -351,9 +351,6 @@ export class NextbotGirl {
         this.leapStart.copy(this.position);
         this.leapTarget.copy(targetPos);
         soundEngine.playNextbotLeap();
-        if (window.gameInstance && window.gameInstance.showToast) {
-          window.gameInstance.showToast('😱 ДЕВУШКА ПЕРЕПРЫГИВАЕТ ЧЕРЕЗ ЦЕНТР ВУЛКАНА!');
-        }
       }
     }
 

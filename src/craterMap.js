@@ -743,7 +743,7 @@ export class CraterMap {
 
     // 5. Store Dynamically Synchronized Key Locations
     this.keyLocations = [
-      { pos: new THREE.Vector3(p6.x, p6.topY + 0.85, p6.z), name: 'Ключ Нижнего Яруса (Внимание: Лава!)' },
+      { pos: new THREE.Vector3(p6.x, p6.topY + 0.85, p6.z), name: 'Ключ Нижнего Яруса (Внимание: Месячные!)' },
       { pos: new THREE.Vector3(p14.x, p14.topY + 0.85, p14.z), name: 'Ключ Среднего Яруса (Прыжок над бездной)' },
       { pos: new THREE.Vector3(p22.x, p22.topY + 0.85, p22.z), name: 'Ключ Верхнего Яруса (Узкий мостик)' }
     ];
