@@ -23,17 +23,56 @@ export class NextbotGirl {
 
     // Human-scale height (2.1 meters tall, fits comfortably in 4.2m hallways)
     this.targetHeight = 2.1;
+    this.baseWidth = 1.6;
+
+    // Spider Mode & Center Leap for Volcano Crater
+    this.isLeaping = false;
+    this.leapProgress = 0;
+    this.leapDuration = 1.35;
+    this.leapStart = new THREE.Vector3();
+    this.leapTarget = new THREE.Vector3();
+    this.leapCooldown = 8.0;
 
     // Billboard mesh group
     this.meshGroup = new THREE.Group();
     this.initMesh();
+    this.initSparkTrail();
 
     // Red/pink underglow aura light
     this.auraLight = new THREE.PointLight(0xff0066, 1.8, 7, 2);
     this.auraLight.position.set(0, 0.6, 0);
     this.meshGroup.add(this.auraLight);
 
+    // Dormancy state (for Volcano Crater map until parkour starts)
+    this.isDormant = false;
+
     this.scene.add(this.meshGroup);
+  }
+
+  initSparkTrail() {
+    const count = 30;
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = 0;
+      pos[i * 3 + 1] = -100;
+      pos[i * 3 + 2] = 0;
+      colors[i * 3] = 1.0;
+      colors[i * 3 + 1] = Math.random() * 0.4;
+      colors[i * 3 + 2] = 0.0;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const mat = new THREE.PointsMaterial({
+      size: 0.45,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85
+    });
+    this.sparkTrail = new THREE.Points(geo, mat);
+    this.sparkIndex = 0;
+    this.scene.add(this.sparkTrail);
   }
 
   initMesh() {
@@ -70,6 +109,7 @@ export class NextbotGirl {
         const aspect = img.width / img.height;
         // Restrict width to max 2.6m so wide photos fit nicely in hallways
         const width = Math.min(2.6, this.targetHeight * aspect);
+        this.baseWidth = width;
         this.spriteMesh.scale.set(width, this.targetHeight, 1);
         this.spriteMesh.position.y = this.targetHeight / 2;
       }
@@ -83,13 +123,36 @@ export class NextbotGirl {
 
   spawn(pos) {
     this.position.copy(pos);
-    this.position.y = 0;
+    this.position.y = (pos.y !== undefined) ? pos.y : 0;
     this.meshGroup.position.copy(this.position);
     this.velocity.set(0, 0, 0);
+    this.isLeaping = false;
+    this.leapCooldown = 8.0;
     this.currentSpeed = this.baseSpeed;
     this.speedMultiplier = 1.0;
     this.distractedTimer = 0;
     this.stunTimer = 0;
+  }
+
+  setDormant(dormant) {
+    this.isDormant = dormant;
+    if (this.meshGroup) this.meshGroup.visible = !dormant;
+    if (this.auraLight) this.auraLight.visible = !dormant;
+    if (this.sparkTrail) this.sparkTrail.visible = !dormant;
+    this.velocity.set(0, 0, 0);
+    this.isLeaping = false;
+  }
+
+  awaken(pos) {
+    this.setDormant(false);
+    if (pos) {
+      this.position.copy(pos);
+      this.position.y = (pos.y !== undefined) ? pos.y : 0;
+      this.meshGroup.position.copy(this.position);
+    }
+    this.velocity.set(0, 0, 0);
+    this.stunTimer = 0.5;
+    soundEngine.playNextbotRespawn();
   }
 
   distract(duration = 5.0, decoyPosition = null) {
@@ -152,13 +215,15 @@ export class NextbotGirl {
   }
 
   aggressiveRespawn(player) {
-    // Choose a valid corridor position within tactical distance from player
-    const spawnPoint = this.map.getRandomSpawnPoint(player.position, 16);
+    // Choose a valid position behind or tactically away from player (never on upcoming path!)
+    const spawnPoint = (this.map && typeof this.map.getNextbotSpawnPoint === 'function')
+      ? this.map.getNextbotSpawnPoint(player.position)
+      : this.map.getRandomSpawnPoint(player.position, 16);
     this.position.copy(spawnPoint);
-    this.position.y = 0;
+    this.position.y = (spawnPoint.y !== undefined) ? spawnPoint.y : 0;
     this.meshGroup.position.copy(this.position);
     this.velocity.set(0, 0, 0);
-    this.stunTimer = 0.4; // brief recovery
+    this.stunTimer = 0.5; // brief recovery
 
     // Play ominous jumpscare scream sound
     soundEngine.playNextbotRespawn();
@@ -167,19 +232,127 @@ export class NextbotGirl {
     }
   }
 
-  update(delta, player, elapsedTime) {
+  applyNetworkUpdate(data) {
+    if (data.x !== undefined && data.z !== undefined) {
+      if (!this.targetNetPos) this.targetNetPos = new THREE.Vector3();
+      this.targetNetPos.set(data.x, 0, data.z);
+    }
+    if (data.stunTimer !== undefined) this.stunTimer = data.stunTimer;
+    if (data.distractedTimer !== undefined) this.distractedTimer = data.distractedTimer;
+  }
+
+  update(delta, player, elapsedTime, remotePlayers = [], isHost = true) {
+    if (this.isDormant) {
+      return 999;
+    }
+
     if (delta > 0.1) delta = 0.1;
+
+    // Non-host client synchronization: smoothly follow host's authoritative nextbot position
+    if (!isHost && this.targetNetPos) {
+      this.position.lerp(this.targetNetPos, 16 * delta);
+      this.meshGroup.position.set(this.position.x, 0, this.position.z);
+      this.meshGroup.lookAt(player.camera.position.x, this.meshGroup.position.y, player.camera.position.z);
+      this.bobTimer += delta * 6;
+      this.spriteMesh.rotation.z = Math.sin(this.bobTimer * 4) * 0.12;
+
+      const toLocalP = new THREE.Vector3().subVectors(player.position, this.position);
+      toLocalP.y = 0;
+      const dist = toLocalP.length();
+      soundEngine.updateChaseDistance(dist, 38);
+      return dist;
+    }
 
     // Difficulty scaling: speed increases slightly over survival time
     this.speedMultiplier = 1.0 + Math.floor(elapsedTime / 20) * 0.05;
     this.currentSpeed = this.baseSpeed * this.speedMultiplier;
 
+    // Pick closest active (non-downed) target among local player and remote players
+    let currentTarget = player;
+    let minDist = 999999;
+
+    const candidates = [];
+    if (!player.isDowned) {
+      candidates.push({ pos: player.position, entity: player });
+    }
+    for (const rp of remotePlayers) {
+      if (!rp.isDowned) {
+        candidates.push({ pos: rp.root.position, entity: rp });
+      }
+    }
+
+    // If everyone is downed, still target closest for final catch
+    if (candidates.length === 0) {
+      candidates.push({ pos: player.position, entity: player });
+      for (const rp of remotePlayers) {
+        candidates.push({ pos: rp.root.position, entity: rp });
+      }
+    }
+
+    for (const cand of candidates) {
+      const d = Math.hypot(cand.pos.x - this.position.x, cand.pos.z - this.position.z);
+      if (d < minDist) {
+        minDist = d;
+        currentTarget = cand.entity;
+      }
+    }
+
+    const targetPos = (currentTarget === player) ? player.position : currentTarget.root.position;
+    const toTarget = new THREE.Vector3().subVectors(targetPos, this.position);
+    toTarget.y = 0;
+    const distToTarget = toTarget.length();
+
+    // Distance to local player for local audio spatialization
     const toPlayer = new THREE.Vector3().subVectors(player.position, this.position);
-    toPlayer.y = 0;
     const distToPlayer = toPlayer.length();
 
-    // Spatial chase music & heartbeat distance update
+    // Spatial chase music & heartbeat distance update for local player
     soundEngine.updateChaseDistance(distToPlayer, 38);
+
+    // 🌋 VOLCANO CRATER: Spark trail & heat haze shimmer effect
+    if (this.map && this.map.isCrater) {
+      if (this.sparkTrail) {
+        const posArr = this.sparkTrail.geometry.attributes.position.array;
+        const idx = (this.sparkIndex % 30) * 3;
+        posArr[idx] = this.position.x + (Math.random() - 0.5) * 0.5;
+        posArr[idx + 1] = this.position.y + 0.8 + (Math.random() - 0.5) * 0.5;
+        posArr[idx + 2] = this.position.z + (Math.random() - 0.5) * 0.5;
+        this.sparkIndex++;
+        this.sparkTrail.geometry.attributes.position.needsUpdate = true;
+      }
+
+      // Heat haze shimmer (дрожание из-за жара)
+      const haze = 1.0 + Math.sin(performance.now() * 0.016) * 0.08;
+      this.spriteMesh.scale.x = (this.baseWidth || 1.6) * haze;
+    }
+
+    // 😱 VOLCANO CRATER: Leap through center across the abyss!
+    if (this.isLeaping) {
+      this.leapProgress += delta / this.leapDuration;
+      const t = Math.min(1.0, this.leapProgress);
+      this.position.lerpVectors(this.leapStart, this.leapTarget, t);
+      const arc = Math.sin(t * Math.PI) * 11.5;
+      this.meshGroup.position.set(this.position.x, this.position.y + arc, this.position.z);
+      this.meshGroup.lookAt(player.camera.position.x, this.meshGroup.position.y, player.camera.position.z);
+
+      if (this.leapProgress >= 1.0) {
+        this.isLeaping = false;
+        this.leapCooldown = 12.0 + Math.random() * 6.0;
+        this.velocity.set(0, 0, 0);
+      }
+      return distToPlayer;
+    } else if (this.map && this.map.isCrater && this.stunTimer <= 0) {
+      this.leapCooldown -= delta;
+      // If player is on higher/mid tiers across the crater, trigger sensational center leap!
+      if (this.leapCooldown <= 0 && distToTarget > 11.0 && distToTarget < 30.0) {
+        this.isLeaping = true;
+        this.leapProgress = 0;
+        this.leapDuration = 1.35;
+        this.leapStart.copy(this.position);
+        this.leapTarget.copy(targetPos);
+        soundEngine.playNextbotLeap();
+      }
+    }
 
     // If currently stunned from a shield blast or D20 save
     if (this.stunTimer > 0) {
@@ -194,13 +367,11 @@ export class NextbotGirl {
       this.checkMapBounds(player);
 
       // Stun wobble / disorientation tilt
-      this.meshGroup.position.set(this.position.x, 0, this.position.z);
+      this.meshGroup.position.set(this.position.x, this.position.y, this.position.z);
       this.spriteMesh.rotation.z = Math.sin(performance.now() * 0.02) * 0.28;
       this.meshGroup.lookAt(player.camera.position.x, this.meshGroup.position.y, player.camera.position.z);
 
-      const toP = new THREE.Vector3().subVectors(player.position, this.position);
-      toP.y = 0;
-      return toP.length();
+      return distToPlayer;
     }
 
     // If distracted by dakimakura decoy
@@ -215,80 +386,101 @@ export class NextbotGirl {
       return distToPlayer;
     }
 
-    // Nextbot Navigation Logic
-    const hasLOS = this.map.hasLineOfSight(this.position, player.position);
+    // Nextbot Navigation Logic:
+    // In Volcano Crater: SPIDER MODE (3D Wall Climbing)
+    if (this.map && this.map.isCrater) {
+      // Move horizontally towards target
+      const toTargetFlat = new THREE.Vector3(toTarget.x, 0, toTarget.z);
+      if (toTargetFlat.lengthSq() > 0.05) {
+        toTargetFlat.normalize();
+        const targetVel = toTargetFlat.multiplyScalar(this.currentSpeed);
+        this.velocity.lerp(targetVel, 8.0 * delta);
+      }
 
-    let moveDir = new THREE.Vector3();
+      this.position.x += this.velocity.x * delta;
+      this.position.z += this.velocity.z * delta;
+      this.map.resolveCollision(this.position, this.radius);
 
-    if (hasLOS) {
-      // Direct chase
-      moveDir.copy(toPlayer).normalize();
+      // 🧗 Spider Climb: Scale steep caldera walls and ledges vertically
+      const dy = (targetPos.y - 0.4) - this.position.y;
+      if (Math.abs(dy) > 0.1) {
+        const climbSpeed = 7.0;
+        this.position.y += Math.sign(dy) * Math.min(Math.abs(dy), climbSpeed * delta);
+      }
     } else {
-      // Obstacle avoidance navigation: probe forward and angled rays
-      const idealDir = toPlayer.clone().normalize();
-      moveDir.copy(idealDir);
+      // Classic Maze BFS Waypoint Chase
+      const hasLOS = this.map.hasLineOfSight(this.position, targetPos);
+      let moveDir = new THREE.Vector3();
 
-      const angles = [0, 0.45, -0.45, 0.9, -0.9, 1.4, -1.4];
-      let bestDir = null;
+      if (hasLOS) {
+        moveDir.copy(toTarget).normalize();
+      } else {
+        const waypoint = this.map.findNextWaypoint(this.position, targetPos);
+        const toWaypoint = new THREE.Vector3().subVectors(waypoint, this.position);
+        toWaypoint.y = 0;
 
-      for (const angle of angles) {
-        const testDir = idealDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
-        const probePoint = this.position.clone().add(testDir.clone().multiplyScalar(2.0));
-        
-        let blocked = false;
-        for (const wall of this.map.walls) {
-          if (probePoint.x >= wall.minX && probePoint.x <= wall.maxX &&
-              probePoint.z >= wall.minZ && probePoint.z <= wall.maxZ) {
-            blocked = true;
-            break;
+        if (toWaypoint.lengthSq() > 0.09) {
+          moveDir.copy(toWaypoint).normalize();
+        } else {
+          moveDir.copy(toTarget).normalize();
+        }
+      }
+
+      const targetVel = moveDir.clone().multiplyScalar(this.currentSpeed);
+      this.velocity.lerp(targetVel, 10.0 * delta);
+
+      if (this.velocity.length() > this.currentSpeed * 1.5) {
+        this.velocity.multiplyScalar(0.92);
+      }
+
+      this.position.x += this.velocity.x * delta;
+      this.position.z += this.velocity.z * delta;
+      this.map.resolveCollision(this.position, this.radius);
+
+      // Stuck Detection
+      const actualMoved = Math.hypot(
+        this.position.x - (this.lastActualX !== undefined ? this.lastActualX : this.position.x),
+        this.position.z - (this.lastActualZ !== undefined ? this.lastActualZ : this.position.z)
+      );
+      this.lastActualX = this.position.x;
+      this.lastActualZ = this.position.z;
+
+      const actualSpeed = delta > 0.0001 ? (actualMoved / delta) : 0;
+      if (actualSpeed < 1.0 && this.stunTimer <= 0 && this.distractedTimer <= 0) {
+        this.stuckTimer = (this.stuckTimer || 0) + delta;
+        if (this.stuckTimer > 0.3) {
+          const tangent = new THREE.Vector3(-moveDir.z, 0, moveDir.x);
+          const sign = (Math.sin(performance.now() * 0.01) > 0) ? 1 : -1;
+          this.position.add(tangent.multiplyScalar(sign * 5.0 * delta));
+          this.map.resolveCollision(this.position, this.radius);
+
+          if (this.stuckTimer > 1.2) {
+            this.aggressiveRespawn(player);
+            this.stuckTimer = 0;
           }
         }
-        if (!blocked) {
-          bestDir = testDir;
-          break;
-        }
-      }
-
-      if (bestDir) {
-        moveDir.copy(bestDir);
+      } else {
+        this.stuckTimer = 0;
       }
     }
-
-    // Apply movement acceleration
-    const targetVel = moveDir.multiplyScalar(this.currentSpeed);
-    this.velocity.lerp(targetVel, 8.0 * delta);
-
-    // Knockback friction decay if moving too fast
-    if (this.velocity.length() > this.currentSpeed * 1.5) {
-      this.velocity.multiplyScalar(0.92);
-    }
-
-    // Update position
-    this.position.x += this.velocity.x * delta;
-    this.position.z += this.velocity.z * delta;
-
-    // Resolve wall collisions
-    this.map.resolveCollision(this.position, this.radius);
 
     // Ensure she stays within map bounds
     this.checkMapBounds(player);
 
     // Nextbot Bobbing & Wobble Animation
     const speed = this.velocity.length();
+    let verticalBob = 0;
     if (speed > 0.5) {
       this.bobTimer += delta * 12;
-      const verticalBob = Math.abs(Math.sin(this.bobTimer)) * 0.12;
-      const wobble = Math.sin(this.bobTimer * 0.7) * 0.08;
-
-      this.meshGroup.position.set(this.position.x, verticalBob, this.position.z);
-      this.spriteMesh.rotation.z = wobble;
+      verticalBob = Math.abs(Math.sin(this.bobTimer)) * 0.12;
+      this.spriteMesh.rotation.z = Math.sin(this.bobTimer * 0.7) * 0.08;
     } else {
-      this.meshGroup.position.set(this.position.x, 0, this.position.z);
       this.spriteMesh.rotation.z = 0;
     }
 
+    this.meshGroup.position.set(this.position.x, this.position.y + verticalBob, this.position.z);
+
     // Cylindrical billboard effect: Sprite faces player camera on Y axis only
-    // Keeps the sprite standing upright on the floor without pitching into the ground
     this.meshGroup.lookAt(player.camera.position.x, this.meshGroup.position.y, player.camera.position.z);
 
     return distToPlayer;
