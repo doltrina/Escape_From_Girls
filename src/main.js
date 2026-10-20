@@ -9,6 +9,7 @@ import { soundEngine } from './audio.js';
 import { assetManager } from './customAssets.js';
 import { networkManager } from './multiplayer.js';
 import { RemotePlayer } from './remotePlayer.js?v=2';
+import { CutsceneManager } from './cutscenes.js';
 
 // Game States
 const STATE = {
@@ -16,7 +17,61 @@ const STATE = {
   PLAYING: 'PLAYING',
   PAUSED: 'PAUSED',
   GAMEOVER: 'GAMEOVER',
-  VICTORY: 'VICTORY'
+  VICTORY: 'VICTORY',
+  CUTSCENE: 'CUTSCENE'
+};
+
+const MAP_END_TEXTS = {
+  crater: {
+    coop: {
+      defeat: {
+        title: '🌋 ОТРЯД СГОРЕЛ В МЕСЯЧНЫХ!<br><span style="font-size: 0.65em; color: #ff0055;">КРОВАВЫЙ КРАХ КООПЕРАТИВА</span>',
+        subtitle: 'Паучиха-девушка загнала весь сквад в кипящие месячные вулкана. Никто не добрался до вертолета!',
+        magmaSubtitle: '«Ой, мальчики, вы все разом упали в мои месячные... Никто не успел спастись!»'
+      },
+      victory: {
+        title: '🌋 БРО ПОКОРИЛИ ВУЛКАН!<br><span class="victory-subtitle-text" style="color: #00ffaa;">КООПЕРАТИВНЫЙ ТРИУМФ НА ВЕРШИНЕ</span>',
+        badge: '👑 ЛЕГЕНДАРНЫЙ СКВАД СИГМА-САМУРАЕВ 👑',
+        description: 'Ваш отряд преодолел бушующие потоки месячных, перепрыгнул все платформы и достиг Врат Тории! Друг на вертолете забрал всех выживших братьев!'
+      }
+    },
+    solo: {
+      defeat: {
+        title: '🩸 УТОНУЛ В МЕСЯЧНЫХ!<br><span style="font-size: 0.65em; color: #ff0055;">КРОВАВЫЙ КОНЕЦ</span>',
+        subtitle: '«Ой, кажется, ты упал в месячные... А я даже не успела познакомиться!»'
+      },
+      victory: {
+        title: '🌋 ТЫ ВЫБРАЛСЯ ИЗ КРАТЕРА!<br><span class="victory-subtitle-text">СВЯЩЕННЫЕ ВРАТА ТОРИИ</span>',
+        badge: '👑 ИСТИННЫЙ СИГМА-САМУРАЙ 👑',
+        description: 'Ты поднялся на вершину кратера, спасся от поднимающихся месячных и улетел на вертолете лучшего друга!'
+      }
+    }
+  },
+  maze: {
+    coop: {
+      defeat: {
+        title: '💔 ОТРЯД ЗАГНАН В УГОЛ!<br><span style="font-size: 0.65em; color: #ff0055;">ВСЕ БРО ПОТЕРЯЛИ ДЕВСТВЕННОСТЬ</span>',
+        subtitle: 'Девушка Nextbot настигла последнего защитника в лабиринте. Братство девственников пало!',
+        magmaSubtitle: 'Никому из отряда не удалось выбраться из лабиринта живым...'
+      },
+      victory: {
+        title: '🚪 БРО ВЗЛОМАЛИ ЛАБИРИНТ!<br><span class="victory-subtitle-text" style="color: #00ffaa;">СЧАСТЛИВЫЙ КОНЕЦ (КООПЕРАТИВ)</span>',
+        badge: '👑 НЕПОБЕДИМОЕ БРАТСТВО СИГМ 👑',
+        description: 'Вы слаженно нашли все ключи, прикрывали друг друга силовыми полями и вместе распахнули железную дверь! Ни одна охотница не смогла сломить ваш бро-союз!'
+      }
+    },
+    solo: {
+      defeat: {
+        title: 'ТЫ ПОТЕРЯЛ ДЕВСТВЕННОСТЬ<br>ТЫ ПРОИГРАЛ',
+        subtitle: 'Твоя девственность была потеряна навсегда...'
+      },
+      victory: {
+        title: 'ТЫ СОХРАНИЛ ДЕВСТВЕННОСТЬ!<br><span class="victory-subtitle-text">СЧАСТЛИВЫЙ КОНЕЦ (ПОБЕДА)</span>',
+        badge: '👑 ИСТИННЫЙ СИГМА-САМУРАЙ 👑',
+        description: 'Ты собрал все 3 ключа, обхитрил девушку и вырвался на свободу! Твоя свобода и чистая душа в безопасности!'
+      }
+    }
+  }
 };
 
 class Game {
@@ -37,6 +92,17 @@ class Game {
     this.reviveTarget = null;
     this.chatOpen = false;
 
+    // Co-op Ready & Spectator Mode State
+    this.isCoopReady = false;
+    this.isSpectating = false;
+    this.spectatorTargetId = null;
+    this.spectatorIndex = 0;
+    this.publicKickInterval = null;
+    this.publicKickTimeLeft = 10;
+
+    // Cutscene System
+    this.cutsceneManager = new CutsceneManager(this);
+
     this.container = document.getElementById('game-canvas');
     this.initThree();
     this.initUI();
@@ -50,10 +116,10 @@ class Game {
   }
 
   initThree() {
-    // Renderer (optimized pixel ratio for smooth 60fps)
+    // Renderer (optimized 1.0 pixel ratio for rock-solid 60fps)
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
     this.container.appendChild(this.renderer.domElement);
@@ -166,7 +232,20 @@ class Game {
 
     // Volcano Crater Callbacks
     this.player.onMagmaDeath = () => {
-      this.triggerGameOver('magma');
+      if (this.isMultiplayer) {
+        this.player.isDead = true;
+        this.player.setDowned(true);
+        soundEngine.playMagmaDeath();
+        networkManager.sendPlayerEliminated('magma');
+        const alive = this.getAliveTeammates();
+        if (alive.length > 0) {
+          this.startSpectating('magma');
+        } else {
+          this.triggerGameOver('magma');
+        }
+      } else {
+        this.triggerGameOver('magma');
+      }
     };
 
     this.player.onRocketJump = () => {
@@ -205,8 +284,8 @@ class Game {
 
     if (mapType === 'crater') {
       this.currentMapType = 'crater';
-      this.scene.background = new THREE.Color(0x180004);
-      this.scene.fog = new THREE.FogExp2(0x220208, 0.022);
+      this.scene.background = new THREE.Color(0xd00028); // Ярко-красное небо вулкана
+      this.scene.fog = new THREE.FogExp2(0x750014, 0.0078); // Плотная алая вулканическая дымка
       this.map = new CraterMap(this.scene);
       this.map.onMagmaRiseStart = () => {
         // Quiet rising without intrusive screen banners
@@ -239,6 +318,13 @@ class Game {
       this.player.map = this.map;
       if (typeof this.player.setScene === 'function') {
         this.player.setScene(this.scene);
+      }
+      // Фонарик на карте с вулканом по умолчанию выключен, в лабиринте - включен
+      const shouldFlashlightOn = (this.currentMapType !== 'crater');
+      this.player.setFlashlightState(shouldFlashlightOn, true);
+      if (this.dom && this.dom.flashlightStatus) {
+        this.dom.flashlightStatus.textContent = this.player.flashlightOn ? 'ВКЛ' : 'ВЫКЛ';
+        this.dom.flashlightStatus.style.color = this.player.flashlightOn ? 'var(--cyan)' : 'var(--text-secondary)';
       }
     }
     if (this.girl) this.girl.map = this.map;
@@ -321,8 +407,18 @@ class Game {
     this.girl.spawn(girlSpawn);
     if (this.currentMapType === 'crater') {
       this.girl.setDormant(true);
+      if (this.player) {
+        this.player.setFlashlightState(false, true);
+      }
     } else {
       this.girl.setDormant(false);
+      if (this.player) {
+        this.player.setFlashlightState(true, true);
+      }
+    }
+    if (this.dom && this.dom.flashlightStatus) {
+      this.dom.flashlightStatus.textContent = this.player.flashlightOn ? 'ВКЛ' : 'ВЫКЛ';
+      this.dom.flashlightStatus.style.color = this.player.flashlightOn ? 'var(--cyan)' : 'var(--text-secondary)';
     }
 
     this.shieldManager.reset(playerSpawn);
@@ -465,7 +561,21 @@ class Game {
       coopPlayerList: document.getElementById('coop-player-list'),
       btnCoopLeave: document.getElementById('btn-coop-leave'),
       btnCoopStartGame: document.getElementById('btn-coop-start-game'),
+      btnCoopReady: document.getElementById('btn-coop-ready'),
       coopWaitingHostNotice: document.getElementById('coop-waiting-host-notice'),
+      coopPublicTimerBanner: document.getElementById('coop-public-timer-banner'),
+      coopKickSeconds: document.getElementById('coop-kick-seconds'),
+      goCoopRestartNotice: document.getElementById('go-coop-restart-notice'),
+      vicCoopRestartNotice: document.getElementById('vic-coop-restart-notice'),
+      vicTitle: document.getElementById('vic-title'),
+      vicBadge: document.getElementById('vic-badge'),
+      vicDesc: document.getElementById('vic-desc'),
+
+      // Spectator Mode HUD
+      spectatorHud: document.getElementById('spectator-hud'),
+      spectatorTargetName: document.getElementById('spectator-target-name'),
+      btnSpectatorPrev: document.getElementById('btn-spectator-prev'),
+      btnSpectatorNext: document.getElementById('btn-spectator-next'),
 
       // In-game Co-op HUD
       hudCoopSquad: document.getElementById('hud-coop-squad'),
@@ -522,7 +632,7 @@ class Game {
       blurActive();
       soundEngine.init();
       soundEngine.resume();
-      this.startGame();
+      this.startGame(false);
     });
 
     // Resume Button (from Pause)
@@ -545,7 +655,7 @@ class Game {
         blurActive();
         soundEngine.init();
         soundEngine.resume();
-        this.startGame();
+        this.startGame(true);
       });
     }
 
@@ -567,7 +677,7 @@ class Game {
       if (this.isMultiplayer) {
         networkManager.sendRestartGame();
       } else {
-        this.startGame();
+        this.startGame(true);
       }
     });
 
@@ -591,7 +701,7 @@ class Game {
         if (this.isMultiplayer) {
           networkManager.sendRestartGame();
         } else {
-          this.startGame();
+          this.startGame(true);
         }
       });
     }
@@ -690,6 +800,16 @@ class Game {
 
     // Keyboard Hotkeys
     window.addEventListener('keydown', (e) => {
+      if (this.isSpectating) {
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+          this.cycleSpectatorTarget(-1);
+          return;
+        } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+          this.cycleSpectatorTarget(1);
+          return;
+        }
+      }
+
       if (e.code === 'Escape') {
         if (this.chatOpen) {
           this.closeChat();
@@ -710,11 +830,48 @@ class Game {
         }
       }
       if (e.code === 'KeyR') {
+        // Non-hosts in private co-op cannot restart
+        if (this.isMultiplayer && !networkManager.isHost && !networkManager.isPublic && networkManager.roomId !== 'PUBLIC') {
+          return;
+        }
         if (this.state === STATE.GAMEOVER) {
           this.dom.btnRestart.click();
         } else if (this.state === STATE.VICTORY && this.dom.btnVictoryRestart) {
           this.dom.btnVictoryRestart.click();
         }
+      }
+    });
+
+    // Spectator Switch Buttons
+    if (this.dom.btnSpectatorPrev) {
+      this.dom.btnSpectatorPrev.addEventListener('click', (e) => {
+        blurActive();
+        e.stopPropagation();
+        this.cycleSpectatorTarget(-1);
+      });
+    }
+    if (this.dom.btnSpectatorNext) {
+      this.dom.btnSpectatorNext.addEventListener('click', (e) => {
+        blurActive();
+        e.stopPropagation();
+        this.cycleSpectatorTarget(1);
+      });
+    }
+
+    // Spectator Mouse Click Cycling (LMB = next, RMB = prev)
+    window.addEventListener('mousedown', (e) => {
+      if (this.isSpectating) {
+        if (e.button === 0) {
+          this.cycleSpectatorTarget(1);
+        } else if (e.button === 2) {
+          this.cycleSpectatorTarget(-1);
+        }
+      }
+    });
+
+    window.addEventListener('contextmenu', (e) => {
+      if (this.isSpectating) {
+        e.preventDefault();
       }
     });
   }
@@ -1068,7 +1225,7 @@ class Game {
     this.dom.hudRecord.textContent = `🏆 РЕКОРД: ${this.formatTime(this.highScore)}`;
   }
 
-  startGame() {
+  startGame(isRestart = false) {
     this.isMultiplayer = false;
     if (networkManager.isConnected) {
       networkManager.disconnect();
@@ -1087,7 +1244,6 @@ class Game {
       this.dom.hudRevivePrompt.classList.add('hidden');
     }
 
-    this.state = STATE.PLAYING;
     this.elapsedTime = 0;
     this.resetPositions();
 
@@ -1100,7 +1256,6 @@ class Game {
     this.dom.menuOverlay.classList.add('hidden');
     this.dom.gameOverModal.classList.add('hidden');
     if (this.dom.victoryModal) this.dom.victoryModal.classList.add('hidden');
-    this.dom.hud.classList.remove('hidden');
 
     if (this.dom.mapSelectionSection) this.dom.mapSelectionSection.style.display = 'none';
     if (this.dom.hudToriiCountdown) this.dom.hudToriiCountdown.classList.add('hidden');
@@ -1121,6 +1276,28 @@ class Game {
     soundEngine.resume();
     soundEngine.stopHeartbeat();
     soundEngine.resetChaseMusic();
+
+    // 🎬 Проверка необходимости запуска сюжетной катсцены
+    if (this.cutsceneManager && this.cutsceneManager.shouldPlayCutscene(this.currentMapType, isRestart)) {
+      this.state = STATE.CUTSCENE;
+      this.dom.hud.classList.add('hidden');
+      const crosshair = document.getElementById('crosshair');
+      if (crosshair) crosshair.classList.add('hidden');
+
+      this.cutsceneManager.play(this.currentMapType, () => {
+        this.startActualGameplay();
+      });
+    } else {
+      this.startActualGameplay();
+    }
+  }
+
+  // Запуск непосредственного геймплея после катсцены или пропуска
+  startActualGameplay() {
+    this.state = STATE.PLAYING;
+    this.dom.hud.classList.remove('hidden');
+    const crosshair = document.getElementById('crosshair');
+    if (crosshair) crosshair.classList.remove('hidden');
 
     if (soundEngine.hasCustomMusic && this.dom.nextbotAudio.src) {
       this.dom.nextbotAudio.currentTime = 0;
@@ -1206,6 +1383,14 @@ class Game {
   }
 
   returnToMainMenu() {
+    this.stopSpectating();
+    this.clearPublicKickTimer();
+    this.isCoopReady = false;
+    this.updateReadyButtonUI();
+
+    if (this.cutsceneManager) {
+      this.cutsceneManager.stopCurrent();
+    }
     this.isMultiplayer = false;
     if (networkManager.isConnected) {
       networkManager.disconnect();
@@ -1309,6 +1494,7 @@ class Game {
   }
 
   triggerGameOver(reason = 'girl_caught') {
+    this.stopSpectating();
     this.state = STATE.GAMEOVER;
     if (reason === 'magma') {
       soundEngine.playMagmaDeath();
@@ -1329,14 +1515,25 @@ class Game {
     if (this.dom.hudToriiCountdown) this.dom.hudToriiCountdown.classList.add('hidden');
     if (this.dom.hudMagmaWarning) this.dom.hudMagmaWarning.classList.add('hidden');
 
-    if (reason === 'magma') {
-      if (this.dom.goTitle) {
-        this.dom.goTitle.innerHTML = '🩸 УТОНУЛ В МЕСЯЧНЫХ!<br><span style="font-size: 0.65em; color: #ff0055;">КРОВАВЫЙ КОНЕЦ</span>';
-      }
-      if (this.dom.goSubtitle) {
-        this.dom.goSubtitle.textContent = '«Ой, кажется, ты упал в месячные... А я даже не успела познакомиться!»';
+    const mapKey = this.currentMapType || 'crater';
+    const textConfig = (this.isMultiplayer && MAP_END_TEXTS[mapKey])
+      ? MAP_END_TEXTS[mapKey].coop.defeat
+      : (MAP_END_TEXTS[mapKey] ? MAP_END_TEXTS[mapKey].solo.defeat : null);
+
+    if (textConfig && this.dom.goTitle) {
+      this.dom.goTitle.innerHTML = textConfig.title;
+    }
+    if (textConfig && this.dom.goSubtitle) {
+      if (reason === 'magma' && textConfig.magmaSubtitle) {
+        this.dom.goSubtitle.textContent = textConfig.magmaSubtitle;
         this.dom.goSubtitle.style.color = '#ff4466';
+      } else {
+        this.dom.goSubtitle.textContent = textConfig.subtitle;
+        this.dom.goSubtitle.style.color = '#ff88a3';
       }
+    }
+
+    if (reason === 'magma') {
       if (this.dom.gameOverFallback) {
         this.dom.gameOverFallback.style.background = 'radial-gradient(circle at 50% 100%, #ff2200 0%, #660000 60%, #1a0000 100%)';
         this.dom.gameOverFallback.innerHTML = `
@@ -1348,13 +1545,6 @@ class Game {
         `;
       }
     } else {
-      if (this.dom.goTitle) {
-        this.dom.goTitle.innerHTML = 'ТЫ ПОТЕРЯЛ ДЕВСТВЕННОСТЬ<br>ТЫ ПРОИГРАЛ';
-      }
-      if (this.dom.goSubtitle) {
-        this.dom.goSubtitle.textContent = 'Твоя девственность была потеряна навсегда...';
-        this.dom.goSubtitle.style.color = '#ff88a3';
-      }
       if (this.dom.gameOverFallback) {
         this.dom.gameOverFallback.innerHTML = '';
         this.dom.gameOverFallback.style.background = '';
@@ -1375,6 +1565,29 @@ class Game {
     this.dom.goTime.textContent = this.formatTime(this.elapsedTime);
     this.dom.goShields.textContent = this.shieldsCollected.toString();
     this.dom.goRecord.textContent = this.formatTime(this.highScore) + (isNewRecord ? ' (НОВЫЙ!)' : '');
+
+    // Host-Only vs Non-Host Restart Controls
+    if (this.isMultiplayer) {
+      if (networkManager.isHost) {
+        this.dom.btnRestart.style.display = 'inline-block';
+        this.dom.btnRestart.textContent = '🔄 ПЕРЕЗАПУСТИТЬ ДЛЯ ВСЕХ';
+        if (this.dom.goCoopRestartNotice) this.dom.goCoopRestartNotice.classList.add('hidden');
+      } else if (networkManager.isPublic || networkManager.roomId === 'PUBLIC') {
+        this.dom.btnRestart.style.display = 'inline-block';
+        this.dom.btnRestart.textContent = '🔄 В ЛОББИ (НОВЫЙ РАУНД)';
+        if (this.dom.goCoopRestartNotice) this.dom.goCoopRestartNotice.classList.add('hidden');
+      } else {
+        this.dom.btnRestart.style.display = 'none';
+        if (this.dom.goCoopRestartNotice) {
+          this.dom.goCoopRestartNotice.classList.remove('hidden');
+          this.dom.goCoopRestartNotice.textContent = '⏳ Только хост может перезапустить игру. Ожидание хоста...';
+        }
+      }
+    } else {
+      this.dom.btnRestart.style.display = 'inline-block';
+      this.dom.btnRestart.textContent = '🔄 ПОПРОБОВАТЬ СПАСТИСЬ СНОВА';
+      if (this.dom.goCoopRestartNotice) this.dom.goCoopRestartNotice.classList.add('hidden');
+    }
 
     // Show Game Over Modal
     this.dom.hud.classList.add('hidden');
@@ -1442,6 +1655,7 @@ class Game {
   }
 
   triggerVictory() {
+    this.stopSpectating();
     this.state = STATE.VICTORY;
     soundEngine.playVictory();
 
@@ -1455,10 +1669,52 @@ class Game {
       this.dom.nextbotAudio.pause();
     }
 
+    const mapKey = this.currentMapType || 'crater';
+    const textConfig = (this.isMultiplayer && MAP_END_TEXTS[mapKey])
+      ? MAP_END_TEXTS[mapKey].coop.victory
+      : (MAP_END_TEXTS[mapKey] ? MAP_END_TEXTS[mapKey].solo.victory : null);
+
+    if (textConfig) {
+      if (this.dom.vicTitle) this.dom.vicTitle.innerHTML = textConfig.title;
+      if (this.dom.vicBadge) this.dom.vicBadge.textContent = textConfig.badge;
+      if (this.dom.vicDesc) this.dom.vicDesc.textContent = textConfig.description;
+    }
+
     // Populate Victory stats
     if (this.dom.vicTime) this.dom.vicTime.textContent = this.formatTime(this.elapsedTime);
     if (this.dom.vicKeys) this.dom.vicKeys.textContent = `${this.escapeGoal.keysCollected} / ${this.escapeGoal.totalKeys}`;
     if (this.dom.vicShields) this.dom.vicShields.textContent = this.shieldsCollected.toString();
+
+    // Host-Only vs Non-Host Restart Controls
+    if (this.isMultiplayer) {
+      if (networkManager.isHost) {
+        if (this.dom.btnVictoryRestart) {
+          this.dom.btnVictoryRestart.style.display = 'inline-block';
+          this.dom.btnVictoryRestart.textContent = '🔄 ПЕРЕЗАПУСТИТЬ ДЛЯ ВСЕХ';
+        }
+        if (this.dom.vicCoopRestartNotice) this.dom.vicCoopRestartNotice.classList.add('hidden');
+      } else if (networkManager.isPublic || networkManager.roomId === 'PUBLIC') {
+        if (this.dom.btnVictoryRestart) {
+          this.dom.btnVictoryRestart.style.display = 'inline-block';
+          this.dom.btnVictoryRestart.textContent = '🔄 В ЛОББИ (НОВЫЙ РАУНД)';
+        }
+        if (this.dom.vicCoopRestartNotice) this.dom.vicCoopRestartNotice.classList.add('hidden');
+      } else {
+        if (this.dom.btnVictoryRestart) {
+          this.dom.btnVictoryRestart.style.display = 'none';
+        }
+        if (this.dom.vicCoopRestartNotice) {
+          this.dom.vicCoopRestartNotice.classList.remove('hidden');
+          this.dom.vicCoopRestartNotice.textContent = '⏳ Только хост может перезапустить игру. Ожидание хоста...';
+        }
+      }
+    } else {
+      if (this.dom.btnVictoryRestart) {
+        this.dom.btnVictoryRestart.style.display = 'inline-block';
+        this.dom.btnVictoryRestart.textContent = '👑 СЫГРАТЬ ЕЩЕ РАЗ';
+      }
+      if (this.dom.vicCoopRestartNotice) this.dom.vicCoopRestartNotice.classList.add('hidden');
+    }
 
     // Show Victory Modal
     this.dom.hud.classList.add('hidden');
@@ -1474,19 +1730,36 @@ class Game {
 
     const delta = this.clock.getDelta();
 
+    // 🎬 Обновление активной катсцены и рендер 3D сцены
+    if (this.state === STATE.CUTSCENE) {
+      if (this.map && typeof this.map.update === 'function') {
+        this.map.update(delta);
+      }
+      if (this.cutsceneManager && this.cutsceneManager.isPlaying) {
+        this.cutsceneManager.update(delta);
+      }
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
+
     if (this.state === STATE.PLAYING || (this.isMultiplayer && this.state === STATE.PAUSED)) {
       if (this.state === STATE.PLAYING) {
         this.elapsedTime += delta;
         this.dom.hudTimer.textContent = this.formatTime(this.elapsedTime);
 
-        // Update active map (rising magma, crumbling platforms, ash embers, geysers)
+        // Update active map (rising magma, crumbling platforms, ash embers, geysers, helicopter light)
         if (this.map && typeof this.map.update === 'function') {
-          this.map.update(delta);
+          const pPos = (this.player && this.player.position) ? this.player.position : null;
+          this.map.update(delta, pPos);
         }
 
-        // Update Player (with co-op teammate collision resolution)
+        // Update Player (with co-op teammate collision resolution) or Spectator Camera
         const remoteList = this.isMultiplayer ? Array.from(this.remotePlayers.values()) : [];
-        this.player.update(delta, remoteList);
+        if (!this.isSpectating) {
+          this.player.update(delta, remoteList);
+        } else {
+          this.updateSpectatorCamera(delta);
+        }
 
         // Update altitude and rising magma display in crater
         if (this.currentMapType === 'crater' && this.dom.hudAltitudeValue) {
@@ -1502,8 +1775,8 @@ class Game {
           rp.update(delta, this.camera);
         }
 
-        const isMoving = (this.state === STATE.PLAYING) && (this.player.keys.forward || this.player.keys.backward || this.player.keys.left || this.player.keys.right);
-        const wantsSprint = (this.state === STATE.PLAYING) && this.player.keys.sprint && isMoving && !this.player.isExhausted && !this.player.isDowned;
+        const isMoving = !this.isSpectating && (this.state === STATE.PLAYING) && (this.player.keys.forward || this.player.keys.backward || this.player.keys.left || this.player.keys.right);
+        const wantsSprint = !this.isSpectating && (this.state === STATE.PLAYING) && this.player.keys.sprint && isMoving && !this.player.isExhausted && !this.player.isDowned;
         networkManager.sendPlayerUpdate(
           this.player.position,
           this.player.yaw,
@@ -1512,7 +1785,7 @@ class Game {
           wantsSprint,
           this.player.flashlightOn,
           this.player.shieldActive,
-          this.player.isDowned
+          this.player.isDowned || this.isSpectating
         );
 
         if (networkManager.isHost) {
@@ -1684,10 +1957,27 @@ class Game {
 
   initCoopNetworking() {
     // 1. Player setup & Color picker
+    // Unique default player nickname for Co-op
+    const COOL_NAMES = [
+      'Самурай', 'Гигачад', 'Стечкин', 'Крепыш', 'Шериф',
+      'Ниндзя', 'Базука', 'Берсерк', 'Фантом', 'Сталкер',
+      'Кибер-Бро', 'Катана', 'Викинг', 'Титаниум', 'Феникс',
+      'Корсар', 'Дракон', 'Хантер', 'Снайпер', 'Ворон'
+    ];
+    let initialName = localStorage.getItem('coop_player_name');
+    if (!initialName) {
+      const base = COOL_NAMES[Math.floor(Math.random() * COOL_NAMES.length)];
+      const num = Math.floor(10 + Math.random() * 90);
+      initialName = `${base}#${num}`;
+      localStorage.setItem('coop_player_name', initialName);
+    }
     if (this.dom.coopNameInput) {
-      this.dom.coopNameInput.value = localStorage.getItem('coop_player_name') || 'Самурай';
+      this.dom.coopNameInput.value = initialName;
       this.dom.coopNameInput.addEventListener('input', () => {
-        localStorage.setItem('coop_player_name', this.dom.coopNameInput.value.trim() || 'Самурай');
+        const val = this.dom.coopNameInput.value.trim();
+        if (val) {
+          localStorage.setItem('coop_player_name', val);
+        }
       });
     }
 
@@ -1735,7 +2025,11 @@ class Game {
       };
       setButtonsDisabled(true);
 
-      const name = (this.dom.coopNameInput ? this.dom.coopNameInput.value : 'Самурай').trim() || 'Самурай';
+      const inputVal = (this.dom.coopNameInput ? this.dom.coopNameInput.value : '').trim();
+      const name = inputVal || localStorage.getItem('coop_player_name') || ('Самурай#' + Math.floor(10 + Math.random() * 90));
+      if (this.dom.coopNameInput) {
+        this.dom.coopNameInput.value = name;
+      }
       this.showToast(`Подключение к комнате ${roomId}...`);
       networkManager.connect(roomId, name, this.selectedColor, this.currentMapType)
         .then(() => {
@@ -1788,6 +2082,9 @@ class Game {
 
     if (this.dom.btnCoopLeave) {
       this.dom.btnCoopLeave.addEventListener('click', () => {
+        this.clearPublicKickTimer();
+        this.isCoopReady = false;
+        this.updateReadyButtonUI();
         networkManager.disconnect();
         this.dom.coopRoomView.classList.add('hidden');
         this.dom.coopConnectView.classList.remove('hidden');
@@ -1798,6 +2095,26 @@ class Game {
     if (this.dom.btnCoopStartGame) {
       this.dom.btnCoopStartGame.addEventListener('click', () => {
         networkManager.sendStartGame(this.currentMapType);
+      });
+    }
+
+    if (this.dom.btnCoopReady) {
+      this.dom.btnCoopReady.addEventListener('click', () => {
+        this.isCoopReady = !this.isCoopReady;
+        console.log('[Game] Clicked Ready button! New isCoopReady =', this.isCoopReady);
+        this.updateReadyButtonUI();
+        networkManager.sendReady(this.isCoopReady);
+        if (networkManager.isPublic || networkManager.roomId === 'PUBLIC') {
+          if (this.isCoopReady) {
+            this.clearPublicKickTimer();
+            if (this.dom.coopPublicTimerBanner) {
+              this.dom.coopPublicTimerBanner.classList.remove('hidden');
+              this.dom.coopPublicTimerBanner.innerHTML = '✅ <span style="color:#00ffaa;">ВЫ ГОТОВЫ! Ожидание остальных игроков...</span>';
+            }
+          } else {
+            this.startPublicKickTimer();
+          }
+        }
       });
     }
 
@@ -1826,7 +2143,19 @@ class Game {
 
     networkManager.onRoomJoined = (msg) => {
       this.dom.coopDisplayRoom.textContent = msg.roomId;
+      this.isCoopReady = false;
+      this.updateReadyButtonUI();
+      // Sync local player nickname if server assigned unique adjusted name
+      if (networkManager.playerName && this.dom.coopNameInput) {
+        this.dom.coopNameInput.value = networkManager.playerName;
+        localStorage.setItem('coop_player_name', networkManager.playerName);
+      }
       this.renderLobbyPlayers(msg.players);
+      if (msg.isPublic || msg.roomId === 'PUBLIC' || networkManager.isPublic) {
+        this.startPublicKickTimer();
+      } else {
+        this.clearPublicKickTimer();
+      }
       if (msg.mapType && msg.mapType !== this.currentMapType) {
         this.loadMap(msg.mapType);
         if (this.dom.tabMapCrater && this.dom.tabMapMaze) {
@@ -1930,23 +2259,71 @@ class Game {
       this.showToast(`🆘 ${data.playerName} ЗАГНАН В УГОЛ! СПАСИ БРО! [E]`);
     };
 
+    networkManager.onPlayerEliminated = (data) => {
+      const rp = this.remotePlayers.get(data.playerId);
+      if (rp) {
+        rp.setEliminated(true);
+      }
+      this.showToast(`💀 ${data.playerName} ВЫБЫЛ ИЗ ИГРЫ!`);
+      if (this.isSpectating && this.spectatorTargetId === data.playerId) {
+        this.cycleSpectatorTarget(1);
+      }
+    };
+
     networkManager.onPlayerRevived = (data) => {
       if (data.targetId === networkManager.playerId) {
         this.player.setDowned(false);
+        this.player.isDead = false;
+        this.stopSpectating();
+        this.renderer.domElement.requestPointerLock();
         this.showToast(`❤️ ${data.reviverName} СПАС ТВОЮ ДЕВСТВЕННОСТЬ! БЕГИ!`);
       } else {
         const rp = this.remotePlayers.get(data.targetId);
-        if (rp) rp.setDowned(false);
+        if (rp) {
+          rp.setDowned(false);
+          rp.isDead = false;
+        }
         this.showToast(`❤️ ${data.reviverName} СПАС БРО!`);
       }
     };
 
-    networkManager.onTeamGameOver = () => {
+    networkManager.onPlayerReadyChanged = (msg) => {
+      this.renderLobbyPlayers(msg.players || networkManager.players);
+    };
+
+    networkManager.onRoomResetLobby = (msg) => {
+      this.stopSpectating();
+      if (this.dom.gameOverModal) this.dom.gameOverModal.classList.add('hidden');
+      if (this.dom.victoryModal) this.dom.victoryModal.classList.add('hidden');
+      if (this.dom.hud) this.dom.hud.classList.add('hidden');
+      if (this.dom.coopModal) this.dom.coopModal.classList.remove('hidden');
+      if (this.dom.coopRoomView) this.dom.coopRoomView.classList.remove('hidden');
+      if (this.dom.coopConnectView) this.dom.coopConnectView.classList.add('hidden');
+
+      this.isCoopReady = false;
+      this.updateReadyButtonUI();
+      this.renderLobbyPlayers(msg.players || networkManager.players);
+      this.startPublicKickTimer();
+      this.showToast('🔄 Раунд завершен. Вернулись в лобби! Нажмите «Готов»');
+    };
+
+    networkManager.onKicked = (msg) => {
+      this.clearPublicKickTimer();
+      this.isCoopReady = false;
+      this.updateReadyButtonUI();
+      if (this.dom.coopRoomView) this.dom.coopRoomView.classList.add('hidden');
+      if (this.dom.coopConnectView) this.dom.coopConnectView.classList.remove('hidden');
+      this.showToast('⚠️ ' + (msg.reason || 'Вы были исключены за неактивность'));
+    };
+
+    networkManager.onTeamGameOver = (data) => {
+      this.stopSpectating();
       this.showToast('💔 ВСЯ КОМАНДА ПОТЕРЯЛА ДЕВСТВЕННОСТЬ!');
-      this.triggerGameOver();
+      this.triggerGameOver(data && data.reason === 'magma' ? 'magma' : 'girl_caught');
     };
 
     networkManager.onTeamVictory = (data) => {
+      this.stopSpectating();
       this.showToast(`👑 ${data.escaperName} ОТКРЫЛ ВЫХОД! КОМАНДНАЯ ПОБЕДА!`);
       this.triggerVictory();
     };
@@ -1972,12 +2349,28 @@ class Game {
     this.dom.coopPlayerList.innerHTML = '';
     this.dom.coopPlayersCount.textContent = `${players.length}/4 Игроков`;
 
-    const isHost = networkManager.isHost;
+    const isPublic = networkManager.isPublic || networkManager.roomId === 'PUBLIC';
+    const isHost = networkManager.isHost && !isPublic;
+
+    // In public room: NO host button!
     if (this.dom.btnCoopStartGame) {
       this.dom.btnCoopStartGame.style.display = isHost ? 'block' : 'none';
     }
+
     if (this.dom.coopWaitingHostNotice) {
-      this.dom.coopWaitingHostNotice.style.display = isHost ? 'none' : 'block';
+      if (isPublic) {
+        this.dom.coopWaitingHostNotice.style.display = 'block';
+        this.dom.coopWaitingHostNotice.innerHTML = '⚡ <b>ОБЩАЯ КОМНАТА</b>: Игра начнется АВТОМАТИЧЕСКИ, когда все игроки нажмут «ГОТОВ»!';
+        this.dom.coopWaitingHostNotice.style.color = '#00f3ff';
+      } else if (isHost) {
+        this.dom.coopWaitingHostNotice.style.display = 'block';
+        this.dom.coopWaitingHostNotice.innerHTML = '⚡ Игра начнется сразу, когда <b>все игроки нажмут «ГОТОВ»</b> (или нажмите кнопку запуска выше)';
+        this.dom.coopWaitingHostNotice.style.color = '#39ff14';
+      } else {
+        this.dom.coopWaitingHostNotice.style.display = 'block';
+        this.dom.coopWaitingHostNotice.innerHTML = '⏳ Ожидание готовности игроков (нажмите «ГОТОВ»)...';
+        this.dom.coopWaitingHostNotice.style.color = '#ffaa00';
+      }
     }
 
     players.forEach((p) => {
@@ -1987,20 +2380,191 @@ class Game {
       const isMe = p.id === networkManager.playerId;
       const meTag = isMe ? ' (Вы)' : '';
 
+      const readyBadge = p.ready
+        ? '<span class="player-item-badge badge-ready">🟢 ГОТОВ</span>'
+        : '<span class="player-item-badge badge-not-ready">🟡 НЕ ГОТОВ</span>';
+
+      const hostBadge = (!isPublic && p.isHost) ? '<span class="player-item-badge host">👑 ХОСТ</span>' : '';
+
       item.innerHTML = `
         <div class="player-item-info">
           <div class="player-avatar-badge" style="background: ${p.color}; color: ${p.color};"></div>
           <span class="player-item-name">${p.name}${meTag}</span>
         </div>
-        <div>
-          ${p.isHost ? '<span class="player-item-badge host">👑 ХОСТ</span>' : '<span class="player-item-badge">ГОТОВ</span>'}
+        <div style="display: flex; gap: 8px; align-items: center;">
+          ${hostBadge}
+          ${readyBadge}
         </div>
       `;
       this.dom.coopPlayerList.appendChild(item);
     });
   }
 
+  updateReadyButtonUI() {
+    if (!this.dom.btnCoopReady) return;
+    if (this.isCoopReady) {
+      this.dom.btnCoopReady.textContent = '✅ ВЫ ГОТОВЫ (ОТМЕНА)';
+      this.dom.btnCoopReady.classList.add('ready-active');
+    } else {
+      this.dom.btnCoopReady.textContent = '🟢 ГОТОВ';
+      this.dom.btnCoopReady.classList.remove('ready-active');
+    }
+  }
+
+  startPublicKickTimer() {
+    this.clearPublicKickTimer();
+    if (!networkManager.isPublic && networkManager.roomId !== 'PUBLIC') return;
+    if (this.isCoopReady) {
+      if (this.dom.coopPublicTimerBanner) {
+        this.dom.coopPublicTimerBanner.classList.remove('hidden');
+        this.dom.coopPublicTimerBanner.innerHTML = '✅ <span style="color:#00ffaa;">ВЫ ГОТОВЫ! Ожидание остальных игроков...</span>';
+      }
+      return;
+    }
+
+    this.publicKickTimeLeft = 10;
+    if (this.dom.coopPublicTimerBanner) {
+      this.dom.coopPublicTimerBanner.classList.remove('hidden');
+      this.dom.coopPublicTimerBanner.innerHTML = '⏱️ НАЖМИТЕ ГОТОВ: <span id="coop-kick-seconds" class="timer-countdown">10</span> сек (иначе кик)';
+      this.dom.coopKickSeconds = document.getElementById('coop-kick-seconds');
+    }
+
+    this.publicKickInterval = setInterval(() => {
+      this.publicKickTimeLeft--;
+      if (this.dom.coopKickSeconds) {
+        this.dom.coopKickSeconds.textContent = Math.max(0, this.publicKickTimeLeft);
+      }
+      if (this.publicKickTimeLeft <= 0) {
+        this.clearPublicKickTimer();
+      }
+    }, 1000);
+  }
+
+  clearPublicKickTimer() {
+    if (this.publicKickInterval) {
+      clearInterval(this.publicKickInterval);
+      this.publicKickInterval = null;
+    }
+    if (this.dom.coopPublicTimerBanner) {
+      this.dom.coopPublicTimerBanner.classList.add('hidden');
+    }
+  }
+
+  getAliveTeammates() {
+    const list = [];
+    for (const rp of this.remotePlayers.values()) {
+      if (!rp.isDead && !rp.isDowned) {
+        list.push(rp);
+      }
+    }
+    if (list.length === 0) {
+      for (const rp of this.remotePlayers.values()) {
+        if (!rp.isDead) {
+          list.push(rp);
+        }
+      }
+    }
+    return list;
+  }
+
+  startSpectating(reason = 'eliminated') {
+    this.isSpectating = true;
+    if (this.player && this.player.firstPersonBody) {
+      this.player.firstPersonBody.setVisible(false);
+    }
+    if (document.exitPointerLock) {
+      document.exitPointerLock();
+    }
+    if (this.dom.spectatorHud) {
+      this.dom.spectatorHud.classList.remove('hidden');
+    }
+    if (this.dom.hudDownedBanner) {
+      this.dom.hudDownedBanner.classList.add('hidden');
+    }
+    if (this.dom.hudRevivePrompt) {
+      this.dom.hudRevivePrompt.classList.add('hidden');
+    }
+
+    const alive = this.getAliveTeammates();
+    if (alive.length > 0) {
+      this.spectatorIndex = 0;
+      this.spectatorTargetId = alive[0].id;
+      this.updateSpectatorUI(alive[0]);
+    }
+    this.showToast('👁️ РЕЖИМ НАБЛЮДАТЕЛЯ: Следи за напарниками! [◀] [▶] или ЛКМ / ПКМ');
+  }
+
+  stopSpectating() {
+    this.isSpectating = false;
+    this.spectatorTargetId = null;
+    if (this.dom.spectatorHud) {
+      this.dom.spectatorHud.classList.add('hidden');
+    }
+    if (this.player && this.player.firstPersonBody) {
+      this.player.firstPersonBody.setVisible(true);
+    }
+  }
+
+  cycleSpectatorTarget(dir = 1) {
+    if (!this.isSpectating) return;
+    const alive = this.getAliveTeammates();
+    if (alive.length === 0) return;
+
+    let curIdx = alive.findIndex(p => p.id === this.spectatorTargetId);
+    if (curIdx === -1) curIdx = 0;
+    this.spectatorIndex = (curIdx + dir + alive.length) % alive.length;
+    const target = alive[this.spectatorIndex];
+    if (target) {
+      this.spectatorTargetId = target.id;
+      this.updateSpectatorUI(target);
+    }
+  }
+
+  updateSpectatorUI(target) {
+    if (!this.dom.spectatorTargetName || !target) return;
+    const status = target.isDowned ? ' (🆘 Загнан)' : ' (🟢 Жив)';
+    this.dom.spectatorTargetName.textContent = `Наблюдение: ${target.name}${status}`;
+  }
+
+  updateSpectatorCamera(delta) {
+    if (!this.isSpectating) return;
+    let target = this.remotePlayers.get(this.spectatorTargetId);
+    if (!target || target.isDead) {
+      const alive = this.getAliveTeammates();
+      if (alive.length > 0) {
+        target = alive[0];
+        this.spectatorTargetId = target.id;
+        this.updateSpectatorUI(target);
+      } else {
+        return;
+      }
+    }
+
+    const pos = target.root.position;
+    const rotY = target.root.rotation.y || target.targetRotationY || 0;
+    const dist = 3.6;
+    const height = 1.7;
+    const camX = pos.x - Math.sin(rotY) * dist;
+    const camZ = pos.z - Math.cos(rotY) * dist;
+    const camY = pos.y + height;
+
+    this.camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 10 * delta);
+    this.camera.lookAt(pos.x, pos.y + 1.25, pos.z);
+  }
+
   startMultiplayerGame(msg) {
+    console.log('[Game] startMultiplayerGame executing with msg:', msg);
+    this.stopSpectating();
+    this.clearPublicKickTimer();
+    this.player.isDead = false;
+    this.player.setDowned(false);
+    this.isCoopReady = false;
+    this.updateReadyButtonUI();
+
+    if (this.cutsceneManager) {
+      this.cutsceneManager.stopCurrent();
+    }
+
     this.isMultiplayer = true;
     this.state = STATE.PLAYING;
     this.elapsedTime = 0;
@@ -2043,6 +2607,16 @@ class Game {
       }
     });
 
+    // Sound engine initialization & music
+    soundEngine.init();
+    soundEngine.resume();
+    soundEngine.stopHeartbeat();
+    soundEngine.resetChaseMusic();
+
+    if (this.dom.gameOverVideo) this.dom.gameOverVideo.pause();
+    if (this.dom.victoryVideo) this.dom.victoryVideo.pause();
+    if (this.dom.victoryAudio) this.dom.victoryAudio.pause();
+
     // UI Updates
     if (this.dom.coopModal) this.dom.coopModal.classList.add('hidden');
     this.dom.menuOverlay.classList.add('hidden');
@@ -2050,8 +2624,15 @@ class Game {
     if (this.dom.victoryModal) this.dom.victoryModal.classList.add('hidden');
     this.dom.hud.classList.remove('hidden');
     if (this.dom.hudCoopSquad) this.dom.hudCoopSquad.classList.remove('hidden');
+    const crosshair = document.getElementById('crosshair');
+    if (crosshair) crosshair.classList.remove('hidden');
 
-    this.renderer.domElement.requestPointerLock();
+    this.updateSquadHUD();
+
+    try {
+      this.renderer.domElement.requestPointerLock();
+    } catch (e) {}
+
     this.showToast('🏃 КООПЕРАТИВНЫЙ ПОБЕГ НАЧАЛСЯ! СПАСАЙТЕ ДРУГ ДРУГА!');
   }
 
@@ -2064,7 +2645,12 @@ class Game {
     // Local player status item
     const meItem = document.createElement('div');
     meItem.className = 'squad-member';
-    const meStatus = this.player.isDowned ? '<span class="squad-status-text downed">🆘 ЗАГНАН!</span>' : '<span class="squad-status-text">🟢 ЖИВ</span>';
+    let meStatus = '<span class="squad-status-text">🟢 ЖИВ</span>';
+    if (this.isSpectating) {
+      meStatus = '<span class="squad-status-text" style="color: #00f3ff;">👁️ НАБЛЮДАТЕЛЬ</span>';
+    } else if (this.player.isDowned) {
+      meStatus = '<span class="squad-status-text downed">🆘 ЗАГНАН!</span>';
+    }
     meItem.innerHTML = `
       <div class="squad-dot" style="background: ${this.selectedColor}; color: ${this.selectedColor};"></div>
       <span>${networkManager.playerName} (Вы)</span>
@@ -2081,9 +2667,12 @@ class Game {
       const dist = Math.hypot(rx - px, rz - pz);
       const item = document.createElement('div');
       item.className = 'squad-member';
-      const statusText = rp.isDowned
-        ? `<span class="squad-status-text downed">🆘 [${dist.toFixed(0)}m]</span>`
-        : `<span class="squad-status-text">🟢 [${dist.toFixed(0)}m]</span>`;
+      let statusText = `<span class="squad-status-text">🟢 [${dist.toFixed(0)}m]</span>`;
+      if (rp.isDead) {
+        statusText = `<span class="squad-status-text" style="color:#888;">💀 ПОТЕРЯН</span>`;
+      } else if (rp.isDowned) {
+        statusText = `<span class="squad-status-text downed">🆘 [${dist.toFixed(0)}m]</span>`;
+      }
 
       item.innerHTML = `
         <div class="squad-dot" style="background: ${rp.colorHex}; color: ${rp.colorHex};"></div>
@@ -2104,8 +2693,15 @@ class Game {
         }
       }
       if (this.player.downedTimer <= 0) {
-        // Player failed to be revived -> eliminate
-        this.triggerGameOver();
+        // Player failed to be revived -> eliminate and enter spectator if teammates alive
+        this.player.isDead = true;
+        networkManager.sendPlayerEliminated('bleedout');
+        const alive = this.getAliveTeammates();
+        if (alive.length > 0) {
+          this.startSpectating('bleedout');
+        } else {
+          this.triggerGameOver('girl_caught');
+        }
         return;
       }
     } else if (this.dom.hudDownedBanner) {

@@ -789,12 +789,14 @@ export class FirstPersonBody {
     }
   }
 
-  triggerFlashlightToggle(isOn) {
+  triggerFlashlightToggle(isOn, silent = false) {
     // Hide or show the physical 3D flashlight mesh in hand
     this.flashlightGroup.visible = isOn;
     this.lensMat.color.setHex(isOn ? 0xfff0c8 : 0x222222);
-    soundEngine.playFlashlightClick(isOn);
-    this.flashlightClickAnim = 0.18;
+    if (!silent) {
+      soundEngine.playFlashlightClick(isOn);
+      this.flashlightClickAnim = 0.18;
+    }
   }
 
   // -------------------------------------------------------------------------

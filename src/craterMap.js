@@ -157,8 +157,9 @@ function createVolcanoTopTexture() {
 }
 
 /**
- * Stratified Volcanic Rock Cliff Side Texture (Requirement 4 & 5: Настоящий кусок вулкана)
- * Rich vertical cliff striations, horizontal basalt layers, and cooled red magma streaks.
+ * Stratified Volcanic Rock Cliff Side Texture (Богатая детальная текстура вулканического базальта и скал)
+ * Глубокая красно-базальтовая основа, горизонтальные геологические пласты пепла и обсидиана,
+ * ветвящиеся светящиеся алые трещины и пористая структура застывшей лавы.
  */
 function createVolcanoSideTexture() {
   const canvas = document.createElement('canvas');
@@ -166,53 +167,161 @@ function createVolcanoSideTexture() {
   canvas.height = 512;
   const ctx = canvas.getContext('2d');
 
-  // Dark jagged rock cliff base
-  ctx.fillStyle = '#141316';
+  // 1. Глубокая вулканическая красно-базальтовая основа
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, 512);
+  bgGrad.addColorStop(0, '#1c070a');
+  bgGrad.addColorStop(0.35, '#2e0a10');
+  bgGrad.addColorStop(0.7, '#180508');
+  bgGrad.addColorStop(1, '#24080d');
+  ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, 512, 512);
 
-  // Horizontal geological strata bands
-  for (let y = 0; y < 512; y += 32) {
-    const bandShade = 18 + Math.floor(Math.random() * 18);
-    ctx.fillStyle = `rgb(${bandShade + 3}, ${bandShade}, ${bandShade + 2})`;
-    ctx.fillRect(0, y, 512, 28 + Math.random() * 6);
+  // 2. Горизонтальные геологические пласты пепла, туфа и застывшей лавы
+  for (let y = 0; y < 512; y += 22) {
+    const bandH = 12 + Math.random() * 16;
+    const isRedBand = (Math.random() < 0.45);
+    if (isRedBand) {
+      ctx.fillStyle = `rgba(${75 + Math.floor(Math.random() * 40)}, ${10 + Math.floor(Math.random() * 15)}, ${18 + Math.floor(Math.random() * 18)}, 0.65)`;
+    } else {
+      const shade = 18 + Math.floor(Math.random() * 18);
+      ctx.fillStyle = `rgba(${shade + 8}, ${shade}, ${shade + 3}, 0.75)`;
+    }
+    ctx.fillRect(0, y, 512, bandH);
   }
 
-  // Vertical cliff crevices & jagged fractures
-  for (let c = 0; c < 28; c++) {
-    ctx.strokeStyle = '#09080a';
-    ctx.lineWidth = 2 + Math.random() * 3.5;
+  // 3. Пористая текстура вулканического туфа (микро-поры и кристаллы)
+  for (let p = 0; p < 600; p++) {
+    const px = Math.random() * 512;
+    const py = Math.random() * 512;
+    const pr = 1.5 + Math.random() * 3.5;
+    const isGlow = (Math.random() < 0.25);
+    ctx.fillStyle = isGlow ? 'rgba(255, 30, 50, 0.4)' : 'rgba(8, 2, 3, 0.6)';
+    ctx.beginPath();
+    ctx.arc(px, py, pr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 4. Вертикальные скальные разломы и трещины
+  for (let c = 0; c < 30; c++) {
+    ctx.strokeStyle = '#080102';
+    ctx.lineWidth = 2.5 + Math.random() * 3.5;
     ctx.beginPath();
     let vx = Math.random() * 512;
     let vy = 0;
     ctx.moveTo(vx, vy);
     while (vy < 512) {
-      vx += (Math.random() - 0.5) * 22;
+      vx += (Math.random() - 0.5) * 25;
       vy += 20 + Math.random() * 35;
       ctx.lineTo(vx, vy);
     }
     ctx.stroke();
   }
 
-  // Glowing cooled red lava veins
-  for (let v = 0; v < 8; v++) {
-    ctx.strokeStyle = 'rgba(255, 30, 45, 0.48)';
-    ctx.lineWidth = 2.0;
+  // 5. Ветвящиеся раскалённые алые лавовые жилы
+  for (let v = 0; v < 14; v++) {
     ctx.beginPath();
     let sx = Math.random() * 512;
     let sy = Math.random() * 512;
     ctx.moveTo(sx, sy);
     for (let s = 0; s < 5; s++) {
-      sx += (Math.random() - 0.5) * 55;
-      sy += (Math.random() - 0.5) * 55;
+      sx += (Math.random() - 0.5) * 80;
+      sy += (Math.random() - 0.5) * 80;
       ctx.lineTo(sx, sy);
     }
+    // Алое свечение
+    ctx.strokeStyle = '#ff1133';
+    ctx.lineWidth = 3.2;
+    ctx.shadowColor = '#ff0033';
+    ctx.shadowBlur = 10;
     ctx.stroke();
+
+    // Горячее светлое ядро
+    ctx.strokeStyle = '#ffa0b5';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
   }
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(2, 1);
+  texture.repeat.set(3, 2);
+  return texture;
+}
+
+/**
+ * Красная местность вокруг вулкана (Outer Volcanic Terrain Texture)
+ * Раскаленная красная вулканическая земля, застывшие лавовые потоки,
+ * паутина горящих алых трещин и каменная багровая пустошь.
+ */
+function createOuterVolcanoTerrainTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // 1. Багровая вулканическая земля
+  const bgGrad = ctx.createRadialGradient(256, 256, 25, 256, 256, 325);
+  bgGrad.addColorStop(0, '#5a0d16');
+  bgGrad.addColorStop(0.35, '#3d080e');
+  bgGrad.addColorStop(0.7, '#240408');
+  bgGrad.addColorStop(1, '#150204');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, 512, 512);
+
+  // 2. Островки застывшего черного и красного базальта
+  for (let i = 0; i < 45; i++) {
+    const px = Math.random() * 512;
+    const py = Math.random() * 512;
+    const rx = 15 + Math.random() * 35;
+    const ry = 10 + Math.random() * 22;
+    const angle = Math.random() * Math.PI;
+    ctx.fillStyle = (Math.random() < 0.5) ? '#180306' : '#2b070d';
+    ctx.beginPath();
+    ctx.ellipse(px, py, rx, ry, angle, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 3. Сеть ветвящихся лавовых рек и горящих красных трещин
+  for (let v = 0; v < 18; v++) {
+    ctx.beginPath();
+    let x = Math.random() * 512;
+    let y = Math.random() * 512;
+    ctx.moveTo(x, y);
+    for (let s = 0; s < 6; s++) {
+      x += (Math.random() - 0.5) * 75;
+      y += (Math.random() - 0.5) * 75;
+      ctx.lineTo(x, y);
+    }
+    // Яркое алое сияние
+    ctx.strokeStyle = '#ff0038';
+    ctx.lineWidth = 3.5;
+    ctx.shadowColor = '#ff0022';
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+
+    // Бело-розовый центр
+    ctx.strokeStyle = '#ff99aa';
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // 4. Пепельная красная рябь и крошка
+  for (let a = 0; a < 600; a++) {
+    const ax = Math.random() * 512;
+    const ay = Math.random() * 512;
+    const ar = 1 + Math.random() * 2.5;
+    ctx.fillStyle = (Math.random() < 0.4) ? 'rgba(255, 60, 80, 0.5)' : 'rgba(15, 3, 5, 0.6)';
+    ctx.beginPath();
+    ctx.arc(ax, ay, ar, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(10, 10);
   return texture;
 }
 
@@ -351,6 +460,7 @@ let cachedCrumbleTop = null;
 let cachedCrumbleSide = null;
 let cachedWoodTop = null;
 let cachedWoodSide = null;
+let cachedOuterTerrain = null;
 
 function getBloodMagmaTexture() {
   if (!cachedBloodMagma) cachedBloodMagma = createBloodMagmaTexture();
@@ -363,6 +473,10 @@ function getVolcanoTopTexture() {
 function getVolcanoSideTexture() {
   if (!cachedVolcanoSide) cachedVolcanoSide = createVolcanoSideTexture();
   return cachedVolcanoSide;
+}
+function getOuterTerrainTexture() {
+  if (!cachedOuterTerrain) cachedOuterTerrain = createOuterVolcanoTerrainTexture();
+  return cachedOuterTerrain;
 }
 function getCrumbleTopTexture() {
   if (!cachedCrumbleTop) cachedCrumbleTop = createCrumbleTopTexture();
@@ -552,9 +666,14 @@ export class CraterMap {
     this.magmaLight.position.set(0, this.magmaLevel + 2.5, 0);
     this.root.add(this.magmaLight);
 
-    // Ambient Volcanic Crimson Glow
-    this.volcanoHemi = new THREE.HemisphereLight(0x280206, 0xff0038, 1.0);
+    // Ambient Bright Red Sky + Volcanic Magma Underglow
+    this.volcanoHemi = new THREE.HemisphereLight(0xff2244, 0x660011, 1.55);
     this.root.add(this.volcanoHemi);
+
+    // Sunlight from bright red volcanic sky
+    this.sunLight = new THREE.DirectionalLight(0xff6655, 1.4);
+    this.sunLight.position.set(25, 65, 18);
+    this.root.add(this.sunLight);
 
     // 3. Dedicated Platform Group for Procedural Regeneration
     this.platformsGroup = new THREE.Group();
@@ -571,6 +690,15 @@ export class CraterMap {
 
     // 7. Geysers
     this.initGeysers();
+
+    // 8. 3D Rescue Helicopter circling in the Red Sky
+    this.buildHelicopter();
+
+    // 9. Procedural Fiery Red Clouds in the Red Sky
+    this.buildSkyClouds();
+
+    // 10. Outer Red Volcanic Terrain surrounding the volcano (Красная местность вокруг вулкана)
+    this.buildOuterVolcanoTerrain();
   }
 
   // --- PLATFORM CREATION HELPER (Multi-material & Crag Underbelly) ---
@@ -904,7 +1032,7 @@ export class CraterMap {
   // 🌋 VOLCANIC ASH & BLOOD-RED RUBY SPARKS (Requirement 1)
   // -------------------------------------------------------------
   initAshParticles() {
-    const particleCount = 180;
+    const particleCount = 45;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const velocities = new Float32Array(particleCount * 3);
@@ -1251,7 +1379,7 @@ export class CraterMap {
     return this.getNextbotSpawnPoint(nearPos);
   }
 
-  update(delta) {
+  update(delta, playerPos = null) {
     if (delta > 0.1) delta = 0.1;
     this.magmaTime += delta;
 
@@ -1262,24 +1390,14 @@ export class CraterMap {
       this.magmaLight.position.y = this.magmaLevel + 2.5;
     }
 
-    // 2. Magma surface 3D bubbling undulation waves
-    if (this.lavaMesh && this.lavaMesh.geometry) {
-      const posAttr = this.lavaMesh.geometry.attributes.position;
-      const count = posAttr.count;
-      const t = this.magmaTime;
-      for (let i = 0; i < count; i++) {
-        const vx = posAttr.getX(i);
-        const vy = posAttr.getY(i);
-        const wave = Math.sin(t * 3.4 + vx * 0.32) * 0.28 +
-                     Math.cos(t * 2.7 + vy * 0.32) * 0.22;
-        posAttr.setZ(i, wave);
-      }
-      posAttr.needsUpdate = true;
+    // 2. Magma surface undulation & animated glowing texture (GPU-friendly, zero CPU vertex recalculation)
+    if (this.lavaMesh) {
+      this.lavaMesh.position.y = this.magmaLevel + Math.sin(this.magmaTime * 2.5) * 0.16;
     }
 
     if (this.lavaMat && this.lavaMat.map) {
-      this.lavaMat.map.offset.x = (this.magmaTime * 0.06) % 1;
-      this.lavaMat.map.offset.y = (this.magmaTime * 0.04) % 1;
+      this.lavaMat.map.offset.x = (this.magmaTime * 0.04) % 1;
+      this.lavaMat.map.offset.y = (this.magmaTime * 0.028) % 1;
       this.lavaMat.emissiveIntensity = 1.1 + Math.sin(this.magmaTime * 4.0) * 0.35;
     }
     this.magmaLight.intensity = 3.8 + Math.sin(this.magmaTime * 6) * 0.9;
@@ -1337,6 +1455,10 @@ export class CraterMap {
       this.vortexMat.opacity = 0.45 + Math.sin(this.magmaTime * 4) * 0.25;
       this.toriiLight.intensity = 2.8 + Math.sin(this.magmaTime * 5) * 0.8;
     }
+
+    // 7. Update Circling Rescue Helicopter & Blue Sky Clouds
+    this.updateHelicopter(delta, playerPos);
+    this.updateClouds(delta);
   }
 
   updateGeysers(delta) {
@@ -1378,9 +1500,511 @@ export class CraterMap {
     this.generateRandomParkour(this.currentSeed);
   }
 
+  // =========================================================================
+  // 🚁 3D RESCUE HELICOPTER IN THE BLUE SKY (ТРЕБОВАНИЕ 3 & 4)
+  // =========================================================================
+
+  buildHelicopter() {
+    this.helicopterGroup = new THREE.Group();
+
+    // 1. Материалы вертолёта (стильный спасательный броне-корпус)
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: 0x1a2436,
+      roughness: 0.35,
+      metalness: 0.65
+    });
+    const cyanAccentMat = new THREE.MeshStandardMaterial({
+      color: 0x00f3ff,
+      emissive: 0x00f3ff,
+      emissiveIntensity: 0.75,
+      roughness: 0.2
+    });
+    const darkMetalMat = new THREE.MeshStandardMaterial({
+      color: 0x111622,
+      roughness: 0.3,
+      metalness: 0.8
+    });
+
+    // 2. Фюзеляж кабины
+    const cabinGeo = new THREE.BoxGeometry(2.2, 1.6, 3.6);
+    const cabin = new THREE.Mesh(cabinGeo, bodyMat);
+    this.helicopterGroup.add(cabin);
+
+    // Неоновые кибер-полосы по бортам
+    const stripeGeo = new THREE.BoxGeometry(2.24, 0.18, 3.64);
+    const stripe = new THREE.Mesh(stripeGeo, cyanAccentMat);
+    this.helicopterGroup.add(stripe);
+
+    // Носовой фонарь кабины (тонированное голубое стекло)
+    const glassMat = new THREE.MeshPhysicalMaterial({
+      color: 0x00f3ff,
+      transparent: true,
+      opacity: 0.7,
+      roughness: 0.1,
+      metalness: 0.15,
+      transmission: 0.75
+    });
+    const noseGeo = new THREE.ConeGeometry(1.05, 1.6, 8);
+    const nose = new THREE.Mesh(noseGeo, glassMat);
+    nose.rotation.x = -Math.PI / 2;
+    nose.position.set(0, -0.1, 2.0);
+    this.helicopterGroup.add(nose);
+
+    // 3. Друг (Mactraher) в открытом бортовом проёме с мегафоном
+    const texLoader = new THREE.TextureLoader();
+    const friendTex = texLoader.load('./assets/mactraher.jpg');
+    const friendMat = new THREE.SpriteMaterial({ map: friendTex });
+    this.friendSprite = new THREE.Sprite(friendMat);
+    this.friendSprite.scale.set(1.3, 1.3, 1);
+    this.friendSprite.position.set(1.18, 0.1, 0.3);
+    this.helicopterGroup.add(this.friendSprite);
+
+    // Мегафон / громкоговоритель в руке друга (расположен ниже уровня лица, в руке у пояса)
+    const megaGroup = new THREE.Group();
+    megaGroup.position.set(1.22, -0.28, 0.50);
+    megaGroup.rotation.set(-0.15, 0.45, -0.25);
+
+    const megaMat = new THREE.MeshStandardMaterial({
+      color: 0xff6600,
+      emissive: 0xff3300,
+      emissiveIntensity: 0.35,
+      roughness: 0.35,
+      metalness: 0.2
+    });
+    const megaBodyMat = new THREE.MeshStandardMaterial({
+      color: 0xf0f0f0,
+      roughness: 0.4,
+      metalness: 0.3
+    });
+    const handleMat = new THREE.MeshStandardMaterial({
+      color: 0x111622,
+      roughness: 0.6,
+      metalness: 0.8
+    });
+
+    // Раструб мегафона (компактный и реалистичный, диаметр 20 см)
+    const bellGeo = new THREE.ConeGeometry(0.11, 0.26, 12, 1, true);
+    const bell = new THREE.Mesh(bellGeo, megaMat);
+    bell.rotation.z = Math.PI / 2;
+    bell.position.set(0.13, 0, 0);
+    megaGroup.add(bell);
+
+    // Цилиндрический корпус динамика
+    const bodyGeo = new THREE.CylinderGeometry(0.055, 0.055, 0.14, 12);
+    const body = new THREE.Mesh(bodyGeo, megaBodyMat);
+    body.rotation.z = Math.PI / 2;
+    body.position.set(-0.06, 0, 0);
+    megaGroup.add(body);
+
+    // Рукоятка
+    const handleGeo = new THREE.BoxGeometry(0.035, 0.12, 0.045);
+    const handle = new THREE.Mesh(handleGeo, handleMat);
+    handle.position.set(-0.04, -0.09, 0);
+    megaGroup.add(handle);
+
+    this.helicopterGroup.add(megaGroup);
+
+    // 4. Хвостовая балка
+    const tailBoomGeo = new THREE.CylinderGeometry(0.25, 0.42, 5.0, 8);
+    const tailBoom = new THREE.Mesh(tailBoomGeo, bodyMat);
+    tailBoom.rotation.x = Math.PI / 2;
+    tailBoom.position.set(0, 0.4, -3.8);
+    this.helicopterGroup.add(tailBoom);
+
+    // Вертикальный стабилизатор (хвостовой киль)
+    const finGeo = new THREE.BoxGeometry(0.14, 1.5, 1.0);
+    const fin = new THREE.Mesh(finGeo, bodyMat);
+    fin.position.set(0, 1.0, -6.1);
+    this.helicopterGroup.add(fin);
+
+    // 5. Несущий винт (4 лопасти)
+    this.mainRotorGroup = new THREE.Group();
+    this.mainRotorGroup.position.set(0, 1.15, 0.2);
+
+    const mastGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8);
+    const mast = new THREE.Mesh(mastGeo, darkMetalMat);
+    this.mainRotorGroup.add(mast);
+
+    const bladeGeo = new THREE.BoxGeometry(0.22, 0.04, 7.8);
+    const blade1 = new THREE.Mesh(bladeGeo, darkMetalMat);
+    const blade2 = new THREE.Mesh(bladeGeo, darkMetalMat);
+    blade2.rotation.y = Math.PI / 2;
+    this.mainRotorGroup.add(blade1);
+    this.mainRotorGroup.add(blade2);
+    this.helicopterGroup.add(this.mainRotorGroup);
+
+    // 6. Хвостовой рулевой винт
+    this.tailRotorGroup = new THREE.Group();
+    this.tailRotorGroup.position.set(0.15, 1.35, -6.1);
+    const tBladeGeo = new THREE.BoxGeometry(0.08, 1.4, 0.03);
+    const tBlade = new THREE.Mesh(tBladeGeo, darkMetalMat);
+    this.tailRotorGroup.add(tBlade);
+    this.helicopterGroup.add(this.tailRotorGroup);
+
+    // 7. Посадочные лыжи (шасси)
+    const skidGeo = new THREE.CylinderGeometry(0.06, 0.06, 3.8, 8);
+    [-0.9, 0.9].forEach((x) => {
+      const skid = new THREE.Mesh(skidGeo, darkMetalMat);
+      skid.rotation.x = Math.PI / 2;
+      skid.position.set(x, -1.05, 0);
+      this.helicopterGroup.add(skid);
+
+      const strutGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.7, 6);
+      const strutF = new THREE.Mesh(strutGeo, darkMetalMat);
+      strutF.position.set(x, -0.7, 1.0);
+      strutF.rotation.z = (x > 0) ? -0.25 : 0.25;
+      const strutB = new THREE.Mesh(strutGeo, darkMetalMat);
+      strutB.position.set(x, -0.7, -1.0);
+      strutB.rotation.z = (x > 0) ? -0.25 : 0.25;
+      this.helicopterGroup.add(strutF);
+      this.helicopterGroup.add(strutB);
+    });
+
+    // 8. Физический бортовой поисковый прожектор на вертолёте (Gimbal Searchlight / Nightsun)
+    this.searchPod = new THREE.Group();
+    // Монтируется под носом вертолёта (источник физически расположен на вертолёте)
+    this.searchPod.position.set(0, -0.85, 1.75);
+    this.helicopterGroup.add(this.searchPod);
+
+    // Кронштейн крепления к фюзеляжу
+    const mountGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.22, 8);
+    const mountMat = new THREE.MeshStandardMaterial({ color: 0x111622, roughness: 0.6, metalness: 0.8 });
+    const mount = new THREE.Mesh(mountGeo, mountMat);
+    mount.position.set(0, 0.11, 0);
+    this.searchPod.add(mount);
+
+    // Двухосевой моторизованный шарнирный гимбал (автономно наводится на зону поиска)
+    this.searchGimbal = new THREE.Group();
+    this.searchGimbal.position.set(0, 0, 0);
+    this.searchPod.add(this.searchGimbal);
+
+    // Цилиндрический корпус прожектора с радиаторными рёбрами
+    const barrelGeo = new THREE.CylinderGeometry(0.20, 0.22, 0.32, 14);
+    barrelGeo.rotateX(Math.PI / 2); // ориентирован вдоль оси луча +Z
+    const barrelMat = new THREE.MeshStandardMaterial({
+      color: 0x1e2430,
+      metalness: 0.85,
+      roughness: 0.3
+    });
+    const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+    this.searchGimbal.add(barrel);
+
+    // Яркая светящаяся фронтальная линза прожектора
+    const lensGeo = new THREE.CircleGeometry(0.20, 16);
+    const lensMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    this.searchLens = new THREE.Mesh(lensGeo, lensMat);
+    this.searchLens.position.set(0, 0, 0.165);
+    this.searchGimbal.add(this.searchLens);
+
+    // Ореол яркого свечения прожектора при взгляде на вертолёт снизу
+    const flareGeo = new THREE.PlaneGeometry(1.4, 1.4);
+    const flareMat = new THREE.MeshBasicMaterial({
+      color: 0xe6f3ff,
+      transparent: true,
+      opacity: 0.65,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const flareMesh = new THREE.Mesh(flareGeo, flareMat);
+    flareMesh.position.set(0, 0, 0.17);
+    this.searchGimbal.add(flareMesh);
+
+    // Реальный мощный бортовой прожектор (сфокусированный узкий поисковый луч, освещающий 3D-рельеф кратера)
+    this.heliSearchlight = new THREE.SpotLight(0xf2f7ff, 12.0, 150, Math.PI / 24, 0.45, 0);
+    this.heliSearchlight.position.set(0, 0, 0.18);
+    this.searchGimbal.add(this.heliSearchlight);
+
+    // Цель прожектора в мировом пространстве кратера (перемещается по траектории поиска)
+    this.heliSearchTarget = new THREE.Object3D();
+    this.heliSearchTarget.position.set(0, 2.5, 16);
+    this.root.add(this.heliSearchTarget);
+    this.heliSearchlight.target = this.heliSearchTarget;
+
+    // Атмосферный объёмный луч света (вершина строго на вертолёте, основание расширяется к земле)
+    const beamGeo = new THREE.ConeGeometry(1.0, 1.0, 32, 1, true);
+    // 1. Сдвигаем геометрию: вершина (источник) в (0, 0, 0), основание в (0, -1, 0)
+    beamGeo.translate(0, -0.5, 0);
+    // 2. Поворачиваем вокруг X на -90°: основание раскрывается вдоль локальной оси +Z к земле
+    beamGeo.rotateX(-Math.PI / 2);
+    beamGeo.computeVertexNormals();
+
+    const beamMat = new THREE.ShaderMaterial({
+      uniforms: {
+        beamColor: { value: new THREE.Color(0xd6eeff) },
+        beamOpacity: { value: 0.22 }
+      },
+      vertexShader: `
+        varying vec3 vLocalPos;
+        varying vec3 vNormalVec;
+        varying vec3 vViewDir;
+        void main() {
+          vLocalPos = position;
+          vNormalVec = normalize(normalMatrix * normal);
+          vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+          vViewDir = normalize(-mvPos.xyz);
+          gl_Position = projectionMatrix * mvPos;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 beamColor;
+        uniform float beamOpacity;
+        varying vec3 vLocalPos;
+        varying vec3 vNormalVec;
+        varying vec3 vViewDir;
+        void main() {
+          // vLocalPos.z: 0.0 у линзы вертолёта -> 1.0 у поверхности земли
+          float z = clamp(vLocalPos.z, 0.0, 1.0);
+
+          // Реалистичное затухание в атмосфере: насыщенный свет у прожектора, мягкое рассеяние в воздухе
+          float lenFade = pow(1.0 - z * 0.65, 1.4);
+
+          // Плавное растворение у земли без искусственных резких срезов геометрии
+          lenFade *= smoothstep(1.0, 0.82, z);
+
+          // Мягкая воздушная дымка пепла по краям луча (без жестких пластиковых граней)
+          float rim = 0.35 + 0.65 * pow(max(0.0, 1.0 - abs(dot(vNormalVec, vViewDir))), 1.4);
+
+          float finalAlpha = beamOpacity * lenFade * rim;
+          gl_FragColor = vec4(beamColor, finalAlpha);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    this.searchBeamMesh = new THREE.Mesh(beamGeo, beamMat);
+    this.root.add(this.searchBeamMesh);
+
+    // Параметры круговой траектории в голубом небе
+    this.helicopterGroup.scale.set(1.45, 1.45, 1.45);
+    this.heliAngle = 0;
+    this.heliRadius = 32;
+    this.heliAltitude = 48;
+
+    this.root.add(this.helicopterGroup);
+  }
+
+  updateHelicopter(delta, playerPos = null) {
+    if (!this.helicopterGroup) return;
+
+    // 1. Круговая траектория полёта вертолёта в небе над кратером
+    this.heliAngle += delta * 0.32;
+
+    const x = Math.cos(this.heliAngle) * this.heliRadius;
+    const z = Math.sin(this.heliAngle) * this.heliRadius;
+    const y = this.heliAltitude + Math.sin(this.heliAngle * 2.5) * 1.8;
+
+    this.helicopterGroup.position.set(x, y, z);
+    // Нос направлен по касательной к окружности
+    this.helicopterGroup.rotation.y = -this.heliAngle - Math.PI / 2;
+    // Наклон корпуса внутрь виража (крен)
+    this.helicopterGroup.rotation.z = -0.16;
+
+    // Вращение несущего и хвостового винтов
+    if (this.mainRotorGroup) {
+      this.mainRotorGroup.rotation.y += delta * 38;
+    }
+    if (this.tailRotorGroup) {
+      this.tailRotorGroup.rotation.x += delta * 48;
+    }
+
+    // 2. РЕАЛИСТИЧНОЕ АВТОНОМНОЕ ПЕРЕМЕЩЕНИЕ БОРТОВОГО ПРОЖЕКТОРА
+    this.searchTime = (this.searchTime || 0) + delta;
+    const st = this.searchTime;
+
+    // Вычисляем траекторию поискового луча:
+    // Широкие дуги сканирования по секторам кратера и периодическое наведение на игрока
+    let targetX, targetY, targetZ;
+    const cycle = st % 12;
+    if (playerPos && cycle > 7.5 && cycle < 11.0) {
+      const blend = Math.sin(((cycle - 7.5) / 3.5) * Math.PI);
+      const sweepX = Math.cos(st * 0.4) * 16 + Math.sin(st * 1.2) * 5;
+      const sweepZ = Math.sin(st * 0.35) * 16 + Math.cos(st * 0.9) * 5;
+      targetX = THREE.MathUtils.lerp(sweepX, playerPos.x, blend * 0.85);
+      targetZ = THREE.MathUtils.lerp(sweepZ, playerPos.z, blend * 0.85);
+      targetY = THREE.MathUtils.lerp(3.5, playerPos.y, blend);
+    } else {
+      const sweepRadius = 14 + Math.sin(st * 0.38) * 8.5;
+      const sweepAngle = st * 0.62 + Math.sin(st * 1.3) * 0.45;
+      targetX = Math.cos(sweepAngle) * sweepRadius;
+      targetZ = Math.sin(sweepAngle) * sweepRadius;
+      targetY = 2.5 + Math.sin(st * 0.75) * 3.5;
+    }
+
+    // Обновляем позицию цели прожектора в мире
+    if (this.heliSearchTarget) {
+      this.heliSearchTarget.position.set(targetX, targetY, targetZ);
+      this.heliSearchTarget.updateMatrixWorld(true);
+    }
+
+    // 3. Поворот гимбала прожектора на вертолете прямо к точке сканирования
+    if (this.searchGimbal && this.searchPod) {
+      const targetWorld = new THREE.Vector3(targetX, targetY, targetZ);
+      const gimbalWorld = this.searchGimbal.getWorldPosition(new THREE.Vector3());
+      const m = new THREE.Matrix4().lookAt(targetWorld, gimbalWorld, new THREE.Vector3(0, 1, 0));
+      const qWorld = new THREE.Quaternion().setFromRotationMatrix(m);
+      const podWorldQ = this.searchPod.getWorldQuaternion(new THREE.Quaternion());
+      this.searchGimbal.quaternion.copy(podWorldQ.clone().invert().multiply(qWorld));
+    }
+
+    // 4. Ориентация и масштабирование объёмного светового луча от вертолета к земле
+    if (this.searchBeamMesh && this.searchLens) {
+      const lampWorld = new THREE.Vector3();
+      this.searchLens.getWorldPosition(lampWorld);
+
+      const targetPos = this.heliSearchTarget.position;
+      const dist = lampWorld.distanceTo(targetPos);
+
+      // Вершина конуса строго фиксирована у линзы прожектора на вертолёте
+      this.searchBeamMesh.position.copy(lampWorld);
+      // Ось +Z направлена прямо в точку падения света на поверхности
+      this.searchBeamMesh.lookAt(targetPos);
+
+      // Основание конуса расширяется навстречу земле в соответствии с узким углом раскрытия SpotLight
+      const spotAngle = (this.heliSearchlight ? this.heliSearchlight.angle : Math.PI / 24);
+      const radiusAtTarget = Math.tan(spotAngle) * dist;
+
+      this.searchBeamMesh.scale.set(radiusAtTarget, radiusAtTarget, dist);
+    }
+  }
+
+  // =========================================================================
+  // ☁️ ГРОЗОВЫЕ ПЕПЕЛЬНЫЕ ОБЛАКА В КРАСНОМ НЕБЕ ВУЛКАНА
+  // =========================================================================
+
+  buildSkyClouds() {
+    this.cloudsGroup = new THREE.Group();
+    // Красно-пепельный оттенок дымовых облаков (MeshBasicMaterial для максимального FPS)
+    const cloudMat = new THREE.MeshBasicMaterial({
+      color: 0x8a1525,
+      transparent: true,
+      opacity: 0.65,
+      depthWrite: false
+    });
+
+    const cloudPuffGeo = new THREE.DodecahedronGeometry(6.5, 1);
+
+    for (let c = 0; c < 6; c++) {
+      const cluster = new THREE.Group();
+      const angle = (c / 6) * Math.PI * 2;
+      const dist = 45 + (c % 3) * 15;
+      const cx = Math.cos(angle) * dist;
+      const cz = Math.sin(angle) * dist;
+      const cy = 68 + (c % 4) * 5;
+
+      for (let p = 0; p < 3; p++) {
+        const puff = new THREE.Mesh(cloudPuffGeo, cloudMat);
+        puff.position.set(
+          (Math.random() - 0.5) * 10,
+          (Math.random() - 0.5) * 4,
+          (Math.random() - 0.5) * 10
+        );
+        const scale = 0.7 + Math.random() * 0.6;
+        puff.scale.set(scale * 1.4, scale * 0.7, scale * 1.2);
+        cluster.add(puff);
+      }
+
+      cluster.position.set(cx, cy, cz);
+      this.cloudsGroup.add(cluster);
+    }
+
+    this.root.add(this.cloudsGroup);
+  }
+
+  updateClouds(delta) {
+    if (this.cloudsGroup) {
+      this.cloudsGroup.rotation.y += delta * 0.012;
+    }
+  }
+
+  // =========================================================================
+  // 🌋 КРАСНАЯ МЕСТНОСТЬ ВОКРУГ ВУЛКАНА (ТРЕБОВАНИЕ 5)
+  // Внешние склоны конуса вулкана, багровая равнина с лавой и скальные пики
+  // =========================================================================
+
+  buildOuterVolcanoTerrain() {
+    this.outerTerrainGroup = new THREE.Group();
+
+    const outerMat = new THREE.MeshStandardMaterial({
+      map: getOuterTerrainTexture(),
+      roughness: 0.88,
+      metalness: 0.15,
+      side: THREE.FrontSide
+    });
+
+    // 1. Внешний конус вулкана: скалистые склоны, спускающиеся от жерла (R=34м, Y=38м) до подножия (R=115м, Y=0м)
+    const coneGeo = new THREE.CylinderGeometry(
+      this.calderaRadius * 1.08, // верх (край кальдеры)
+      115,                      // низ (подножие вулкана)
+      this.calderaHeight,       // высота
+      36,
+      3,
+      true                      // открытый цилиндр
+    );
+    // Добавляем процедурные неровности и гребни на склонах вулкана
+    const posAttr = coneGeo.attributes.position;
+    for (let i = 0; i < posAttr.count; i++) {
+      const y = posAttr.getY(i);
+      if (y < this.calderaHeight / 2 - 2) {
+        const factor = 1.0 + (Math.sin(posAttr.getX(i) * 0.12) * Math.cos(posAttr.getZ(i) * 0.12)) * 0.09;
+        posAttr.setX(i, posAttr.getX(i) * factor);
+        posAttr.setZ(i, posAttr.getZ(i) * factor);
+      }
+    }
+    coneGeo.computeVertexNormals();
+
+    const outerCone = new THREE.Mesh(coneGeo, outerMat);
+    outerCone.position.set(0, this.calderaHeight / 2, 0);
+    this.outerTerrainGroup.add(outerCone);
+
+    // 2. Огромная красная вулканическая равнина вокруг вулкана (R=35м .. 280м)
+    const groundGeo = new THREE.RingGeometry(this.calderaRadius * 1.05, 280, 48, 8);
+    const groundMesh = new THREE.Mesh(groundGeo, outerMat);
+    groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.position.set(0, 0.05, 0);
+    this.outerTerrainGroup.add(groundMesh);
+
+    // 3. Кольцо дальних остроконечных красных скал и пиков на горизонте
+    const peakGeo = new THREE.ConeGeometry(14, 46, 6);
+    const peakMat = new THREE.MeshStandardMaterial({
+      map: getVolcanoSideTexture(),
+      roughness: 0.9,
+      metalness: 0.1
+    });
+
+    for (let p = 0; p < 22; p++) {
+      const angle = (p / 22) * Math.PI * 2 + (Math.random() - 0.5) * 0.15;
+      const dist = 135 + (p % 3) * 30 + Math.random() * 25;
+      const px = Math.cos(angle) * dist;
+      const pz = Math.sin(angle) * dist;
+      const scaleH = 0.85 + Math.random() * 0.85;
+      const scaleW = 0.9 + Math.random() * 0.7;
+
+      const peak = new THREE.Mesh(peakGeo, peakMat);
+      peak.position.set(px, 20 * scaleH, pz);
+      peak.scale.set(scaleW, scaleH, scaleW);
+      peak.rotation.y = Math.random() * Math.PI * 2;
+      this.outerTerrainGroup.add(peak);
+    }
+
+    this.root.add(this.outerTerrainGroup);
+  }
+
   destroy() {
-    if (this.root && this.root.parent) {
-      this.root.parent.remove(this.root);
+    if (this.root) {
+      this.root.traverse((child) => {
+        if (child.isMesh) {
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) {
+            if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
+            else child.material.dispose();
+          }
+        }
+      });
+      if (this.root.parent) {
+        this.root.parent.remove(this.root);
+      }
     }
   }
 }

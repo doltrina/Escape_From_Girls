@@ -35,12 +35,15 @@ export class NetworkManager {
     this.onGameRestarted = null;
     this.onChatMessage = null;
     this.onHostMigrated = null;
+    this.onKicked = null;
     this.onError = null;
     this.isConnecting = false;
 
     // Session Synchronization
     this.roomSeed = null;
     this.mapType = 'crater';
+    this.isPublic = false;
+    this.kickTimeoutSec = null;
     this.onParkourStart = null;
     this.onMapTypeChanged = null;
   }
@@ -90,7 +93,9 @@ export class NetworkManager {
           type: 'join_room',
           roomId: this.roomId,
           name: this.playerName,
+          playerName: this.playerName,
           color: this.playerColor,
+          playerColor: this.playerColor,
           mapType: this.mapType
         });
       };
@@ -163,10 +168,22 @@ export class NetworkManager {
         this.playerId = msg.playerId;
         this.roomId = msg.roomId;
         this.isHost = msg.isHost;
+        this.isPublic = !!msg.isPublic;
+        this.kickTimeoutSec = msg.kickTimeoutSec;
         this.players = msg.players || [];
         this.roomSeed = msg.seed;
+        // Sync local name with server-assigned unique name
+        const myInfo = this.players.find(p => p.id === this.playerId);
+        if (myInfo && myInfo.name) {
+          this.playerName = myInfo.name;
+        }
         if (msg.mapType) this.mapType = msg.mapType;
         if (this.onRoomJoined) this.onRoomJoined(msg);
+        break;
+
+      case 'kicked':
+        if (this.onKicked) this.onKicked(msg.reason);
+        this.disconnect();
         break;
 
       case 'player_joined':
@@ -181,10 +198,11 @@ export class NetworkManager {
 
       case 'player_ready_changed':
         this.players = msg.players || [];
-        if (this.onPlayerReadyChanged) this.onPlayerReadyChanged(msg.playerId, msg.ready, this.players);
+        if (this.onPlayerReadyChanged) this.onPlayerReadyChanged(msg);
         break;
 
       case 'game_started':
+        console.log('[Multiplayer] Received game_started message from server:', msg);
         this.players = msg.players || [];
         if (msg.seed !== undefined) this.roomSeed = msg.seed;
         if (msg.mapType) this.mapType = msg.mapType;
@@ -252,6 +270,20 @@ export class NetworkManager {
       case 'game_restarted':
         this.players = msg.players || [];
         if (this.onGameRestarted) this.onGameRestarted(msg);
+        break;
+
+      case 'player_ready_changed':
+        this.players = msg.players || this.players;
+        if (this.onPlayerReadyChanged) this.onPlayerReadyChanged(msg);
+        break;
+
+      case 'player_eliminated':
+        if (this.onPlayerEliminated) this.onPlayerEliminated(msg);
+        break;
+
+      case 'room_reset_lobby':
+        this.players = msg.players || [];
+        if (this.onRoomResetLobby) this.onRoomResetLobby(msg);
         break;
 
       case 'chat_message':
@@ -354,6 +386,14 @@ export class NetworkManager {
       type: 'player_revived',
       targetId,
       reviverName
+    });
+  }
+
+  sendPlayerEliminated(reason = 'eliminated') {
+    this.send({
+      type: 'player_eliminated',
+      playerName: this.playerName,
+      reason
     });
   }
 

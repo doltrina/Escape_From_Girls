@@ -18,6 +18,7 @@ export class RemotePlayer {
     this.color = new THREE.Color(this.colorHex);
 
     this.isDowned = false;
+    this.isDead = false;
     this.shieldActive = false;
     this.flashlightOn = true;
 
@@ -322,37 +323,55 @@ export class RemotePlayer {
     this.bodyGroup.add(this.rightLegPivot);
 
     // -----------------------------------------------------------------------
-    // 5. LEFT ARM (Swings Naturally with Strides)
+    // 5. LEFT ARM (Raised Forward in Ready Posture, matching First-Person view!)
     // -----------------------------------------------------------------------
+    const elbowGeo = new THREE.SphereGeometry(0.048, 12, 10);
+    const wristRingGeo = new THREE.TorusGeometry(0.042, 0.008, 8, 16);
+    const handGeo = new THREE.BoxGeometry(0.05, 0.07, 0.09);
+
     this.leftArmPivot = new THREE.Group();
     this.leftArmPivot.position.set(-0.24, 1.46, 0.02);
 
-    const armUpperGeo = new THREE.CylinderGeometry(0.046, 0.056, 0.26, 12);
-    armUpperGeo.translate(0, -0.13, 0);
-    const leftUpperArm = new THREE.Mesh(armUpperGeo, this.sleeveMat);
-    this.leftArmPivot.add(leftUpperArm);
+    const leftUpperArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.054, 0.22, 12), this.sleeveMat);
+    leftUpperArmMesh.rotation.x = -Math.PI / 4.5;
+    leftUpperArmMesh.position.set(-0.01, -0.09, -0.07);
+    this.leftArmPivot.add(leftUpperArmMesh);
 
-    const elbowGeo = new THREE.SphereGeometry(0.048, 10, 8);
     const leftElbow = new THREE.Mesh(elbowGeo, this.collarMat);
-    leftElbow.position.set(0, -0.26, 0);
+    leftElbow.position.set(-0.01, -0.17, -0.14);
     this.leftArmPivot.add(leftElbow);
 
-    const armForeGeo = new THREE.CylinderGeometry(0.038, 0.046, 0.24, 12);
-    armForeGeo.translate(0, -0.12, 0);
-    const leftForearm = new THREE.Mesh(armForeGeo, this.sleeveMat);
-    leftForearm.position.set(0, -0.26, 0);
-    this.leftArmPivot.add(leftForearm);
+    const leftForearmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.046, 0.22, 12), this.sleeveMat);
+    leftForearmMesh.rotation.x = -Math.PI / 2.2;
+    leftForearmMesh.position.set(0.0, -0.14, -0.24);
+    this.leftArmPivot.add(leftForearmMesh);
 
-    const wristRingGeo = new THREE.TorusGeometry(0.044, 0.006, 8, 16);
     const leftWrist = new THREE.Mesh(wristRingGeo, this.cyberAccentMat);
     leftWrist.rotation.x = Math.PI / 2;
-    leftWrist.position.set(0, -0.48, 0);
+    leftWrist.position.set(0.0, -0.12, -0.34);
     this.leftArmPivot.add(leftWrist);
 
-    const handGeo = new THREE.BoxGeometry(0.065, 0.06, 0.08);
     const leftHand = new THREE.Mesh(handGeo, this.skinMat);
-    leftHand.position.set(0, -0.52, 0);
+    leftHand.position.set(0.0, -0.11, -0.38);
     this.leftArmPivot.add(leftHand);
+
+    // Tactical cyber communicator on left wrist (matching cyber suit theme)
+    const commGeo = new THREE.BoxGeometry(0.042, 0.018, 0.048);
+    const commMat = new THREE.MeshStandardMaterial({
+      color: 0x141822,
+      metalness: 0.8,
+      roughness: 0.3
+    });
+    const commMesh = new THREE.Mesh(commGeo, commMat);
+    commMesh.position.set(-0.02, -0.11, -0.32);
+    this.leftArmPivot.add(commMesh);
+
+    const screenGeo = new THREE.PlaneGeometry(0.028, 0.032);
+    const screenMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
+    const screenMesh = new THREE.Mesh(screenGeo, screenMat);
+    screenMesh.rotation.x = -Math.PI / 2;
+    screenMesh.position.set(-0.02, -0.099, -0.32);
+    this.leftArmPivot.add(screenMesh);
 
     this.bodyGroup.add(this.leftArmPivot);
 
@@ -467,7 +486,13 @@ export class RemotePlayer {
 
     // Border in player color
     ctx.lineWidth = 6;
-    ctx.strokeStyle = this.isDowned ? '#ff0044' : this.colorHex;
+    if (this.isDead) {
+      ctx.strokeStyle = '#666666';
+    } else if (this.isDowned) {
+      ctx.strokeStyle = '#ff0044';
+    } else {
+      ctx.strokeStyle = this.colorHex;
+    }
     ctx.stroke();
 
     // Name text
@@ -476,10 +501,27 @@ export class RemotePlayer {
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 36px sans-serif';
 
-    const displayName = this.isDowned ? `🆘 ${this.name} [НУЖНА ПОМОЩЬ!]` : `🛡️ ${this.name}`;
+    let displayName = `🛡️ ${this.name}`;
+    if (this.isDead) {
+      displayName = `💀 ${this.name} [ПОТЕРЯН]`;
+    } else if (this.isDowned) {
+      displayName = `🆘 ${this.name} [НУЖНА ПОМОЩЬ!]`;
+    }
     ctx.fillText(displayName, 256, 64);
 
     this.nameTexture.needsUpdate = true;
+  }
+
+  setEliminated(dead = true) {
+    this.isDead = dead;
+    this.isDowned = dead;
+    this.updateNameplateText();
+    if (this.isDead) {
+      this.bodyGroup.rotation.z = Math.PI / 2;
+      this.bodyGroup.position.y = -0.4;
+      this.nameplateSprite.position.y = 0.8;
+      if (this.downedBeacon) this.downedBeacon.material.opacity = 0;
+    }
   }
 
   initShieldAura() {
@@ -550,6 +592,8 @@ export class RemotePlayer {
       this.bodyGroup.rotation.z = Math.PI / 2;
       this.bodyGroup.position.y = 0.2;
       this.nameplateSprite.position.y = 1.2;
+      if (this.rightArmPivot) this.rightArmPivot.rotation.x = 0;
+      if (this.leftArmPivot) this.leftArmPivot.rotation.x = 0;
     } else {
       this.bodyGroup.rotation.z = 0;
       this.bodyGroup.position.y = 0;
@@ -568,20 +612,34 @@ export class RemotePlayer {
       this.headPivot.rotation.x = this.targetPitch;
     }
 
-    // 3. Right Arm Aiming & Flashlight Orientation
-    if (this.rightArmPivot && !this.isDowned) {
-      if (this.flashlightOn) {
-        // Arm points forward and tilts directly with player pitch!
-        this.rightArmPivot.rotation.x = this.targetPitch;
-        this.flashlightGroup.visible = true;
-        this.spotLight.visible = true;
-      } else {
-        // Flashlight stowed: hide light and let arm swing with walking
-        this.flashlightGroup.visible = false;
-        this.spotLight.visible = false;
-        const swingSpeed = this.isSprinting ? 14 : 9;
-        const armSwing = this.isMoving ? Math.sin(this.animTimer) * 0.6 : 0;
-        this.rightArmPivot.rotation.x = THREE.MathUtils.lerp(this.rightArmPivot.rotation.x, armSwing, 12 * delta);
+    // 3. Both Arms Aiming & Pitch Orientation (Both arms raised forward, matching first-person view!)
+    if (!this.isDowned) {
+      const animSpeed = this.isSprinting ? 14 : 9;
+      if (this.isMoving) {
+        this.animTimer += delta * animSpeed;
+      }
+
+      // Subtle athletic bobbing when walking/sprinting (matching first-person hand sway)
+      const armBobR = this.isMoving ? Math.sin(this.animTimer) * (this.isSprinting ? 0.08 : 0.04) : 0;
+      const armBobL = this.isMoving ? -Math.sin(this.animTimer) * (this.isSprinting ? 0.08 : 0.04) : 0;
+
+      // Both arms stay raised forward and tilt naturally with the player's pitch
+      if (this.rightArmPivot) {
+        this.rightArmPivot.rotation.x = THREE.MathUtils.lerp(
+          this.rightArmPivot.rotation.x,
+          this.targetPitch + armBobR,
+          18 * delta
+        );
+        if (this.flashlightGroup) this.flashlightGroup.visible = this.flashlightOn;
+        if (this.spotLight) this.spotLight.visible = this.flashlightOn;
+      }
+
+      if (this.leftArmPivot) {
+        this.leftArmPivot.rotation.x = THREE.MathUtils.lerp(
+          this.leftArmPivot.rotation.x,
+          this.targetPitch + armBobL,
+          18 * delta
+        );
       }
     }
 
@@ -605,18 +663,14 @@ export class RemotePlayer {
       this.downedBeacon.rotation.y += delta * 1.5;
     }
 
-    // 7. Walking / Running leg and left arm swing animation
+    // 7. Walking / Running leg animation
     if (this.isMoving && !this.isDowned) {
-      const animSpeed = this.isSprinting ? 14 : 9;
-      this.animTimer += delta * animSpeed;
-      const legSwing = Math.sin(this.animTimer) * 0.6;
+      const legSwing = Math.sin(this.animTimer) * (this.isSprinting ? 0.65 : 0.42);
       this.leftLegPivot.rotation.x = legSwing;
       this.rightLegPivot.rotation.x = -legSwing;
-      this.leftArmPivot.rotation.x = -legSwing * 0.7;
     } else if (!this.isDowned) {
       this.leftLegPivot.rotation.x = THREE.MathUtils.lerp(this.leftLegPivot.rotation.x, 0, 10 * delta);
       this.rightLegPivot.rotation.x = THREE.MathUtils.lerp(this.rightLegPivot.rotation.x, 0, 10 * delta);
-      this.leftArmPivot.rotation.x = THREE.MathUtils.lerp(this.leftArmPivot.rotation.x, 0, 10 * delta);
     }
   }
 

@@ -164,6 +164,18 @@ export class Player {
     }
   }
 
+  setFlashlightState(on, silent = false) {
+    this.flashlightOn = !!on;
+    if (this.flashlight) {
+      this.flashlight.intensity = this.flashlightOn ? 2.5 : 0;
+    }
+    if (this.fpBody && typeof this.fpBody.triggerFlashlightToggle === 'function') {
+      this.fpBody.triggerFlashlightToggle(this.flashlightOn, silent);
+    } else if (!silent) {
+      soundEngine.playFlashlightClick(this.flashlightOn);
+    }
+  }
+
   setupInputs() {
     // Pointer lock request
     this.domElement.addEventListener('click', () => {
@@ -244,6 +256,7 @@ export class Player {
             this.verticalVelocity = this.jumpForce;
             this.isGrounded = false;
             this.canDoubleJump = true;
+            soundEngine.playJump();
           } else if (!this.isGrounded && !this.isDowned && this.canDoubleJump) {
             // Monster Energy allows double jump in mid-air
             if (this.speedBoostTimeRemaining > 0) {
@@ -499,6 +512,9 @@ export class Player {
       this.position.y += this.verticalVelocity * delta;
 
       if (this.position.y <= groundY) {
+        if (this.verticalVelocity < -3.5) {
+          soundEngine.playLand(Math.abs(this.verticalVelocity));
+        }
         this.position.y = groundY;
         this.verticalVelocity = 0;
         this.isGrounded = true;

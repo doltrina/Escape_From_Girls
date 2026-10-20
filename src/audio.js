@@ -732,6 +732,147 @@ class SoundEngine {
     osc.stop(now + 0.26);
   }
 
+  // 👟 Прыжок игрока (упругий толчок кроссовок о поверхность)
+  playJump() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(140, now);
+    osc.frequency.exponentialRampToValueAtTime(380, now + 0.12);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(800, now);
+
+    gain.gain.setValueAtTime(0.01, now);
+    gain.gain.linearRampToValueAtTime(0.28, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.15);
+  }
+
+  // 🥾 Приземление игрока на камень/пол (сочный глухой удар стопы и шелест подошвы)
+  playLand(speed = 6) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const intensity = Math.min(0.65, Math.max(0.18, (speed / 14) * 0.55));
+
+    // Глухой басовый удар стопы
+    const thud = this.ctx.createOscillator();
+    const thudGain = this.ctx.createGain();
+    thud.type = 'sine';
+    thud.frequency.setValueAtTime(110, now);
+    thud.frequency.exponentialRampToValueAtTime(35, now + 0.15);
+
+    thudGain.gain.setValueAtTime(intensity, now);
+    thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+    thud.connect(thudGain);
+    thudGain.connect(this.masterGain);
+    thud.start(now);
+    thud.stop(now + 0.18);
+
+    // Шуршание подошвы о камень
+    const bufferSize = Math.floor(this.ctx.sampleRate * 0.12);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+    }
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(380, now);
+
+    const noiseGain = this.ctx.createGain();
+    noiseGain.gain.setValueAtTime(intensity * 0.6, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(this.masterGain);
+    noise.start(now);
+  }
+
+  // ✨ Подбор артефакта / щита (RTX 5090, энергетик, дакимакура, D20)
+  playItemPickup() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const notes = [587.33, 739.99, 880, 1174.66]; // D5, F#5, A5, D6
+    notes.forEach((freq, idx) => {
+      const start = now + idx * 0.035;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+
+      gain.gain.setValueAtTime(0.001, start);
+      gain.gain.linearRampToValueAtTime(0.24, start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.28);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(start);
+      osc.stop(start + 0.3);
+    });
+  }
+
+  // 🌪️ Рёв ветра и рассекаемого воздуха при падении в жерло вулкана
+  playVolcanoWindDescent() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const bufferSize = Math.floor(this.ctx.sampleRate * 2.0);
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(180, now);
+    filter.frequency.exponentialRampToValueAtTime(1400, now + 1.2);
+    filter.frequency.exponentialRampToValueAtTime(250, now + 1.9);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.01, now);
+    gain.gain.linearRampToValueAtTime(0.48, now + 1.1);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.95);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+    noise.start(now);
+  }
+
+  // 💥 Резкий рывок / вырывание телефона из рук
+  playPhoneSnatch() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.exponentialRampToValueAtTime(80, now + 0.18);
+
+    gain.gain.setValueAtTime(0.5, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.22);
+  }
+
   // 🧗 Crumbling Ledge Warning (Tremor / Vibration)
   playCrumbleWarning() {
     if (!this.ctx) return;
@@ -965,12 +1106,350 @@ class SoundEngine {
     this.stopHeartbeat();
     this.stopProceduralChaseLoop();
     this.resetChaseMusic();
+    this.stopHelicopterSound();
 
     if (this.customAudio) {
       try {
         this.customAudio.pause();
         this.customAudio.currentTime = 0;
       } catch (e) {}
+    }
+  }
+
+  // =========================================================================
+  // 🎬 STORY CUTSCENES PROCEDURAL SOUND EFFECTS
+  // =========================================================================
+
+  // Waking up groggy breath / inhalation
+  playWakingBreath() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(65, now);
+    osc.frequency.linearRampToValueAtTime(110, now + 0.8);
+    osc.frequency.exponentialRampToValueAtTime(50, now + 1.4);
+
+    gain.gain.setValueAtTime(0.01, now);
+    gain.gain.linearRampToValueAtTime(0.18, now + 0.5);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 1.45);
+  }
+
+  // Smartphone dual vibration burst (bzz-bzz)
+  playPhoneVibrate() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    [0, 0.22].forEach((offset) => {
+      const start = now + offset;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(135, start);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(260, start);
+
+      gain.gain.setValueAtTime(0.001, start);
+      gain.gain.linearRampToValueAtTime(0.28, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.14);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain);
+
+      osc.start(start);
+      osc.stop(start + 0.15);
+    });
+  }
+
+  // Modern crystal smartphone message chime (ding-ding!)
+  playSmsNotification() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const tones = [
+      { freq: 880, delay: 0, dur: 0.35, vol: 0.35 },    // A5
+      { freq: 1318.5, delay: 0.09, dur: 0.45, vol: 0.40 }, // E6
+      { freq: 1760, delay: 0.18, dur: 0.7, vol: 0.45 }   // A6
+    ];
+
+    tones.forEach((t) => {
+      const start = now + t.delay;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(t.freq, start);
+
+      gain.gain.setValueAtTime(0.001, start);
+      gain.gain.linearRampToValueAtTime(t.vol, start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + t.dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(start);
+      osc.stop(start + t.dur + 0.05);
+    });
+  }
+
+  // Smartphone virtual keyboard subtle click
+  playKeyboardTap() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(2200 + (Math.random() - 0.5) * 400, now);
+    osc.frequency.exponentialRampToValueAtTime(600, now + 0.025);
+
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.035);
+  }
+
+  // Violent glass shatter & phone smash
+  playGlassShatter() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+
+    // 1. Heavy physical impact thud
+    const thud = this.ctx.createOscillator();
+    const thudGain = this.ctx.createGain();
+    thud.type = 'sine';
+    thud.frequency.setValueAtTime(140, now);
+    thud.frequency.exponentialRampToValueAtTime(45, now + 0.12);
+    thudGain.gain.setValueAtTime(0.65, now);
+    thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    thud.connect(thudGain);
+    thudGain.connect(this.masterGain);
+    thud.start(now);
+    thud.stop(now + 0.16);
+
+    // 2. High-frequency glass crack & shatter noise
+    const bufferSize = this.ctx.sampleRate * 0.45;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.08));
+    }
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(6500, now);
+    filter.Q.setValueAtTime(2.5, now);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.55, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+    noise.start(now);
+
+    // 3. High crystal shards tinkle
+    [4200, 5800, 7400, 8900].forEach((freq, idx) => {
+      const shard = this.ctx.createOscillator();
+      const shardGain = this.ctx.createGain();
+      const sStart = now + 0.03 + idx * 0.04;
+      shard.type = 'sine';
+      shard.frequency.setValueAtTime(freq, sStart);
+
+      shardGain.gain.setValueAtTime(0.2, sStart);
+      shardGain.gain.exponentialRampToValueAtTime(0.001, sStart + 0.12);
+
+      shard.connect(shardGain);
+      shardGain.connect(this.masterGain);
+      shard.start(sStart);
+      shard.stop(sStart + 0.14);
+    });
+  }
+
+  // Magical shrinking laser beam / dimensional warp sound
+  playMagicShrink() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(1800, now);
+    osc.frequency.exponentialRampToValueAtTime(75, now + 1.1);
+
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(2200, now);
+    filter.frequency.exponentialRampToValueAtTime(160, now + 1.1);
+    filter.Q.setValueAtTime(3.5, now);
+
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.45, now + 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.15);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 1.2);
+  }
+
+  // Helicopter rotor blade rhythmic thump loop (мягкий кинематографичный перестук без раздражающего зуда)
+  startHelicopterSound() {
+    if (!this.ctx || this.heliPlaying) return;
+    this.heliPlaying = true;
+    const now = this.ctx.currentTime;
+
+    // Мягкая комфортная общая громкость (не режет уши и не мешает речи друга)
+    this.heliGain = this.ctx.createGain();
+    this.heliGain.gain.setValueAtTime(0.001, now);
+    this.heliGain.gain.linearRampToValueAtTime(0.14, now + 0.8);
+    this.heliGain.connect(this.masterGain);
+
+    // 1. Теплый глубокий саб-гул (чистый мягкий синус 44 Гц)
+    this.heliSub = this.ctx.createOscillator();
+    this.heliSub.type = 'sine';
+    this.heliSub.frequency.setValueAtTime(44, now);
+
+    // 2. Аэродинамический низкочастотный шум рассекаемого воздуха ("whump-whump")
+    const bufferSize = this.ctx.sampleRate * 2.0;
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    let lastOut = 0.0;
+    // Мягкий розовый шум
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1;
+      output[i] = (lastOut + (0.02 * white)) / 1.02;
+      lastOut = output[i];
+      output[i] *= 2.8;
+    }
+
+    this.heliNoise = this.ctx.createBufferSource();
+    this.heliNoise.buffer = noiseBuffer;
+    this.heliNoise.loop = true;
+
+    // Низкочастотный фильтр (140 Гц с легким резонансом), убирающий любой высокочастотный зуд
+    const noiseFilter = this.ctx.createBiquadFilter();
+    noiseFilter.type = 'lowpass';
+    noiseFilter.frequency.setValueAtTime(140, now);
+    noiseFilter.Q.setValueAtTime(2.0, now);
+
+    // 3. Модуляция перестука лопастей (5.2 Гц — плавное ритмичное биение)
+    this.heliLFO = this.ctx.createOscillator();
+    this.heliLFO.type = 'sine';
+    this.heliLFO.frequency.setValueAtTime(5.2, now);
+
+    const lfoGain = this.ctx.createGain();
+    lfoGain.gain.setValueAtTime(0.45, now);
+
+    this.heliChopGain = this.ctx.createGain();
+    this.heliChopGain.gain.setValueAtTime(0.5, now);
+
+    this.heliLFO.connect(lfoGain);
+    lfoGain.connect(this.heliChopGain.gain);
+
+    // Подмешиваем суб-бас
+    const subGain = this.ctx.createGain();
+    subGain.gain.setValueAtTime(0.6, now);
+    this.heliSub.connect(subGain);
+    subGain.connect(this.heliChopGain);
+
+    this.heliNoise.connect(noiseFilter);
+    noiseFilter.connect(this.heliChopGain);
+
+    this.heliChopGain.connect(this.heliGain);
+
+    this.heliSub.start(now);
+    this.heliNoise.start(now);
+    this.heliLFO.start(now);
+  }
+
+  stopHelicopterSound() {
+    if (!this.heliPlaying || !this.ctx) return;
+    this.heliPlaying = false;
+    const now = this.ctx.currentTime;
+    if (this.heliGain) {
+      this.heliGain.gain.linearRampToValueAtTime(0.001, now + 0.7);
+      setTimeout(() => {
+        try {
+          if (this.heliSub) { this.heliSub.stop(); this.heliSub.disconnect(); }
+          if (this.heliNoise) { this.heliNoise.stop(); this.heliNoise.disconnect(); }
+          if (this.heliLFO) { this.heliLFO.stop(); this.heliLFO.disconnect(); }
+          if (this.heliGain) { this.heliGain.disconnect(); }
+        } catch (e) {}
+        this.heliSub = null;
+        this.heliNoise = null;
+        this.heliLFO = null;
+        this.heliGain = null;
+      }, 800);
+    }
+  }
+
+  // Loudspeaker / Megaphone radio squelch chime
+  playMegaphoneChime() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+
+    // Mic click pop
+    const pop = this.ctx.createOscillator();
+    const popGain = this.ctx.createGain();
+    pop.type = 'triangle';
+    pop.frequency.setValueAtTime(900, now);
+    pop.frequency.exponentialRampToValueAtTime(250, now + 0.04);
+    popGain.gain.setValueAtTime(0.4, now);
+    popGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    pop.connect(popGain);
+    popGain.connect(this.masterGain);
+    pop.start(now);
+    pop.stop(now + 0.05);
+
+    // Two megaphone beeps
+    [750, 950].forEach((f, idx) => {
+      const beep = this.ctx.createOscillator();
+      const bGain = this.ctx.createGain();
+      const bStart = now + 0.05 + idx * 0.08;
+      beep.type = 'sine';
+      beep.frequency.setValueAtTime(f, bStart);
+
+      bGain.gain.setValueAtTime(0.22, bStart);
+      bGain.gain.exponentialRampToValueAtTime(0.001, bStart + 0.06);
+
+      beep.connect(bGain);
+      bGain.connect(this.masterGain);
+      beep.start(bStart);
+      beep.stop(bStart + 0.07);
+    });
+  }
+
+  // Friend speaking over megaphone with radio effect
+  speakMegaphone(text) {
+    this.playMegaphoneChime();
+    if ('speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'ru-RU';
+        utter.rate = 1.05;
+        utter.pitch = 0.95;
+        utter.volume = Math.min(1.0, this.volume * 1.25);
+        const voices = window.speechSynthesis.getVoices();
+        const ruVoice = voices.find(v => v.lang.startsWith('ru'));
+        if (ruVoice) utter.voice = ruVoice;
+        window.speechSynthesis.speak(utter);
+      } catch (e) {
+        console.warn('Speech synthesis not available:', e);
+      }
     }
   }
 }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { soundEngine } from './audio.js';
 
 export const SHIELD_TYPES = {
   FORCEFIELD: {
@@ -262,6 +263,7 @@ export class ShieldManager {
         if (p.type.id === 'd20_dice') {
           player.addExtraLife();
         }
+        soundEngine.playItemPickup();
 
         if (onNotify) {
           onNotify(p.type);

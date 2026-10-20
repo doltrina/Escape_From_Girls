@@ -37,11 +37,11 @@
   <div id="hud" class="hidden">
     <!-- Top Bar -->
     <div class="hud-top">
-      <div class="hud-panel">
+      <div class="hud-panel hud-panel-timer">
         <div class="hud-timer" id="hud-timer">00:00.00</div>
       </div>
 
-      <div class="hud-panel">
+      <div class="hud-panel hud-panel-record">
         <div class="hud-record" id="hud-record">🏆 РЕКОРД: 00:00.00</div>
       </div>
 
@@ -378,10 +378,23 @@
         <input type="range" id="volume-slider" class="range-slider" min="0" max="1" step="0.05" value="0.8">
       </div>
 
+      <!-- Cutscenes Settings Toggle -->
+      <div class="setting-toggle-box">
+        <label class="toggle-checkbox-label" for="setting-skip-cutscenes">
+          <input type="checkbox" id="setting-skip-cutscenes">
+          <span class="custom-toggle-slider"></span>
+          <span class="toggle-title">🎬 Пропускать катсцены</span>
+        </label>
+        <p class="toggle-subtext">Автоматически пропускать сюжетные катсцены перед началом уровней</p>
+      </div>
+
       <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
           <button id="btn-author-preset" class="btn-secondary" style="color: #00f3ff; border-color: rgba(0, 243, 255, 0.5); background: rgba(0, 243, 255, 0.1);">
             ⭐ Авторские настройки
+          </button>
+          <button id="btn-reset-cutscenes" class="btn-secondary" style="color: #ff0077; border-color: rgba(255, 0, 119, 0.4);">
+            🎬 Пересмотреть сюжет
           </button>
           <button id="btn-reset-assets" class="btn-secondary" style="color: #ffaa00;">
             Сбросить на стандартные
@@ -438,6 +451,7 @@
         <button id="btn-go-settings" class="btn-secondary">
           ⚙️ СМЕНИТЬ ВИДЕО / ФОТО
         </button>
+        <div id="go-coop-restart-notice" class="waiting-notice hidden" style="margin-top: 12px; font-weight: bold; color: #ffaa00; width: 100%; text-align: center;">⏳ Только хост может перезапустить игру. Ожидание хоста...</div>
       </div>
     </div>
   </div>
@@ -453,11 +467,11 @@
     </div>
 
     <div class="game-over-content victory-content">
-      <h1 class="victory-title">
+      <h1 class="victory-title" id="vic-title">
         ТЫ СОХРАНИЛ ДЕВСТВЕННОСТЬ!<br><span class="victory-subtitle-text">СЧАСТЛИВЫЙ КОНЕЦ (ПОБЕДА)</span>
       </h1>
-      <div class="victory-badge-large">👑 ИСТИННЫЙ СИГМА-САМУРАЙ 👑</div>
-      <p class="victory-description">
+      <div class="victory-badge-large" id="vic-badge">👑 ИСТИННЫЙ СИГМА-САМУРАЙ 👑</div>
+      <p class="victory-description" id="vic-desc">
         Ты собрал все 3 ключа, обхитрил девушку и вырвался на свободу! Твоя свобода и чистая душа в безопасности!
       </p>
 
@@ -489,6 +503,7 @@
         <button id="btn-victory-settings" class="btn-secondary">
           ⚙️ НАСТРОЙКИ
         </button>
+        <div id="vic-coop-restart-notice" class="waiting-notice hidden" style="margin-top: 12px; font-weight: bold; color: #ffaa00; width: 100%; text-align: center;">⏳ Только хост может перезапустить игру. Ожидание хоста...</div>
       </div>
     </div>
   </div>
@@ -558,11 +573,88 @@
           <!-- Dynamically populated players -->
         </div>
 
+        <!-- Public room kick timer banner -->
+        <div id="coop-public-timer-banner" class="coop-public-timer-banner hidden">
+          ⏱️ Нажмите «Я ГОТОВ»! Исключение через: <strong id="coop-kick-seconds">10</strong> сек.
+        </div>
+
         <div class="coop-lobby-actions">
           <button id="btn-coop-leave" class="btn-secondary">ВЫЙТИ ИЗ КОМНАТЫ</button>
+          <button id="btn-coop-ready" class="btn-primary">🟢 Я ГОТОВ</button>
           <button id="btn-coop-start-game" class="btn-primary" style="display: none;">🚀 НАЧАТЬ ПОБЕГ ВМЕСТЕ</button>
-          <div id="coop-waiting-host-notice" class="waiting-notice">Ожидание запуска игры хостом комнаты...</div>
+          <div id="coop-waiting-host-notice" class="waiting-notice">Ожидание готовности игроков...</div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 👁️ Co-op Spectator Mode Overlay -->
+  <div id="spectator-hud" class="spectator-hud hidden">
+    <div class="spectator-top-bar">
+      <div class="spectator-badge">
+        <span class="spectator-icon">👁️</span>
+        <span>РЕЖИМ НАБЛЮДЕНИЯ (ВЫ ПОГИБЛИ)</span>
+      </div>
+      <div class="spectator-target-box">
+        <span>Следим за:</span>
+        <strong id="spectator-target-name">Бро</strong>
+      </div>
+      <div class="spectator-controls">
+        <button id="btn-spectator-prev" class="btn-spectator-arrow" title="Предыдущий игрок">◀ [A]</button>
+        <button id="btn-spectator-next" class="btn-spectator-arrow" title="Следующий игрок">[D] ▶</button>
+      </div>
+    </div>
+    <div class="spectator-bottom-hint">
+      [ЛКМ] / [ПКМ] или стрелочки [←] [→] — смена игрока
+    </div>
+  </div>
+
+  <!-- 🎬 Cinematic Story Cutscenes Overlay -->
+  <div id="cutscene-overlay" class="cutscene-overlay hidden">
+    <!-- Letterbox cinematic bars -->
+    <div class="cutscene-letterbox top"></div>
+    <div class="cutscene-letterbox bottom"></div>
+
+    <!-- Screen FX layer for eye waking blur, warp, flash -->
+    <div id="cutscene-fx-layer" class="cutscene-fx-layer"></div>
+
+    <!-- 2D / Viewmodel Stage (Street visual, shrinking art, smartphone, helicopter) -->
+    <div id="cutscene-stage" class="cutscene-stage"></div>
+
+    <!-- Dialogue / Subtitles Box -->
+    <div id="cutscene-subtitles" class="cutscene-subtitles hidden">
+      <div class="subtitle-speaker" id="subtitle-speaker">Спикер</div>
+      <div class="subtitle-text" id="subtitle-text">Текст диалога...</div>
+    </div>
+
+    <!-- Hold to Skip prompt with SVG circular progress ring -->
+    <div id="cutscene-skip-container" class="cutscene-skip-container">
+      <div class="skip-ring-wrap">
+        <svg class="skip-ring-svg" viewBox="0 0 44 44">
+          <circle cx="22" cy="22" r="18" class="skip-ring-bg"></circle>
+          <circle cx="22" cy="22" r="18" class="skip-ring-fill" id="skip-ring-fill"></circle>
+        </svg>
+        <span class="skip-icon">⏩</span>
+      </div>
+      <div class="skip-label">
+        <span class="skip-hint">Удерживай <kbd>ПРОБЕЛ</kbd> или <kbd>ЛКМ</kbd></span>
+        <span class="skip-action">Пропустить сюжет</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🎬 Cutscene Skip Frequency Prompt Modal -->
+  <div id="cutscene-freq-modal" class="hidden">
+    <div class="settings-card prompt-card">
+      <div class="settings-header">
+        <h2>🎬 Пропуск сюжета</h2>
+      </div>
+      <p style="font-size: 16px; color: #ffffff; line-height: 1.5; margin: 12px 0;">
+        Вы часто пропускаете сюжет. Отключить катсцены в настройках?
+      </p>
+      <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 15px;">
+        <button id="btn-freq-yes" class="btn-primary" style="padding: 10px 24px;">Да</button>
+        <button id="btn-freq-no" class="btn-secondary" style="padding: 10px 24px;">Нет</button>
       </div>
     </div>
   </div>

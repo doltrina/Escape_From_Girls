@@ -102,10 +102,12 @@ function generatePlayerId() {
 function getOrCreateRoom(roomId) {
   const normId = (roomId || 'public').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '').substring(0, 16) || 'PUBLIC';
   if (!rooms.has(normId)) {
+    const isPublic = (normId === 'PUBLIC');
     rooms.set(normId, {
       id: normId,
+      isPublic,
       players: new Map(), // playerId -> playerData
-      hostId: null,
+      hostId: null, // Public room has NO host
       gameState: 'LOBBY', // 'LOBBY' | 'PLAYING' | 'GAMEOVER' | 'VICTORY'
       keysCollected: 0,
       totalKeys: 3,
@@ -135,7 +137,7 @@ function getRoomPlayerList(room) {
       id: p.id,
       name: p.name,
       color: p.color,
-      isHost: p.id === room.hostId,
+      isHost: (!room.isPublic && p.id === room.hostId),
       isDowned: p.isDowned || false,
       ready: p.ready || false
     });
@@ -144,16 +146,25 @@ function getRoomPlayerList(room) {
 }
 
 function removePlayerFromRoom(ws, rId, pId) {
+  if (typeof ws === 'string') {
+    pId = rId;
+    rId = ws;
+    ws = null;
+  }
   if (!rId || !pId) return;
   const room = rooms.get(rId);
   if (!room) return;
 
   const leavingPlayer = room.players.get(pId);
+  if (leavingPlayer && leavingPlayer.kickTimer) {
+    clearTimeout(leavingPlayer.kickTimer);
+    leavingPlayer.kickTimer = null;
+  }
   room.players.delete(pId);
   console.log(`[Co-op] Player ${leavingPlayer ? leavingPlayer.name : pId} left room ${rId}`);
 
-  // If host left, elect new host
-  if (room.hostId === pId) {
+  // If host left in private room, elect new host
+  if (!room.isPublic && room.hostId === pId) {
     const remainingIds = Array.from(room.players.keys());
     if (remainingIds.length > 0) {
       room.hostId = remainingIds[0];
@@ -209,10 +220,27 @@ wss.on('connection', (ws) => {
           }
 
           const roomId = (data.roomId || 'PUBLIC').toUpperCase().trim().replace(/[^A-Z0-9_-]/g, '').substring(0, 16) || 'PUBLIC';
-          const playerName = (data.name || 'Самурай').trim().substring(0, 20) || 'Самурай';
-          const playerColor = data.color || '#00f3ff';
-
+          const isPublic = (roomId === 'PUBLIC');
           const room = getOrCreateRoom(roomId);
+
+          // Get distinctive player nickname (accept data.name or data.playerName)
+          const rawName = (data.playerName || data.name || '').toString().trim();
+          let playerName = rawName.length > 0 ? rawName : ('Самурай_' + Math.floor(100 + Math.random() * 900));
+          playerName = playerName.substring(0, 16);
+
+          // Ensure nickname is unique within this room!
+          const existingNames = Array.from(room.players.values()).map(p => p.name.toLowerCase());
+          if (existingNames.includes(playerName.toLowerCase())) {
+            let suffix = 2;
+            let candidate = `${playerName.substring(0, 13)}_${suffix}`;
+            while (existingNames.includes(candidate.toLowerCase())) {
+              suffix++;
+              candidate = `${playerName.substring(0, 13)}_${suffix}`;
+            }
+            playerName = candidate;
+          }
+
+          const playerColor = (data.playerColor || data.color || '#4facfe').toString().substring(0, 7);
 
           // Room capacity check (max 4 players)
           if (room.players.size >= 4) {
@@ -226,14 +254,18 @@ wss.on('connection', (ws) => {
           currentRoomId = roomId;
           currentPlayerId = generatePlayerId();
 
-          // Assign host if none
-          if (!room.hostId || !room.players.has(room.hostId)) {
-            room.hostId = currentPlayerId;
-            if (data.mapType) room.mapType = data.mapType;
-            room.seed = Math.floor(Math.random() * 1000000);
+          // Assign host only for private rooms (in public room there is NO host)
+          if (!isPublic) {
+            if (!room.hostId || !room.players.has(room.hostId)) {
+              room.hostId = currentPlayerId;
+              if (data.mapType) room.mapType = data.mapType;
+              room.seed = Math.floor(Math.random() * 1000000);
+            }
+          } else {
+            room.hostId = null;
           }
 
-          const isHost = (currentPlayerId === room.hostId);
+          const isHost = (!isPublic && currentPlayerId === room.hostId);
 
           const playerData = {
             id: currentPlayerId,
@@ -242,8 +274,24 @@ wss.on('connection', (ws) => {
             color: playerColor,
             isHost,
             isDowned: false,
-            ready: isHost // host is always ready
+            ready: false // All players start unready until clicking "Готов"
           };
+
+          // In PUBLIC room: start 10-second inactivity kick timer
+          if (isPublic) {
+            playerData.kickTimer = setTimeout(() => {
+              if (!playerData.ready && room.players.has(currentPlayerId) && room.gameState === 'LOBBY') {
+                console.log(`[Co-op] Kicking unready player ${playerName} (${currentPlayerId}) from PUBLIC room (10s timeout)`);
+                if (ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({
+                    type: 'kicked',
+                    reason: 'Вы были исключены за бездействие: кнопка «Готов» не была нажата в течение 10 секунд.'
+                  }));
+                }
+                removePlayerFromRoom(ws, roomId, currentPlayerId);
+              }
+            }, 10000);
+          }
 
           room.players.set(currentPlayerId, playerData);
 
@@ -253,12 +301,14 @@ wss.on('connection', (ws) => {
             playerId: currentPlayerId,
             roomId: room.id,
             isHost,
+            isPublic,
             gameState: room.gameState,
             keysCollected: room.keysCollected,
             collectedKeyIndices: room.collectedKeyIndices,
             players: getRoomPlayerList(room),
             seed: room.seed,
-            mapType: room.mapType || 'crater'
+            mapType: room.mapType || 'crater',
+            kickTimeoutSec: isPublic ? 10 : null
           });
 
           // Broadcast to other players in room
@@ -281,18 +331,70 @@ wss.on('connection', (ws) => {
 
         // --- 2. Player Ready / Unready in Lobby ---
         case 'set_ready': {
+          console.log(`[Co-op] Received 'set_ready' from ${currentPlayerId} in room ${currentRoomId}: ready=${data.ready}`);
           if (!currentRoomId || !currentPlayerId) return;
           const room = rooms.get(currentRoomId);
-          if (!room) return;
+          if (!room) {
+            console.log(`[Co-op] Room ${currentRoomId} not found for set_ready!`);
+            return;
+          }
           const player = room.players.get(currentPlayerId);
           if (player) {
             player.ready = !!data.ready;
+            console.log(`[Co-op] Player ${player.name} (${currentPlayerId}) is now ready=${player.ready}`);
+
+            // Clear kick timer if marked ready
+            if (player.ready && player.kickTimer) {
+              clearTimeout(player.kickTimer);
+              player.kickTimer = null;
+            } else if (!player.ready && (room.isPublic || currentRoomId === 'PUBLIC') && !player.kickTimer && room.gameState === 'LOBBY') {
+              // Restart 10s timer if un-readied in public lobby
+              player.kickTimer = setTimeout(() => {
+                if (!player.ready && room.players.has(currentPlayerId) && room.gameState === 'LOBBY') {
+                  if (player.ws && player.ws.readyState === WebSocket.OPEN) {
+                    player.ws.send(JSON.stringify({
+                      type: 'kicked',
+                      reason: 'Вы были исключены за бездействие: кнопка «Готов» не была нажата в течение 10 секунд.'
+                    }));
+                  }
+                  removePlayerFromRoom(player.ws, currentRoomId, currentPlayerId);
+                }
+              }, 10000);
+            }
+
             broadcastToRoom(currentRoomId, {
               type: 'player_ready_changed',
               playerId: currentPlayerId,
               ready: player.ready,
               players: getRoomPlayerList(room)
             });
+
+            // Start game immediately when ALL players in the room are ready!
+            // Works for BOTH public and private rooms!
+            const playersArr = Array.from(room.players.values());
+            const allReady = (playersArr.length >= 1 && playersArr.every(p => p.ready));
+            console.log(`[Co-op] Room ${currentRoomId} check: ${playersArr.map(p => `${p.name}:${p.ready}`).join(', ')} -> allReady=${allReady}, gameState=${room.gameState}`);
+            if (allReady && room.gameState === 'LOBBY') {
+              console.log(`[Co-op] >>> STARTING GAME in room ${currentRoomId}! Broadcasting game_started to ${playersArr.length} players!`);
+              room.gameState = 'PLAYING';
+              room.keysCollected = 0;
+              room.collectedKeyIndices = [];
+              room.seed = Math.floor(Math.random() * 1000000);
+              for (const pl of room.players.values()) {
+                pl.isDowned = false;
+                pl.isDead = false;
+                if (pl.kickTimer) {
+                  clearTimeout(pl.kickTimer);
+                  pl.kickTimer = null;
+                }
+              }
+              broadcastToRoom(currentRoomId, {
+                type: 'game_started',
+                seed: room.seed,
+                mapType: room.mapType || 'crater',
+                players: getRoomPlayerList(room)
+              });
+            }
           }
           break;
         }
@@ -310,6 +412,11 @@ wss.on('connection', (ws) => {
           if (data.seed !== undefined && data.seed !== null) room.seed = data.seed;
           for (const p of room.players.values()) {
             p.isDowned = false;
+            p.isDead = false;
+            if (p.kickTimer) {
+              clearTimeout(p.kickTimer);
+              p.kickTimer = null;
+            }
           }
 
           broadcastToRoom(currentRoomId, {
@@ -412,20 +519,59 @@ wss.on('connection', (ws) => {
             position: data.position
           });
 
-          // Check if ALL players are downed!
-          let allDowned = true;
+          // Check if ALL players are defeated (downed or dead)!
+          let allDefeated = true;
           for (const pl of room.players.values()) {
-            if (!pl.isDowned) {
-              allDowned = false;
+            if (!pl.isDowned && !pl.isDead) {
+              allDefeated = false;
               break;
             }
           }
 
-          if (allDowned && room.players.size > 0 && room.gameState === 'PLAYING') {
+          if (allDefeated && room.players.size > 0 && room.gameState === 'PLAYING') {
             room.gameState = 'GAMEOVER';
             broadcastToRoom(currentRoomId, {
               type: 'team_gameover',
-              reason: 'ВСЯ КОМАНДА ЛИШИЛАСЬ ДЕВСТВЕННОСТИ!'
+              reason: 'ВСЯ КОМАНДА ЛИШИЛАСЬ ДЕВСТВЕННОСТИ!',
+              mapType: room.mapType || 'crater'
+            });
+          }
+          break;
+        }
+
+        case 'player_eliminated': {
+          if (!currentRoomId || !currentPlayerId) return;
+          const room = rooms.get(currentRoomId);
+          if (!room) return;
+
+          const p = room.players.get(currentPlayerId);
+          if (p) {
+            p.isDead = true;
+            p.isDowned = true;
+          }
+
+          broadcastToRoom(currentRoomId, {
+            type: 'player_eliminated',
+            playerId: currentPlayerId,
+            playerName: data.playerName || (p ? p.name : 'Бро'),
+            reason: data.reason || 'eliminated'
+          });
+
+          // Check if ALL players are defeated (dead or downed)!
+          let allDefeated = true;
+          for (const pl of room.players.values()) {
+            if (!pl.isDead && !pl.isDowned) {
+              allDefeated = false;
+              break;
+            }
+          }
+
+          if (allDefeated && room.players.size > 0 && room.gameState === 'PLAYING') {
+            room.gameState = 'GAMEOVER';
+            broadcastToRoom(currentRoomId, {
+              type: 'team_gameover',
+              reason: 'ВСЯ КОМАНДА ЛИШИЛАСЬ ДЕВСТВЕННОСТИ!',
+              mapType: room.mapType || 'crater'
             });
           }
           break;
@@ -448,7 +594,10 @@ wss.on('connection', (ws) => {
           if (!room) return;
 
           const targetPlayer = room.players.get(data.targetId);
-          if (targetPlayer) targetPlayer.isDowned = false;
+          if (targetPlayer) {
+            targetPlayer.isDowned = false;
+            targetPlayer.isDead = false;
+          }
 
           broadcastToRoom(currentRoomId, {
             type: 'player_revived',
@@ -468,7 +617,8 @@ wss.on('connection', (ws) => {
           room.gameState = 'VICTORY';
           broadcastToRoom(currentRoomId, {
             type: 'team_victory',
-            escaperName: data.escaperName || 'Самурай'
+            escaperName: data.escaperName || 'Самурай',
+            mapType: room.mapType || 'crater'
           });
           break;
         }
@@ -477,7 +627,41 @@ wss.on('connection', (ws) => {
         case 'restart_game': {
           if (!currentRoomId || !currentPlayerId) return;
           const room = rooms.get(currentRoomId);
-          if (!room || room.hostId !== currentPlayerId) return;
+          if (!room) return;
+          // In private rooms: host only. In public room: any player can reset back to lobby.
+          if (!room.isPublic && currentRoomId !== 'PUBLIC' && room.hostId !== currentPlayerId) return;
+
+          if (room.isPublic || currentRoomId === 'PUBLIC') {
+            room.gameState = 'LOBBY';
+            room.keysCollected = 0;
+            room.collectedKeyIndices = [];
+            room.seed = Math.floor(Math.random() * 1000000);
+            for (const p of room.players.values()) {
+              p.isDowned = false;
+              p.isDead = false;
+              p.ready = false;
+              if (p.kickTimer) clearTimeout(p.kickTimer);
+              p.kickTimer = setTimeout(() => {
+                if (!p.ready && room.players.has(p.id) && room.gameState === 'LOBBY') {
+                  if (p.ws && p.ws.readyState === WebSocket.OPEN) {
+                    p.ws.send(JSON.stringify({
+                      type: 'kicked',
+                      reason: 'Вы были исключены за бездействие: кнопка «Готов» не была нажата в течение 10 секунд.'
+                    }));
+                  }
+                  removePlayerFromRoom(p.ws, currentRoomId, p.id);
+                }
+              }, 10000);
+            }
+
+            broadcastToRoom(currentRoomId, {
+              type: 'room_reset_lobby',
+              mapType: room.mapType || 'crater',
+              players: getRoomPlayerList(room),
+              kickTimeoutSec: 10
+            });
+            return;
+          }
 
           room.gameState = 'PLAYING';
           room.keysCollected = 0;
@@ -486,6 +670,7 @@ wss.on('connection', (ws) => {
           if (data.mapType) room.mapType = data.mapType;
           for (const p of room.players.values()) {
             p.isDowned = false;
+            p.isDead = false;
           }
 
           broadcastToRoom(currentRoomId, {
