@@ -1,0 +1,2010 @@
+import * as THREE from 'three';
+import { soundEngine } from './audio.js';
+
+// Deterministic 32-bit PRNG (Mulberry32) for synchronized procedural parkour generation across co-op clients
+export function createPRNG(seed = 123456789) {
+  let s = (Math.floor(Number(seed)) || 123456789) >>> 0;
+  return function() {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ============================================================================
+// 🌋 PROCEDURAL TEXTURE GENERATORS (VOLCANIC BASALT & VIVID BLOOD MAGMA)
+// ============================================================================
+
+/**
+ * Vivid Blood-Red Magma Texture (Requirement 1: Ярко-красная магма)
+ * Deep arterial crimson base, glowing scarlet veins, pulsating bubbling cells and coagulated clots.
+ */
+function createBloodMagmaTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // Arterial blood scarlet radial gradient
+  const grad = ctx.createRadialGradient(256, 256, 40, 256, 256, 256);
+  grad.addColorStop(0, '#ff1a4a');     // Vivid arterial scarlet center
+  grad.addColorStop(0.28, '#ff0038');  // Bright saturated blood red
+  grad.addColorStop(0.62, '#b80024');  // Rich crimson
+  grad.addColorStop(0.85, '#660012');  // Deep clot ruby
+  grad.addColorStop(1, '#240006');     // Dark coagulated edge
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Floating dark coagulated blood clots / crust islands
+  for (let i = 0; i < 45; i++) {
+    const px = Math.random() * 512;
+    const py = Math.random() * 512;
+    const rx = 16 + Math.random() * 38;
+    const ry = 12 + Math.random() * 26;
+    const angle = Math.random() * Math.PI;
+    ctx.fillStyle = (Math.random() < 0.6) ? '#280007' : '#180004';
+    ctx.beginPath();
+    ctx.ellipse(px, py, rx, ry, angle, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Glowing scarlet / crimson arterial fissure veins
+  for (let v = 0; v < 18; v++) {
+    ctx.beginPath();
+    let x = Math.random() * 512;
+    let y = Math.random() * 512;
+    ctx.moveTo(x, y);
+    for (let s = 0; s < 5; s++) {
+      x += (Math.random() - 0.5) * 85;
+      y += (Math.random() - 0.5) * 85;
+      ctx.lineTo(x, y);
+    }
+    // High-energy scarlet glow
+    ctx.strokeStyle = '#ff3366';
+    ctx.lineWidth = 3.0;
+    ctx.shadowColor = '#ff0044';
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+
+    // Hot bright core
+    ctx.strokeStyle = '#ff809b';
+    ctx.lineWidth = 1.0;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // Bubbling red surface cells / highlights
+  for (let b = 0; b < 24; b++) {
+    const bx = Math.random() * 512;
+    const by = Math.random() * 512;
+    const br = 4 + Math.random() * 10;
+    ctx.fillStyle = 'rgba(255, 60, 95, 0.75)';
+    ctx.beginPath();
+    ctx.arc(bx, by, br, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Specular bubble highlight
+    ctx.fillStyle = 'rgba(255, 200, 220, 0.9)';
+    ctx.beginPath();
+    ctx.arc(bx - br * 0.3, by - br * 0.3, br * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(6, 6);
+  return texture;
+}
+
+/**
+ * Flat Stepping Slab Top Surface (Requirement 5: Ровная плоскость для игрока)
+ * Distinct outer border, clean basalt slab pavers with subtle dark grain & faint crimson fissures.
+ */
+function createVolcanoTopTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // Dark charcoal basalt slab base
+  ctx.fillStyle = '#18181c';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Outer carved stone border (makes platform edges crisp & clearly visible for parkour)
+  ctx.strokeStyle = '#32323a';
+  ctx.lineWidth = 14;
+  ctx.strokeRect(7, 7, 498, 498);
+
+  ctx.strokeStyle = '#0d0d10';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(16, 16, 480, 480);
+
+  // Basalt slab grains & mineral flecks
+  for (let i = 0; i < 450; i++) {
+    const x = 20 + Math.random() * 472;
+    const y = 20 + Math.random() * 472;
+    const size = 6 + Math.random() * 22;
+    const shade = 22 + Math.floor(Math.random() * 20);
+    ctx.fillStyle = `rgb(${shade + 4}, ${shade}, ${shade + 2})`;
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Faint glowing red micro-fissures in rock
+  for (let c = 0; c < 6; c++) {
+    ctx.strokeStyle = 'rgba(255, 25, 45, 0.38)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    let cx = 30 + Math.random() * 452;
+    let cy = 30 + Math.random() * 452;
+    ctx.moveTo(cx, cy);
+    for (let s = 0; s < 5; s++) {
+      cx += (Math.random() - 0.5) * 50;
+      cy += (Math.random() - 0.5) * 50;
+      ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(2, 2);
+  return texture;
+}
+
+/**
+ * Stratified Volcanic Rock Cliff Side Texture (Богатая детальная текстура вулканического базальта и скал)
+ * Глубокая красно-базальтовая основа, горизонтальные геологические пласты пепла и обсидиана,
+ * ветвящиеся светящиеся алые трещины и пористая структура застывшей лавы.
+ */
+function createVolcanoSideTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // 1. Глубокая вулканическая красно-базальтовая основа
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, 512);
+  bgGrad.addColorStop(0, '#1c070a');
+  bgGrad.addColorStop(0.35, '#2e0a10');
+  bgGrad.addColorStop(0.7, '#180508');
+  bgGrad.addColorStop(1, '#24080d');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, 512, 512);
+
+  // 2. Горизонтальные геологические пласты пепла, туфа и застывшей лавы
+  for (let y = 0; y < 512; y += 22) {
+    const bandH = 12 + Math.random() * 16;
+    const isRedBand = (Math.random() < 0.45);
+    if (isRedBand) {
+      ctx.fillStyle = `rgba(${75 + Math.floor(Math.random() * 40)}, ${10 + Math.floor(Math.random() * 15)}, ${18 + Math.floor(Math.random() * 18)}, 0.65)`;
+    } else {
+      const shade = 18 + Math.floor(Math.random() * 18);
+      ctx.fillStyle = `rgba(${shade + 8}, ${shade}, ${shade + 3}, 0.75)`;
+    }
+    ctx.fillRect(0, y, 512, bandH);
+  }
+
+  // 3. Пористая текстура вулканического туфа (микро-поры и кристаллы)
+  for (let p = 0; p < 600; p++) {
+    const px = Math.random() * 512;
+    const py = Math.random() * 512;
+    const pr = 1.5 + Math.random() * 3.5;
+    const isGlow = (Math.random() < 0.25);
+    ctx.fillStyle = isGlow ? 'rgba(255, 30, 50, 0.4)' : 'rgba(8, 2, 3, 0.6)';
+    ctx.beginPath();
+    ctx.arc(px, py, pr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 4. Вертикальные скальные разломы и трещины
+  for (let c = 0; c < 30; c++) {
+    ctx.strokeStyle = '#080102';
+    ctx.lineWidth = 2.5 + Math.random() * 3.5;
+    ctx.beginPath();
+    let vx = Math.random() * 512;
+    let vy = 0;
+    ctx.moveTo(vx, vy);
+    while (vy < 512) {
+      vx += (Math.random() - 0.5) * 25;
+      vy += 20 + Math.random() * 35;
+      ctx.lineTo(vx, vy);
+    }
+    ctx.stroke();
+  }
+
+  // 5. Ветвящиеся раскалённые алые лавовые жилы
+  for (let v = 0; v < 14; v++) {
+    ctx.beginPath();
+    let sx = Math.random() * 512;
+    let sy = Math.random() * 512;
+    ctx.moveTo(sx, sy);
+    for (let s = 0; s < 5; s++) {
+      sx += (Math.random() - 0.5) * 80;
+      sy += (Math.random() - 0.5) * 80;
+      ctx.lineTo(sx, sy);
+    }
+    // Алое свечение
+    ctx.strokeStyle = '#ff1133';
+    ctx.lineWidth = 3.2;
+    ctx.shadowColor = '#ff0033';
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+
+    // Горячее светлое ядро
+    ctx.strokeStyle = '#ffa0b5';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(3, 2);
+  return texture;
+}
+
+/**
+ * Красная местность вокруг вулкана (Outer Volcanic Terrain Texture)
+ * Раскаленная красная вулканическая земля, застывшие лавовые потоки,
+ * паутина горящих алых трещин и каменная багровая пустошь.
+ */
+function createOuterVolcanoTerrainTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // 1. Багровая вулканическая земля
+  const bgGrad = ctx.createRadialGradient(256, 256, 25, 256, 256, 325);
+  bgGrad.addColorStop(0, '#5a0d16');
+  bgGrad.addColorStop(0.35, '#3d080e');
+  bgGrad.addColorStop(0.7, '#240408');
+  bgGrad.addColorStop(1, '#150204');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, 512, 512);
+
+  // 2. Островки застывшего черного и красного базальта
+  for (let i = 0; i < 45; i++) {
+    const px = Math.random() * 512;
+    const py = Math.random() * 512;
+    const rx = 15 + Math.random() * 35;
+    const ry = 10 + Math.random() * 22;
+    const angle = Math.random() * Math.PI;
+    ctx.fillStyle = (Math.random() < 0.5) ? '#180306' : '#2b070d';
+    ctx.beginPath();
+    ctx.ellipse(px, py, rx, ry, angle, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 3. Сеть ветвящихся лавовых рек и горящих красных трещин
+  for (let v = 0; v < 18; v++) {
+    ctx.beginPath();
+    let x = Math.random() * 512;
+    let y = Math.random() * 512;
+    ctx.moveTo(x, y);
+    for (let s = 0; s < 6; s++) {
+      x += (Math.random() - 0.5) * 75;
+      y += (Math.random() - 0.5) * 75;
+      ctx.lineTo(x, y);
+    }
+    // Яркое алое сияние
+    ctx.strokeStyle = '#ff0038';
+    ctx.lineWidth = 3.5;
+    ctx.shadowColor = '#ff0022';
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+
+    // Бело-розовый центр
+    ctx.strokeStyle = '#ff99aa';
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // 4. Пепельная красная рябь и крошка
+  for (let a = 0; a < 600; a++) {
+    const ax = Math.random() * 512;
+    const ay = Math.random() * 512;
+    const ar = 1 + Math.random() * 2.5;
+    ctx.fillStyle = (Math.random() < 0.4) ? 'rgba(255, 60, 80, 0.5)' : 'rgba(15, 3, 5, 0.6)';
+    ctx.beginPath();
+    ctx.arc(ax, ay, ar, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(10, 10);
+  return texture;
+}
+
+/**
+ * Crumbling Ledge Top Texture (Warning cracks & unstable crust)
+ */
+function createCrumbleTopTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#2d1b14';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Jagged fracture cracks
+  ctx.strokeStyle = '#ff3300';
+  ctx.lineWidth = 4;
+  for (let i = 0; i < 16; i++) {
+    ctx.beginPath();
+    let x = Math.random() * 512;
+    let y = Math.random() * 512;
+    ctx.moveTo(x, y);
+    for (let s = 0; s < 6; s++) {
+      x += (Math.random() - 0.5) * 90;
+      y += (Math.random() - 0.5) * 90;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  // Bright yellow-orange unstable glow spots
+  for (let i = 0; i < 20; i++) {
+    ctx.fillStyle = 'rgba(255, 120, 0, 0.7)';
+    ctx.beginPath();
+    ctx.arc(Math.random() * 512, Math.random() * 512, 8 + Math.random() * 12, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}
+
+/**
+ * Crumbling Ledge Side Texture
+ */
+function createCrumbleSideTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#22140f';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Jagged falling shards & cracks
+  ctx.strokeStyle = '#ff2200';
+  ctx.lineWidth = 3;
+  for (let i = 0; i < 14; i++) {
+    ctx.beginPath();
+    let x = Math.random() * 512;
+    let y = 0;
+    ctx.moveTo(x, y);
+    while (y < 512) {
+      x += (Math.random() - 0.5) * 35;
+      y += 30 + Math.random() * 40;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}
+
+/**
+ * Charred Wooden Planks (Top & Sides)
+ */
+function createWoodTopTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#201815';
+  ctx.fillRect(0, 0, 256, 256);
+
+  ctx.strokeStyle = '#2d221e';
+  ctx.lineWidth = 4;
+  for (let y = 0; y < 256; y += 32) {
+    ctx.strokeRect(0, y, 256, 30);
+  }
+
+  // Burnt marks
+  for (let i = 0; i < 35; i++) {
+    ctx.fillStyle = 'rgba(10, 6, 4, 0.75)';
+    ctx.fillRect(Math.random() * 256, Math.random() * 256, Math.random() * 40, Math.random() * 12);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}
+
+function createWoodSideTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#150f0c';
+  ctx.fillRect(0, 0, 256, 256);
+
+  ctx.strokeStyle = '#281c16';
+  ctx.lineWidth = 3;
+  for (let x = 0; x < 256; x += 32) {
+    ctx.strokeRect(x, 0, 30, 256);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}
+
+// Global cached textures
+let cachedBloodMagma = null;
+let cachedVolcanoTop = null;
+let cachedVolcanoSide = null;
+let cachedCrumbleTop = null;
+let cachedCrumbleSide = null;
+let cachedWoodTop = null;
+let cachedWoodSide = null;
+let cachedOuterTerrain = null;
+
+function getBloodMagmaTexture() {
+  if (!cachedBloodMagma) cachedBloodMagma = createBloodMagmaTexture();
+  return cachedBloodMagma;
+}
+function getVolcanoTopTexture() {
+  if (!cachedVolcanoTop) cachedVolcanoTop = createVolcanoTopTexture();
+  return cachedVolcanoTop;
+}
+function getVolcanoSideTexture() {
+  if (!cachedVolcanoSide) cachedVolcanoSide = createVolcanoSideTexture();
+  return cachedVolcanoSide;
+}
+function getOuterTerrainTexture() {
+  if (!cachedOuterTerrain) cachedOuterTerrain = createOuterVolcanoTerrainTexture();
+  return cachedOuterTerrain;
+}
+function getCrumbleTopTexture() {
+  if (!cachedCrumbleTop) cachedCrumbleTop = createCrumbleTopTexture();
+  return cachedCrumbleTop;
+}
+function getCrumbleSideTexture() {
+  if (!cachedCrumbleSide) cachedCrumbleSide = createCrumbleSideTexture();
+  return cachedCrumbleSide;
+}
+function getWoodTopTexture() {
+  if (!cachedWoodTop) cachedWoodTop = createWoodTopTexture();
+  return cachedWoodTop;
+}
+function getWoodSideTexture() {
+  if (!cachedWoodSide) cachedWoodSide = createWoodSideTexture();
+  return cachedWoodSide;
+}
+
+// ============================================================================
+// 🌋 CRATER MAP (VOLCANO PARKOUR)
+// ============================================================================
+
+export class CraterMap {
+  constructor(scene) {
+    this.scene = scene;
+    this.isCrater = true;
+
+    // Dimensions
+    this.calderaRadius = 32;
+    this.calderaHeight = 38;
+    this.offsetX = -this.calderaRadius;
+    this.offsetZ = -this.calderaRadius;
+    this.width = this.calderaRadius * 2;
+    this.depth = this.calderaRadius * 2;
+    this.tileSize = 4;
+
+    // Magma state (dormant at 0.5m until player leaps onto first platform)
+    this.magmaLevel = 0.5;
+    this.initialMagmaLevel = 0.5;
+    this.maxMagmaLevel = 29.5;
+    this.magmaBaseSpeed = 0.20;
+    this.magmaRapidSpeed = 0.50;
+    this.magmaRisingSpeed = this.magmaBaseSpeed;
+    this.isMagmaRising = false;
+    this.hasPlayerStartedParkour = false;
+    this.isRapidRise = false;
+    this.magmaTime = 0;
+
+    // Platform lists
+    this.platforms = [];
+    this.crumblingPlatforms = [];
+    this.walls = [];
+    this.spawnPoints = [];
+    this.keyLocations = [];
+
+    // Geysers
+    this.geysers = [];
+    this.nextGeyserTime = 3.0;
+
+    // Torii Gate Summit Exit
+    this.exitPortal = null;
+    this.exitPosition = new THREE.Vector3(0, 32.5, 0);
+
+    // Callbacks
+    this.onMagmaRiseStart = null;
+    this.onParkourStart = null;
+    this.onPlayerMagmaDeath = null;
+
+    this.buildVolcanoWorld();
+  }
+
+  buildVolcanoWorld() {
+    this.root = new THREE.Group();
+    this.scene.add(this.root);
+
+    // Materials setup: ALL platform materials explicitly use DoubleSide so NO side is ever culled or see-through!
+    this.rockTopMat = new THREE.MeshStandardMaterial({
+      map: getVolcanoTopTexture(),
+      roughness: 0.82,
+      metalness: 0.18,
+      side: THREE.DoubleSide
+    });
+
+    this.rockSideMat = new THREE.MeshStandardMaterial({
+      map: getVolcanoSideTexture(),
+      roughness: 0.90,
+      metalness: 0.12,
+      side: THREE.DoubleSide
+    });
+
+    this.crumbleTopMat = new THREE.MeshStandardMaterial({
+      map: getCrumbleTopTexture(),
+      roughness: 0.88,
+      metalness: 0.10,
+      emissive: 0x551100,
+      emissiveIntensity: 0.6,
+      side: THREE.DoubleSide
+    });
+
+    this.crumbleSideMat = new THREE.MeshStandardMaterial({
+      map: getCrumbleSideTexture(),
+      roughness: 0.92,
+      metalness: 0.08,
+      emissive: 0x440800,
+      emissiveIntensity: 0.5,
+      side: THREE.DoubleSide
+    });
+
+    this.woodTopMat = new THREE.MeshStandardMaterial({
+      map: getWoodTopTexture(),
+      roughness: 0.88,
+      metalness: 0.12,
+      side: THREE.DoubleSide
+    });
+
+    this.woodSideMat = new THREE.MeshStandardMaterial({
+      map: getWoodSideTexture(),
+      roughness: 0.94,
+      metalness: 0.06,
+      side: THREE.DoubleSide
+    });
+
+    // Multi-materials array for BoxGeometry: [+X, -X, +Y (TOP), -Y (BOTTOM), +Z, -Z]
+    this.rockMaterials = [
+      this.rockSideMat, // 0: +X
+      this.rockSideMat, // 1: -X
+      this.rockTopMat,  // 2: +Y (TOP: flat volcanic stone slab)
+      this.rockSideMat, // 3: -Y (BOTTOM)
+      this.rockSideMat, // 4: +Z
+      this.rockSideMat  // 5: -Z
+    ];
+
+    this.crumbleMaterials = [
+      this.crumbleSideMat,
+      this.crumbleSideMat,
+      this.crumbleTopMat,
+      this.crumbleSideMat,
+      this.crumbleSideMat,
+      this.crumbleSideMat
+    ];
+
+    this.woodMaterials = [
+      this.woodSideMat,
+      this.woodSideMat,
+      this.woodTopMat,
+      this.woodSideMat,
+      this.woodSideMat,
+      this.woodSideMat
+    ];
+
+    // 1. Crater Caldera Walls (Separate dedicated material with BackSide so rockSideMat is NEVER mutated!)
+    const wallGeo = new THREE.CylinderGeometry(
+      this.calderaRadius * 1.08,
+      this.calderaRadius * 0.88,
+      this.calderaHeight,
+      32,
+      1,
+      true
+    );
+    this.calderaWallMat = new THREE.MeshStandardMaterial({
+      map: getVolcanoSideTexture(),
+      roughness: 0.90,
+      metalness: 0.12,
+      side: THREE.BackSide
+    });
+    this.calderaWall = new THREE.Mesh(wallGeo, this.calderaWallMat);
+    this.calderaWall.position.set(0, this.calderaHeight / 2, 0);
+    this.root.add(this.calderaWall);
+
+    // 2. Rising Magma Pool Surface with 3D Wave Undulation (Requirement 1: Ярко-красная кровь/магма)
+    const lavaGeo = new THREE.PlaneGeometry(this.calderaRadius * 2.15, this.calderaRadius * 2.15, 28, 28);
+    this.lavaMat = new THREE.MeshStandardMaterial({
+      map: getBloodMagmaTexture(),
+      color: 0xff0038,
+      emissive: 0xff002b,
+      emissiveIntensity: 1.35,
+      roughness: 0.20,
+      metalness: 0.70
+    });
+    this.lavaMesh = new THREE.Mesh(lavaGeo, this.lavaMat);
+    this.lavaMesh.rotation.x = -Math.PI / 2;
+    this.lavaMesh.position.set(0, this.magmaLevel, 0);
+    this.root.add(this.lavaMesh);
+
+    // Dynamic Vivid Blood-Red Magma Glow Light
+    this.magmaLight = new THREE.PointLight(0xff0038, 4.2, 55, 1.2);
+    this.magmaLight.position.set(0, this.magmaLevel + 2.5, 0);
+    this.root.add(this.magmaLight);
+
+    // Ambient Bright Red Sky + Volcanic Magma Underglow
+    this.volcanoHemi = new THREE.HemisphereLight(0xff2244, 0x660011, 1.55);
+    this.root.add(this.volcanoHemi);
+
+    // Sunlight from bright red volcanic sky
+    this.sunLight = new THREE.DirectionalLight(0xff6655, 1.4);
+    this.sunLight.position.set(25, 65, 18);
+    this.root.add(this.sunLight);
+
+    // 3. Dedicated Platform Group for Procedural Regeneration
+    this.platformsGroup = new THREE.Group();
+    this.root.add(this.platformsGroup);
+
+    // 4. Build Summit Torii Gate (Permanent Landmark)
+    this.buildSummitToriiGate();
+
+    // 5. Generate Initial Authentic Parkour
+    this.generateRandomParkour();
+
+    // 6. Volcanic Ash & Red Ruby Spark Particle System
+    this.initAshParticles();
+
+    // 7. Geysers
+    this.initGeysers();
+
+    // 8. 3D Rescue Helicopter circling in the Red Sky
+    this.buildHelicopter();
+
+    // 9. Procedural Fiery Red Clouds in the Red Sky
+    this.buildSkyClouds();
+
+    // 10. Outer Red Volcanic Terrain surrounding the volcano (Красная местность вокруг вулкана)
+    this.buildOuterVolcanoTerrain();
+  }
+
+  // --- PLATFORM CREATION HELPER (Multi-material & Crag Underbelly) ---
+  addPlatform(x, y, z, w, h, d, type = 'rock', isCrumbling = false, isStartPlatform = false) {
+    let materials = this.rockMaterials;
+    if (type === 'wood') materials = this.woodMaterials;
+    if (isCrumbling) materials = this.crumbleMaterials;
+
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const mesh = new THREE.Mesh(geo, materials);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+
+    // Natural craggy tapered volcanic rock chunk underbelly below the flat box slab
+    if (type === 'rock' || isCrumbling) {
+      const cragHeight = h * 1.5 + 0.8;
+      const cragGeo = new THREE.CylinderGeometry(
+        Math.min(w, d) * 0.44,
+        0.30 + Math.random() * 0.25,
+        cragHeight,
+        7,
+        1,
+        false
+      );
+      const posAttr = cragGeo.attributes.position;
+      for (let i = 0; i < posAttr.count; i++) {
+        if (posAttr.getY(i) < 0) {
+          posAttr.setX(i, posAttr.getX(i) + (Math.random() - 0.5) * 0.28);
+          posAttr.setZ(i, posAttr.getZ(i) + (Math.random() - 0.5) * 0.28);
+        }
+      }
+      cragGeo.computeVertexNormals();
+
+      const cragMat = isCrumbling ? this.crumbleSideMat : this.rockSideMat;
+      const cragMesh = new THREE.Mesh(cragGeo, cragMat);
+      cragMesh.position.y = -(h / 2 + cragHeight / 2);
+      cragMesh.rotation.y = Math.random() * Math.PI * 2;
+      mesh.add(cragMesh);
+    }
+
+    this.platformsGroup.add(mesh);
+
+    const platformData = {
+      mesh,
+      box: new THREE.Box3(
+        new THREE.Vector3(x - w / 2, y - h / 2, z - d / 2),
+        new THREE.Vector3(x + w / 2, y + h / 2, z + d / 2)
+      ),
+      x, y, z, w, h, d,
+      topY: y + h / 2,
+      type,
+      isCrumbling,
+      isStartPlatform,
+      stepped: false,
+      stepTimer: 0,
+      isFalling: false,
+      fallSpeed: 0,
+      origY: y
+    };
+
+    this.platforms.push(platformData);
+    if (isCrumbling) {
+      this.crumblingPlatforms.push(platformData);
+    }
+
+    return platformData;
+  }
+
+  // -------------------------------------------------------------
+  // 🧗‍♂️ AUTHENTIC VERTICAL PARKOUR GENERATOR (No More Spiral Staircase!)
+  // 3 Distinct Tiers, Sprint Chasms, Balance Beams, Monoliths & Dynamic Jitter!
+  // -------------------------------------------------------------
+  generateRandomParkour(seed = null) {
+    if (seed !== null && seed !== undefined) {
+      this.currentSeed = seed;
+    } else if (this.currentSeed === undefined || this.currentSeed === null) {
+      this.currentSeed = Math.floor(Math.random() * 1000000);
+    }
+    const rng = createPRNG(this.currentSeed);
+
+    // 1. Clear existing platforms & decorations
+    while (this.platformsGroup.children.length > 0) {
+      const child = this.platformsGroup.children[0];
+      if (child.geometry) child.geometry.dispose();
+      this.platformsGroup.remove(child);
+    }
+    this.platforms = [];
+    this.crumblingPlatforms = [];
+    this.spawnPoints = [];
+    this.keyLocations = [];
+
+    // 2. Fixed Starting Altar (Player Spawns Here at 0, 2.5, 16)
+    const startP = this.addPlatform(0, 1.8, 16, 12, 1.2, 10, 'rock', false, true);
+    this.spawnPoints.push(new THREE.Vector3(0, 2.5, 16));
+
+    // Decorative braziers on starting altar
+    this.addFireBrazier(-4.5, 2.4, 13.5);
+    this.addFireBrazier(4.5, 2.4, 13.5);
+
+    // 3. Fixed Summit Arena (Y = 32.0m, Top = 32.7m, Center = 0, 0)
+    this.summitPlatform = this.addPlatform(0, 32.0, 0, 14, 1.4, 14, 'rock', false, false);
+    this.exitPosition.set(0, 32.7, 0);
+
+    // Braziers flanking the Torii Gate
+    this.addFireBrazier(-4.5, 32.7, -3);
+    this.addFireBrazier(4.5, 32.7, -3);
+    this.addFireBrazier(-4.5, 32.7, 3);
+    this.addFireBrazier(4.5, 32.7, 3);
+
+    // 4. Procedural Direction & Jitter (Synchronized via Seeded PRNG)
+    // 50% chance to mirror the entire parkour course across the caldera deterministically
+    const dir = (rng() < 0.5) ? 1 : -1;
+    // Small random jitter offset per run for replayability
+    const jitter = () => (rng() - 0.5) * 0.45;
+
+    // Helper to add parkour step with mirroring
+    const addStep = (x, y, z, w, h, d, type = 'rock', isCrumble = false) => {
+      const rx = (x + jitter()) * dir;
+      const rz = z + jitter();
+      const ry = y + (rng() - 0.5) * 0.12;
+      return this.addPlatform(rx, ry, rz, w, h, d, type, isCrumble, false);
+    };
+
+    // =========================================================================
+    // 🧗‍♂️ TIER 1: The Lower Caldera & Chasms (Platforms 1-8, Y: 2.8m -> 10.0m)
+    // =========================================================================
+    // P1: Initial broad rock outcrop
+    const p1 = addStep(-6.5, 2.8, 15.0, 5.5, 1.0, 5.0, 'rock');
+    // P2: Basalt shelf
+    const p2 = addStep(-11.5, 3.8, 12.0, 5.0, 1.0, 5.0, 'rock');
+    // P3 & P4: THE GREAT CHASM (Разлом) - sprint gap across void at same height!
+    const p3 = addStep(-16.0, 4.6, 7.5, 4.5, 1.0, 4.5, 'rock');
+    const p4 = addStep(-19.5, 4.9, 1.5, 5.0, 1.0, 5.0, 'rock');
+    // P5: Crumbling Ledge (Осыпающийся уступ)
+    const p5 = addStep(-19.0, 6.0, -4.5, 4.0, 0.8, 4.0, 'rock', true);
+    // P6: KEY 1 ALTAR PLATFORM (Golden Key 1 Altar!)
+    const p6 = addStep(-16.5, 7.0, -10.0, 5.5, 1.2, 5.5, 'rock');
+    // P7: High Stepping Pillar
+    const p7 = addStep(-12.5, 8.2, -14.5, 3.6, 1.0, 3.6, 'rock');
+    // P8: Transition Shelf into Tier 2
+    const p8 = addStep(-7.5, 9.4, -17.5, 5.0, 1.0, 4.5, 'rock');
+    this.addFireBrazier(-7.5 * dir, 9.4 + 1.1, -17.5);
+
+    // =========================================================================
+    // 🧗‍♂️ TIER 2: The Floating Beams & Abyss Leap (Platforms 9-17, Y: 11.0m -> 20.0m)
+    // =========================================================================
+    // P9 & P10: Narrow Charred Wood Bridge (Узкие деревянные мостки)
+    const p9 = addStep(-2.0, 10.7, -18.5, 5.5, 0.6, 2.0, 'wood');
+    const p10 = addStep(4.0, 11.9, -18.0, 5.5, 0.6, 2.0, 'wood');
+    this.addHangingChain(4.0 * dir, 11.9, -18.0, 16);
+    // P11: Chain Anchor Rock
+    const p11 = addStep(9.5, 13.1, -15.5, 4.5, 1.0, 4.5, 'rock');
+    // P12: Chasm Springboard Rock
+    const p12 = addStep(14.5, 14.2, -11.5, 4.5, 0.8, 4.5, 'rock');
+    // P13: Floating Beam over the Abyss (Sprint leap!)
+    const p13 = addStep(18.0, 15.3, -6.0, 4.0, 0.6, 2.5, 'wood');
+    // P14: KEY 2 ALTAR PLATFORM (Golden Key 2 Altar!)
+    const p14 = addStep(19.5, 16.2, 0.0, 5.5, 1.2, 5.0, 'rock');
+    this.addHangingChain(19.5 * dir, 16.2, 0.0, 16);
+    // P15: Crumbling Ledge 2
+    const p15 = addStep(18.0, 17.4, 5.5, 4.0, 0.8, 4.0, 'rock', true);
+    // P16: Step-Down Rock (Hop down)
+    const p16 = addStep(15.0, 18.2, 10.5, 4.5, 1.0, 4.5, 'rock');
+    // P17: Steep Upward Outcrop (+1.1m)
+    const p17 = addStep(10.5, 19.3, 14.5, 4.5, 1.0, 4.5, 'rock');
+
+    // =========================================================================
+    // 🧗‍♂️ TIER 3: The Rim, Suspension Planks & Summit Monoliths (Platforms 18-26)
+    // =========================================================================
+    // P18: High Rim Balcony
+    const p18 = addStep(5.0, 20.5, 17.0, 5.5, 1.0, 4.5, 'rock');
+    this.addFireBrazier(5.0 * dir, 20.5 + 1.1, 17.0);
+    // P19 & P20: Narrow Suspension Planks across Rim
+    const p19 = addStep(-1.0, 21.7, 16.5, 5.0, 0.6, 1.8, 'wood');
+    const p20 = addStep(-6.5, 23.0, 14.5, 5.0, 0.6, 1.8, 'wood');
+    // P21: Crumbling Ledge 3 (Pre-Key challenge!)
+    const p21 = addStep(-11.5, 24.2, 11.0, 4.0, 0.8, 4.0, 'rock', true);
+    // P22: KEY 3 ALTAR PLATFORM (Golden Key 3 Altar!)
+    const p22 = addStep(-14.0, 25.4, 6.0, 5.5, 1.2, 5.0, 'rock');
+    // P23 & P24: Giant Basalt Monoliths zig-zagging inward to center
+    const p23 = addStep(-13.0, 26.8, 0.5, 4.5, 1.2, 4.5, 'rock');
+    const p24 = addStep(-10.5, 28.2, -4.5, 4.5, 1.2, 4.5, 'rock');
+    // P25: High Stepping Stone
+    const p25 = addStep(-6.5, 29.5, -7.5, 4.0, 1.2, 4.0, 'rock');
+    // P26: The Leap of Faith Pillar (Directly lands onto Summit Arena!)
+    const p26 = addStep(-1.5, 30.8, -7.5, 4.5, 1.2, 4.5, 'rock');
+
+    // 5. Store Dynamically Synchronized Key Locations
+    this.keyLocations = [
+      { pos: new THREE.Vector3(p6.x, p6.topY + 0.85, p6.z), name: 'Ключ Нижнего Яруса (Внимание: Месячные!)' },
+      { pos: new THREE.Vector3(p14.x, p14.topY + 0.85, p14.z), name: 'Ключ Среднего Яруса (Прыжок над бездной)' },
+      { pos: new THREE.Vector3(p22.x, p22.topY + 0.85, p22.z), name: 'Ключ Верхнего Яруса (Узкий мостик)' }
+    ];
+  }
+
+  getKeyLocations() {
+    return this.keyLocations;
+  }
+
+  // -------------------------------------------------------------
+  // ⛩️ SUMMIT EXIT: Glowing Torii Gate (Врата Тории)
+  // -------------------------------------------------------------
+  buildSummitToriiGate() {
+    this.toriiGroup = new THREE.Group();
+    this.toriiGroup.position.set(0, 32.7, 0);
+
+    const vermilionMat = new THREE.MeshStandardMaterial({
+      color: 0xdd2200,
+      roughness: 0.4,
+      metalness: 0.2
+    });
+
+    const goldMat = new THREE.MeshStandardMaterial({
+      color: 0xffcc00,
+      roughness: 0.2,
+      metalness: 0.9,
+      emissive: 0xff8800,
+      emissiveIntensity: 0.4
+    });
+
+    const blackStoneMat = new THREE.MeshStandardMaterial({
+      color: 0x111111,
+      roughness: 0.8
+    });
+
+    // Torii Pillars (left & right)
+    const pillarGeo = new THREE.CylinderGeometry(0.35, 0.45, 6.5, 16);
+    const leftPillar = new THREE.Mesh(pillarGeo, vermilionMat);
+    leftPillar.position.set(-2.8, 3.25, 0);
+    this.toriiGroup.add(leftPillar);
+
+    const rightPillar = leftPillar.clone();
+    rightPillar.position.x = 2.8;
+    this.toriiGroup.add(rightPillar);
+
+    // Pillar stone bases
+    const baseGeo = new THREE.CylinderGeometry(0.55, 0.65, 0.8, 16);
+    const baseL = new THREE.Mesh(baseGeo, blackStoneMat);
+    baseL.position.set(-2.8, 0.4, 0);
+    this.toriiGroup.add(baseL);
+    const baseR = baseL.clone();
+    baseR.position.x = 2.8;
+    this.toriiGroup.add(baseR);
+
+    // Kasagi (Top curved horizontal lintel)
+    const lintelGeo = new THREE.BoxGeometry(8.2, 0.6, 0.8);
+    const lintel = new THREE.Mesh(lintelGeo, vermilionMat);
+    lintel.position.set(0, 6.3, 0);
+    this.toriiGroup.add(lintel);
+
+    // Kasagi Gold Caps
+    const capGeo = new THREE.BoxGeometry(0.7, 0.7, 0.9);
+    const capL = new THREE.Mesh(capGeo, goldMat);
+    capL.position.set(-4.1, 6.3, 0);
+    this.toriiGroup.add(capL);
+    const capR = capL.clone();
+    capR.position.x = 4.1;
+    this.toriiGroup.add(capR);
+
+    // Nuki (Lower secondary horizontal beam)
+    const nukiGeo = new THREE.BoxGeometry(6.6, 0.4, 0.5);
+    const nuki = new THREE.Mesh(nukiGeo, vermilionMat);
+    nuki.position.set(0, 5.0, 0);
+    this.toriiGroup.add(nuki);
+
+    // Central Torii Plaque
+    const plaqueGeo = new THREE.BoxGeometry(1.2, 1.4, 0.2);
+    const plaqueMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, metalness: 0.5 });
+    const plaque = new THREE.Mesh(plaqueGeo, plaqueMat);
+    plaque.position.set(0, 5.65, 0.1);
+    this.toriiGroup.add(plaque);
+
+    // Swirling Energy Vortex in Gate Center
+    const vortexGeo = new THREE.PlaneGeometry(4.8, 5.2);
+    this.vortexMat = new THREE.MeshBasicMaterial({
+      color: 0xff0044,
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide
+    });
+    this.vortexMesh = new THREE.Mesh(vortexGeo, this.vortexMat);
+    this.vortexMesh.position.set(0, 2.8, 0);
+    this.toriiGroup.add(this.vortexMesh);
+
+    // Torii Point Light
+    this.toriiLight = new THREE.PointLight(0xff0044, 3.2, 16, 1.5);
+    this.toriiLight.position.set(0, 3.2, 0);
+    this.toriiGroup.add(this.toriiLight);
+
+    this.root.add(this.toriiGroup);
+  }
+
+  addFireBrazier(x, y, z) {
+    const brazierGroup = new THREE.Group();
+    brazierGroup.position.set(x, y, z);
+
+    // Stone bowl
+    const bowlGeo = new THREE.CylinderGeometry(0.7, 0.4, 0.8, 12);
+    const bowlMat = new THREE.MeshStandardMaterial({ color: 0x222225, roughness: 0.8 });
+    const bowl = new THREE.Mesh(bowlGeo, bowlMat);
+    brazierGroup.add(bowl);
+
+    // Fire flame core (Blood-red volcanic fire)
+    const flameGeo = new THREE.ConeGeometry(0.35, 0.9, 8);
+    const flameMat = new THREE.MeshBasicMaterial({ color: 0xff1a40 });
+    const flame = new THREE.Mesh(flameGeo, flameMat);
+    flame.position.y = 0.7;
+    brazierGroup.add(flame);
+
+    const light = new THREE.PointLight(0xff0038, 2.0, 10, 2);
+    light.position.y = 1.0;
+    brazierGroup.add(light);
+
+    this.platformsGroup.add(brazierGroup);
+  }
+
+  addHangingChain(x, startY, z, length) {
+    const chainMat = new THREE.MeshStandardMaterial({
+      color: 0x3a3028,
+      metalness: 0.85,
+      roughness: 0.3
+    });
+    const chainGeo = new THREE.CylinderGeometry(0.06, 0.06, length, 8);
+    const chain = new THREE.Mesh(chainGeo, chainMat);
+    chain.position.set(x, startY + length / 2, z);
+    this.platformsGroup.add(chain);
+  }
+
+  // -------------------------------------------------------------
+  // 🌋 VOLCANIC ASH & BLOOD-RED RUBY SPARKS (Requirement 1)
+  // -------------------------------------------------------------
+  initAshParticles() {
+    const particleCount = 45;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const velocities = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+
+    for (let i = 0; i < particleCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.random() * (this.calderaRadius * 0.9);
+      positions[i * 3] = Math.cos(angle) * r;
+      positions[i * 3 + 1] = Math.random() * this.calderaHeight;
+      positions[i * 3 + 2] = Math.sin(angle) * r;
+
+      const isSpark = Math.random() < 0.40;
+      if (isSpark) {
+        velocities[i * 3] = (Math.random() - 0.5) * 1.5;
+        velocities[i * 3 + 1] = 1.2 + Math.random() * 2.2;
+        velocities[i * 3 + 2] = (Math.random() - 0.5) * 1.5;
+
+        // Vivid ruby scarlet spark color
+        colors[i * 3] = 1.0;
+        colors[i * 3 + 1] = 0.05 + Math.random() * 0.15;
+        colors[i * 3 + 2] = 0.15;
+      } else {
+        velocities[i * 3] = (Math.random() - 0.5) * 0.8;
+        velocities[i * 3 + 1] = -(0.8 + Math.random() * 1.6);
+        velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.8;
+
+        const shade = 0.05 + Math.random() * 0.12;
+        colors[i * 3] = shade + 0.04;
+        colors[i * 3 + 1] = shade;
+        colors[i * 3 + 2] = shade;
+      }
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const material = new THREE.PointsMaterial({
+      size: 0.38,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85
+    });
+
+    this.ashPoints = new THREE.Points(geometry, material);
+    this.ashVelocities = velocities;
+    this.root.add(this.ashPoints);
+  }
+
+  initGeysers() {
+    this.geysers = [
+      { x: -10, z: 0, timer: 2.0, active: 0, mesh: null },
+      { x: 8, z: 8, timer: 4.5, active: 0, mesh: null },
+      { x: 0, z: -10, timer: 6.0, active: 0, mesh: null }
+    ];
+
+    const geyserGeo = new THREE.CylinderGeometry(0.6, 1.4, 14, 16);
+    const geyserMat = new THREE.MeshBasicMaterial({
+      color: 0xff0038,
+      transparent: true,
+      opacity: 0.0
+    });
+
+    this.geysers.forEach((g) => {
+      g.mesh = new THREE.Mesh(geyserGeo, geyserMat.clone());
+      g.mesh.position.set(g.x, this.magmaLevel + 7, g.z);
+      this.root.add(g.mesh);
+    });
+  }
+
+  // -------------------------------------------------------------
+  // 🔄 PARKOUR & MAGMA ACTIVATION TRIGGER
+  // -------------------------------------------------------------
+  triggerParkourStart(fromNetwork = false) {
+    if (this.hasPlayerStartedParkour) return;
+    this.hasPlayerStartedParkour = true;
+    this.isMagmaRising = true;
+    this.magmaRisingSpeed = this.magmaBaseSpeed;
+
+    if (this.onParkourStart) {
+      this.onParkourStart(fromNetwork);
+    }
+  }
+
+  setNetworkMagmaLevel(targetLevel) {
+    if (typeof targetLevel !== 'number' || isNaN(targetLevel)) return;
+    if (Math.abs(this.magmaLevel - targetLevel) > 1.2) {
+      this.magmaLevel = targetLevel;
+    } else {
+      this.magmaLevel += (targetLevel - this.magmaLevel) * 0.25;
+    }
+    if (this.lavaMesh) this.lavaMesh.position.y = this.magmaLevel;
+    if (this.magmaLight) this.magmaLight.position.y = this.magmaLevel + 2.5;
+  }
+
+  startMagmaRise() {
+    // Accelerated rise after Key 1 alarm
+    this.isRapidRise = true;
+    this.magmaRisingSpeed = this.magmaRapidSpeed;
+    this.isMagmaRising = true;
+    soundEngine.playSirenAlarm();
+    if (this.onMagmaRiseStart) {
+      this.onMagmaRiseStart();
+    }
+  }
+
+  onPlayerStep(x, z, footY) {
+    // Check if player stands on any platform
+    for (const p of this.platforms) {
+      if (p.isFalling) continue;
+      const margin = 0.5;
+      const inX = x >= p.x - p.w / 2 - margin && x <= p.x + p.w / 2 + margin;
+      const inZ = z >= p.z - p.d / 2 - margin && z <= p.z + p.d / 2 + margin;
+      const inY = Math.abs(footY - p.topY) < 0.6;
+
+      if (inX && inZ && inY) {
+        // Stepping onto any non-start platform wakes magma & girl!
+        if (!p.isStartPlatform && !this.hasPlayerStartedParkour) {
+          this.triggerParkourStart();
+        }
+
+        if (p.isCrumbling && !p.stepped) {
+          p.stepped = true;
+          soundEngine.playCrumbleWarning();
+        }
+      }
+    }
+  }
+
+  getFloorHeight(x, z, currentY, radius = 0.45) {
+    let highestFloor = -999;
+
+    for (const p of this.platforms) {
+      if (p.isFalling && p.topY < this.magmaLevel - 1) continue;
+
+      const minX = p.x - p.w / 2 - radius * 0.7;
+      const maxX = p.x + p.w / 2 + radius * 0.7;
+      const minZ = p.z - p.d / 2 - radius * 0.7;
+      const maxZ = p.z + p.d / 2 + radius * 0.7;
+
+      if (x >= minX && x <= maxX && z >= minZ && z <= maxZ) {
+        if (currentY >= p.topY - 0.45) {
+          if (p.topY > highestFloor) {
+            highestFloor = p.topY;
+            // Landing on a non-start platform wakes magma & girl!
+            if (!p.isStartPlatform && !this.hasPlayerStartedParkour) {
+              this.triggerParkourStart();
+            }
+          }
+        }
+      }
+    }
+
+    return highestFloor;
+  }
+
+  isMagmaTouch(y) {
+    return y <= this.magmaLevel + 0.35;
+  }
+
+  // -------------------------------------------------------------
+  // 🛡️ SOLID 3D AABB HORIZONTAL SIDE COLLISIONS (Fixed: No random teleports!)
+  // Prevents phasing through platform sides while cleanly allowing jumps and landings
+  // -------------------------------------------------------------
+  resolveCollision(pos, radius = 0.45) {
+    if (isNaN(pos.x) || isNaN(pos.y) || isNaN(pos.z)) return;
+
+    // 1. Keep within cylindrical caldera wall boundary
+    const distFromCenter = Math.hypot(pos.x, pos.z);
+    const safeHeight = Math.max(0, Math.min(this.calderaHeight, pos.y));
+    const currentWallRadius = this.calderaRadius * (0.88 + 0.18 * (safeHeight / this.calderaHeight)) - radius;
+
+    if (distFromCenter > currentWallRadius && distFromCenter > 0.001) {
+      const angle = Math.atan2(pos.z, pos.x);
+      pos.x = Math.cos(angle) * currentWallRadius;
+      pos.z = Math.sin(angle) * currentWallRadius;
+    }
+
+    // 2. Solid horizontal side collision for platforms
+    // Feet position relative to platform tops
+    const feetY = pos.y - 1.7;
+
+    for (const p of this.platforms) {
+      // Falling platforms should never exert side collision
+      if (p.isFalling) continue;
+
+      const platformTop = p.topY;
+      const platformBottom = p.y - p.h / 2 - 1.5;
+
+      // If feet are within landing/step-up range of platform top, do NOT block horizontally!
+      // Vertical collision (getFloorHeight) will catch and support the player cleanly.
+      if (feetY >= platformTop - 0.45) continue;
+
+      // If player is entirely below the platform, skip
+      if (pos.y <= platformBottom) continue;
+
+      const minX = p.x - p.w / 2;
+      const maxX = p.x + p.w / 2;
+      const minZ = p.z - p.d / 2;
+      const maxZ = p.z + p.d / 2;
+
+      const closestX = Math.max(minX, Math.min(pos.x, maxX));
+      const closestZ = Math.max(minZ, Math.min(pos.z, maxZ));
+
+      const dx = pos.x - closestX;
+      const dz = pos.z - closestZ;
+      const distSq = dx * dx + dz * dz;
+
+      // Approaching from OUTSIDE the platform bounding box:
+      if (distSq > 0.0001 && distSq < radius * radius) {
+        const dist = Math.sqrt(distSq);
+        const overlap = radius - dist;
+        pos.x += (dx / dist) * overlap;
+        pos.z += (dz / dist) * overlap;
+      } else if (distSq <= 0.0001) {
+        // Player center is horizontally inside the platform footprint.
+        // If feet are near top surface (within 0.65m), allow floor collision to resolve vertically.
+        if (feetY >= platformTop - 0.65) {
+          continue;
+        }
+
+        // Only if deep inside from a high-speed penetration, nudge gently to nearest edge
+        // Clamped to at most 0.15m per step to NEVER fling/teleport the player across the map!
+        const dLeft = pos.x - minX;
+        const dRight = maxX - pos.x;
+        const dBottom = pos.z - minZ;
+        const dTop = maxZ - pos.z;
+        const minDist = Math.min(dLeft, dRight, dBottom, dTop);
+
+        const nudge = Math.min(0.15, minDist + radius);
+        if (minDist === dLeft) pos.x -= nudge;
+        else if (minDist === dRight) pos.x += nudge;
+        else if (minDist === dBottom) pos.z -= nudge;
+        else pos.z += nudge;
+      }
+    }
+  }
+
+  hasLineOfSight(pos1, pos2) {
+    const dy = Math.abs(pos1.y - pos2.y);
+    const dxz = Math.hypot(pos1.x - pos2.x, pos1.z - pos2.z);
+    return dxz < 32 && dy < 16;
+  }
+
+  findNextWaypoint(fromPos, toPos) {
+    let best = toPos.clone();
+    let minDist = 99999;
+    for (const p of this.platforms) {
+      const d = Math.hypot(p.x - fromPos.x, p.z - fromPos.z);
+      if (d < minDist) {
+        minDist = d;
+        best.set(p.x, p.topY, p.z);
+      }
+    }
+    return best;
+  }
+
+  // -------------------------------------------------------------
+  // 👧 SAFE NEXTBOT SPAWN CALCULATOR (Point 3)
+  // NEVER spawns directly in front of the player on their next jump!
+  // -------------------------------------------------------------
+  getNextbotSpawnPoint(nearPos = null) {
+    // If no player pos or near the start, awaken her at the Starting Altar (0, 2.5, 16)
+    // This is 100% BEHIND the player, chasing from the start!
+    if (!nearPos) {
+      return new THREE.Vector3(0, 2.5, 16);
+    }
+
+    // Find the platform closest to the player
+    let playerPlatIdx = 0;
+    let minPlayerDist = 9999;
+    for (let i = 0; i < this.platforms.length; i++) {
+      const p = this.platforms[i];
+      const d = Math.hypot(p.x - nearPos.x, p.z - nearPos.z);
+      if (d < minPlayerDist) {
+        minPlayerDist = d;
+        playerPlatIdx = i;
+      }
+    }
+
+    // If player is on lower platforms (idx <= 3), spawn her at Starting Altar (behind player!)
+    if (playerPlatIdx <= 3) {
+      return new THREE.Vector3(0, 2.5, 16);
+    }
+
+    // For mid-game respawns: pick a platform BEHIND the player that is above lava!
+    const behindPlatforms = this.platforms.filter((p, idx) => {
+      return idx < playerPlatIdx - 2 && p.topY > this.magmaLevel + 1.8 && !p.isFalling;
+    });
+
+    if (behindPlatforms.length > 0) {
+      // Pick a platform behind the player to pursue from below!
+      const choice = behindPlatforms[behindPlatforms.length - 1];
+      return new THREE.Vector3(choice.x, choice.topY + 0.5, choice.z);
+    }
+
+    // Otherwise, pick a platform far across the crater (> 18m away) but NEVER in the next 6 platforms ahead!
+    const acrossPlatforms = this.platforms.filter((p, idx) => {
+      const isAhead = (idx >= playerPlatIdx && idx <= playerPlatIdx + 6);
+      const d = Math.hypot(p.x - nearPos.x, p.z - nearPos.z);
+      return !isAhead && d >= 16 && p.topY > this.magmaLevel + 2 && !p.isFalling;
+    });
+
+    if (acrossPlatforms.length > 0) {
+      const choice = acrossPlatforms[Math.floor(Math.random() * acrossPlatforms.length)];
+      return new THREE.Vector3(choice.x, choice.topY + 0.5, choice.z);
+    }
+
+    return new THREE.Vector3(0, 2.5, 16);
+  }
+
+  getPlayerSpawnPoint() {
+    return new THREE.Vector3(0, 2.5, 16);
+  }
+
+  getPickupSpawnPoint(nearPlayerPos = null) {
+    // Collect stable, non-crumbling, non-falling platforms strictly above rising magma
+    // Strict safeguard: NEVER spawn on starting altar (0, 2.5, 16) or within 8m of it!
+    const validPlatforms = this.platforms.filter((p) => {
+      if (p.isStartPlatform) return false;
+      if (p.isCrumbling) return false;
+      if (p.isFalling) return false;
+      if (p.topY <= this.magmaLevel + 1.8) return false;
+      if (Math.hypot(p.x, p.z - 16) < 8.0) return false;
+      if (nearPlayerPos) {
+        const d = Math.hypot(p.x - nearPlayerPos.x, p.z - nearPlayerPos.z);
+        if (d < 4.0) return false;
+      }
+      return true;
+    });
+
+    if (validPlatforms.length > 0) {
+      const choice = validPlatforms[Math.floor(Math.random() * validPlatforms.length)];
+      return new THREE.Vector3(choice.x, choice.topY + 0.6, choice.z);
+    }
+
+    return new THREE.Vector3(5.0, 21.6, 17.0);
+  }
+
+  getRandomSpawnPoint(nearPos = null, minDist = 0) {
+    if (!nearPos) {
+      return this.getPlayerSpawnPoint();
+    }
+    return this.getNextbotSpawnPoint(nearPos);
+  }
+
+  update(delta, playerPos = null) {
+    if (delta > 0.1) delta = 0.1;
+    this.magmaTime += delta;
+
+    // 1. Rising Magma Logic (ONLY rises after parkour has started!)
+    if (this.isMagmaRising && this.magmaLevel < this.maxMagmaLevel) {
+      this.magmaLevel += this.magmaRisingSpeed * delta;
+      this.lavaMesh.position.y = this.magmaLevel;
+      this.magmaLight.position.y = this.magmaLevel + 2.5;
+    }
+
+    // 2. Magma surface undulation & animated glowing texture (GPU-friendly, zero CPU vertex recalculation)
+    if (this.lavaMesh) {
+      this.lavaMesh.position.y = this.magmaLevel + Math.sin(this.magmaTime * 2.5) * 0.16;
+    }
+
+    if (this.lavaMat && this.lavaMat.map) {
+      this.lavaMat.map.offset.x = (this.magmaTime * 0.04) % 1;
+      this.lavaMat.map.offset.y = (this.magmaTime * 0.028) % 1;
+      this.lavaMat.emissiveIntensity = 1.1 + Math.sin(this.magmaTime * 4.0) * 0.35;
+    }
+    this.magmaLight.intensity = 3.8 + Math.sin(this.magmaTime * 6) * 0.9;
+
+    // 3. Crumbling Platforms Update
+    for (const p of this.crumblingPlatforms) {
+      if (p.stepped && !p.isFalling) {
+        p.stepTimer += delta;
+        p.mesh.position.x = p.x + (Math.random() - 0.5) * 0.12;
+        p.mesh.position.z = p.z + (Math.random() - 0.5) * 0.12;
+
+        if (p.stepTimer >= 2.2) {
+          p.isFalling = true;
+          soundEngine.playRockCollapse();
+        }
+      }
+
+      if (p.isFalling) {
+        p.fallSpeed += 22.0 * delta;
+        p.mesh.position.y -= p.fallSpeed * delta;
+        p.topY = p.mesh.position.y + p.h / 2;
+        p.mesh.rotation.x += delta * 1.5;
+        p.mesh.rotation.z += delta * 1.2;
+
+        if (p.mesh.position.y < this.magmaLevel - 6) {
+          p.mesh.visible = false;
+        }
+      }
+    }
+
+    // 4. Volcanic Ash & Ruby Spark Particles Update
+    if (this.ashPoints) {
+      const positions = this.ashPoints.geometry.attributes.position.array;
+      const count = positions.length / 3;
+
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] += this.ashVelocities[i * 3] * delta;
+        positions[i * 3 + 1] += this.ashVelocities[i * 3 + 1] * delta;
+        positions[i * 3 + 2] += this.ashVelocities[i * 3 + 2] * delta;
+
+        if (positions[i * 3 + 1] < this.magmaLevel) {
+          positions[i * 3 + 1] = this.calderaHeight - 1;
+        } else if (positions[i * 3 + 1] > this.calderaHeight) {
+          positions[i * 3 + 1] = this.magmaLevel + 0.5;
+        }
+      }
+      this.ashPoints.geometry.attributes.position.needsUpdate = true;
+    }
+
+    // 5. Geysers Eruption Loop
+    this.updateGeysers(delta);
+
+    // 6. Torii Gate Energy Pulse
+    if (this.vortexMesh && this.vortexMat) {
+      this.vortexMat.opacity = 0.45 + Math.sin(this.magmaTime * 4) * 0.25;
+      this.toriiLight.intensity = 2.8 + Math.sin(this.magmaTime * 5) * 0.8;
+    }
+
+    // 7. Update Circling Rescue Helicopter & Blue Sky Clouds
+    this.updateHelicopter(delta, playerPos);
+    this.updateClouds(delta);
+  }
+
+  updateGeysers(delta) {
+    this.geysers.forEach((g) => {
+      g.timer -= delta;
+      if (g.timer <= 0) {
+        g.timer = 5.0 + Math.random() * 6.0;
+        g.active = 1.4;
+        soundEngine.playGeyserErupt();
+      }
+
+      if (g.active > 0) {
+        g.active -= delta;
+        g.mesh.position.y = this.magmaLevel + 7;
+        g.mesh.material.opacity = Math.min(0.9, g.active * 1.5);
+        g.mesh.scale.set(1 + Math.sin(performance.now() * 0.05) * 0.3, 1, 1 + Math.sin(performance.now() * 0.05) * 0.3);
+      } else {
+        g.mesh.material.opacity = 0;
+      }
+    });
+  }
+
+  reset(seed = null) {
+    if (seed !== null && seed !== undefined) {
+      this.currentSeed = seed;
+    } else {
+      this.currentSeed = Math.floor(Math.random() * 1000000);
+    }
+    this.magmaLevel = this.initialMagmaLevel;
+    this.isMagmaRising = false;
+    this.hasPlayerStartedParkour = false;
+    this.isRapidRise = false;
+    this.magmaRisingSpeed = this.magmaBaseSpeed;
+    this.magmaTime = 0;
+    this.lavaMesh.position.y = this.magmaLevel;
+    this.magmaLight.position.y = this.magmaLevel + 2.5;
+
+    // Regenerate deterministic parkour course for this seed!
+    this.generateRandomParkour(this.currentSeed);
+  }
+
+  // =========================================================================
+  // 🚁 3D RESCUE HELICOPTER IN THE BLUE SKY (ТРЕБОВАНИЕ 3 & 4)
+  // =========================================================================
+
+  buildHelicopter() {
+    this.helicopterGroup = new THREE.Group();
+
+    // 1. Материалы вертолёта (стильный спасательный броне-корпус)
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: 0x1a2436,
+      roughness: 0.35,
+      metalness: 0.65
+    });
+    const cyanAccentMat = new THREE.MeshStandardMaterial({
+      color: 0x00f3ff,
+      emissive: 0x00f3ff,
+      emissiveIntensity: 0.75,
+      roughness: 0.2
+    });
+    const darkMetalMat = new THREE.MeshStandardMaterial({
+      color: 0x111622,
+      roughness: 0.3,
+      metalness: 0.8
+    });
+
+    // 2. Фюзеляж кабины
+    const cabinGeo = new THREE.BoxGeometry(2.2, 1.6, 3.6);
+    const cabin = new THREE.Mesh(cabinGeo, bodyMat);
+    this.helicopterGroup.add(cabin);
+
+    // Неоновые кибер-полосы по бортам
+    const stripeGeo = new THREE.BoxGeometry(2.24, 0.18, 3.64);
+    const stripe = new THREE.Mesh(stripeGeo, cyanAccentMat);
+    this.helicopterGroup.add(stripe);
+
+    // Носовой фонарь кабины (тонированное голубое стекло)
+    const glassMat = new THREE.MeshPhysicalMaterial({
+      color: 0x00f3ff,
+      transparent: true,
+      opacity: 0.7,
+      roughness: 0.1,
+      metalness: 0.15,
+      transmission: 0.75
+    });
+    const noseGeo = new THREE.ConeGeometry(1.05, 1.6, 8);
+    const nose = new THREE.Mesh(noseGeo, glassMat);
+    nose.rotation.x = -Math.PI / 2;
+    nose.position.set(0, -0.1, 2.0);
+    this.helicopterGroup.add(nose);
+
+    // 3. Друг (Mactraher) в открытом бортовом проёме с мегафоном
+    const texLoader = new THREE.TextureLoader();
+    const friendTex = texLoader.load('./assets/mactraher.jpg');
+    const friendMat = new THREE.SpriteMaterial({ map: friendTex });
+    this.friendSprite = new THREE.Sprite(friendMat);
+    this.friendSprite.scale.set(1.3, 1.3, 1);
+    this.friendSprite.position.set(1.18, 0.1, 0.3);
+    this.helicopterGroup.add(this.friendSprite);
+
+    // Мегафон / громкоговоритель в руке друга (расположен ниже уровня лица, в руке у пояса)
+    const megaGroup = new THREE.Group();
+    megaGroup.position.set(1.22, -0.28, 0.50);
+    megaGroup.rotation.set(-0.15, 0.45, -0.25);
+
+    const megaMat = new THREE.MeshStandardMaterial({
+      color: 0xff6600,
+      emissive: 0xff3300,
+      emissiveIntensity: 0.35,
+      roughness: 0.35,
+      metalness: 0.2
+    });
+    const megaBodyMat = new THREE.MeshStandardMaterial({
+      color: 0xf0f0f0,
+      roughness: 0.4,
+      metalness: 0.3
+    });
+    const handleMat = new THREE.MeshStandardMaterial({
+      color: 0x111622,
+      roughness: 0.6,
+      metalness: 0.8
+    });
+
+    // Раструб мегафона (компактный и реалистичный, диаметр 20 см)
+    const bellGeo = new THREE.ConeGeometry(0.11, 0.26, 12, 1, true);
+    const bell = new THREE.Mesh(bellGeo, megaMat);
+    bell.rotation.z = Math.PI / 2;
+    bell.position.set(0.13, 0, 0);
+    megaGroup.add(bell);
+
+    // Цилиндрический корпус динамика
+    const bodyGeo = new THREE.CylinderGeometry(0.055, 0.055, 0.14, 12);
+    const body = new THREE.Mesh(bodyGeo, megaBodyMat);
+    body.rotation.z = Math.PI / 2;
+    body.position.set(-0.06, 0, 0);
+    megaGroup.add(body);
+
+    // Рукоятка
+    const handleGeo = new THREE.BoxGeometry(0.035, 0.12, 0.045);
+    const handle = new THREE.Mesh(handleGeo, handleMat);
+    handle.position.set(-0.04, -0.09, 0);
+    megaGroup.add(handle);
+
+    this.helicopterGroup.add(megaGroup);
+
+    // 4. Хвостовая балка
+    const tailBoomGeo = new THREE.CylinderGeometry(0.25, 0.42, 5.0, 8);
+    const tailBoom = new THREE.Mesh(tailBoomGeo, bodyMat);
+    tailBoom.rotation.x = Math.PI / 2;
+    tailBoom.position.set(0, 0.4, -3.8);
+    this.helicopterGroup.add(tailBoom);
+
+    // Вертикальный стабилизатор (хвостовой киль)
+    const finGeo = new THREE.BoxGeometry(0.14, 1.5, 1.0);
+    const fin = new THREE.Mesh(finGeo, bodyMat);
+    fin.position.set(0, 1.0, -6.1);
+    this.helicopterGroup.add(fin);
+
+    // 5. Несущий винт (4 лопасти)
+    this.mainRotorGroup = new THREE.Group();
+    this.mainRotorGroup.position.set(0, 1.15, 0.2);
+
+    const mastGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8);
+    const mast = new THREE.Mesh(mastGeo, darkMetalMat);
+    this.mainRotorGroup.add(mast);
+
+    const bladeGeo = new THREE.BoxGeometry(0.22, 0.04, 7.8);
+    const blade1 = new THREE.Mesh(bladeGeo, darkMetalMat);
+    const blade2 = new THREE.Mesh(bladeGeo, darkMetalMat);
+    blade2.rotation.y = Math.PI / 2;
+    this.mainRotorGroup.add(blade1);
+    this.mainRotorGroup.add(blade2);
+    this.helicopterGroup.add(this.mainRotorGroup);
+
+    // 6. Хвостовой рулевой винт
+    this.tailRotorGroup = new THREE.Group();
+    this.tailRotorGroup.position.set(0.15, 1.35, -6.1);
+    const tBladeGeo = new THREE.BoxGeometry(0.08, 1.4, 0.03);
+    const tBlade = new THREE.Mesh(tBladeGeo, darkMetalMat);
+    this.tailRotorGroup.add(tBlade);
+    this.helicopterGroup.add(this.tailRotorGroup);
+
+    // 7. Посадочные лыжи (шасси)
+    const skidGeo = new THREE.CylinderGeometry(0.06, 0.06, 3.8, 8);
+    [-0.9, 0.9].forEach((x) => {
+      const skid = new THREE.Mesh(skidGeo, darkMetalMat);
+      skid.rotation.x = Math.PI / 2;
+      skid.position.set(x, -1.05, 0);
+      this.helicopterGroup.add(skid);
+
+      const strutGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.7, 6);
+      const strutF = new THREE.Mesh(strutGeo, darkMetalMat);
+      strutF.position.set(x, -0.7, 1.0);
+      strutF.rotation.z = (x > 0) ? -0.25 : 0.25;
+      const strutB = new THREE.Mesh(strutGeo, darkMetalMat);
+      strutB.position.set(x, -0.7, -1.0);
+      strutB.rotation.z = (x > 0) ? -0.25 : 0.25;
+      this.helicopterGroup.add(strutF);
+      this.helicopterGroup.add(strutB);
+    });
+
+    // 8. Физический бортовой поисковый прожектор на вертолёте (Gimbal Searchlight / Nightsun)
+    this.searchPod = new THREE.Group();
+    // Монтируется под носом вертолёта (источник физически расположен на вертолёте)
+    this.searchPod.position.set(0, -0.85, 1.75);
+    this.helicopterGroup.add(this.searchPod);
+
+    // Кронштейн крепления к фюзеляжу
+    const mountGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.22, 8);
+    const mountMat = new THREE.MeshStandardMaterial({ color: 0x111622, roughness: 0.6, metalness: 0.8 });
+    const mount = new THREE.Mesh(mountGeo, mountMat);
+    mount.position.set(0, 0.11, 0);
+    this.searchPod.add(mount);
+
+    // Двухосевой моторизованный шарнирный гимбал (автономно наводится на зону поиска)
+    this.searchGimbal = new THREE.Group();
+    this.searchGimbal.position.set(0, 0, 0);
+    this.searchPod.add(this.searchGimbal);
+
+    // Цилиндрический корпус прожектора с радиаторными рёбрами
+    const barrelGeo = new THREE.CylinderGeometry(0.20, 0.22, 0.32, 14);
+    barrelGeo.rotateX(Math.PI / 2); // ориентирован вдоль оси луча +Z
+    const barrelMat = new THREE.MeshStandardMaterial({
+      color: 0x1e2430,
+      metalness: 0.85,
+      roughness: 0.3
+    });
+    const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+    this.searchGimbal.add(barrel);
+
+    // Яркая светящаяся фронтальная линза прожектора
+    const lensGeo = new THREE.CircleGeometry(0.20, 16);
+    const lensMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    this.searchLens = new THREE.Mesh(lensGeo, lensMat);
+    this.searchLens.position.set(0, 0, 0.165);
+    this.searchGimbal.add(this.searchLens);
+
+    // Ореол яркого свечения прожектора при взгляде на вертолёт снизу
+    const flareGeo = new THREE.PlaneGeometry(1.4, 1.4);
+    const flareMat = new THREE.MeshBasicMaterial({
+      color: 0xe6f3ff,
+      transparent: true,
+      opacity: 0.65,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const flareMesh = new THREE.Mesh(flareGeo, flareMat);
+    flareMesh.position.set(0, 0, 0.17);
+    this.searchGimbal.add(flareMesh);
+
+    // Реальный мощный бортовой прожектор (сфокусированный узкий поисковый луч, освещающий 3D-рельеф кратера)
+    this.heliSearchlight = new THREE.SpotLight(0xf2f7ff, 12.0, 150, Math.PI / 24, 0.45, 0);
+    this.heliSearchlight.position.set(0, 0, 0.18);
+    this.searchGimbal.add(this.heliSearchlight);
+
+    // Цель прожектора в мировом пространстве кратера (перемещается по траектории поиска)
+    this.heliSearchTarget = new THREE.Object3D();
+    this.heliSearchTarget.position.set(0, 2.5, 16);
+    this.root.add(this.heliSearchTarget);
+    this.heliSearchlight.target = this.heliSearchTarget;
+
+    // Атмосферный объёмный луч света (вершина строго на вертолёте, основание расширяется к земле)
+    const beamGeo = new THREE.ConeGeometry(1.0, 1.0, 32, 1, true);
+    // 1. Сдвигаем геометрию: вершина (источник) в (0, 0, 0), основание в (0, -1, 0)
+    beamGeo.translate(0, -0.5, 0);
+    // 2. Поворачиваем вокруг X на -90°: основание раскрывается вдоль локальной оси +Z к земле
+    beamGeo.rotateX(-Math.PI / 2);
+    beamGeo.computeVertexNormals();
+
+    const beamMat = new THREE.ShaderMaterial({
+      uniforms: {
+        beamColor: { value: new THREE.Color(0xd6eeff) },
+        beamOpacity: { value: 0.22 }
+      },
+      vertexShader: `
+        varying vec3 vLocalPos;
+        varying vec3 vNormalVec;
+        varying vec3 vViewDir;
+        void main() {
+          vLocalPos = position;
+          vNormalVec = normalize(normalMatrix * normal);
+          vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+          vViewDir = normalize(-mvPos.xyz);
+          gl_Position = projectionMatrix * mvPos;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 beamColor;
+        uniform float beamOpacity;
+        varying vec3 vLocalPos;
+        varying vec3 vNormalVec;
+        varying vec3 vViewDir;
+        void main() {
+          // vLocalPos.z: 0.0 у линзы вертолёта -> 1.0 у поверхности земли
+          float z = clamp(vLocalPos.z, 0.0, 1.0);
+
+          // Реалистичное затухание в атмосфере: насыщенный свет у прожектора, мягкое рассеяние в воздухе
+          float lenFade = pow(1.0 - z * 0.65, 1.4);
+
+          // Плавное растворение у земли без искусственных резких срезов геометрии
+          lenFade *= smoothstep(1.0, 0.82, z);
+
+          // Мягкая воздушная дымка пепла по краям луча (без жестких пластиковых граней)
+          float rim = 0.35 + 0.65 * pow(max(0.0, 1.0 - abs(dot(vNormalVec, vViewDir))), 1.4);
+
+          float finalAlpha = beamOpacity * lenFade * rim;
+          gl_FragColor = vec4(beamColor, finalAlpha);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    this.searchBeamMesh = new THREE.Mesh(beamGeo, beamMat);
+    this.root.add(this.searchBeamMesh);
+
+    // Параметры круговой траектории в голубом небе
+    this.helicopterGroup.scale.set(1.45, 1.45, 1.45);
+    this.heliAngle = 0;
+    this.heliRadius = 32;
+    this.heliAltitude = 48;
+
+    this.root.add(this.helicopterGroup);
+  }
+
+  updateHelicopter(delta, playerPos = null) {
+    if (!this.helicopterGroup) return;
+
+    // 1. Круговая траектория полёта вертолёта в небе над кратером
+    this.heliAngle += delta * 0.32;
+
+    const x = Math.cos(this.heliAngle) * this.heliRadius;
+    const z = Math.sin(this.heliAngle) * this.heliRadius;
+    const y = this.heliAltitude + Math.sin(this.heliAngle * 2.5) * 1.8;
+
+    this.helicopterGroup.position.set(x, y, z);
+    // Нос направлен по касательной к окружности
+    this.helicopterGroup.rotation.y = -this.heliAngle - Math.PI / 2;
+    // Наклон корпуса внутрь виража (крен)
+    this.helicopterGroup.rotation.z = -0.16;
+
+    // Вращение несущего и хвостового винтов
+    if (this.mainRotorGroup) {
+      this.mainRotorGroup.rotation.y += delta * 38;
+    }
+    if (this.tailRotorGroup) {
+      this.tailRotorGroup.rotation.x += delta * 48;
+    }
+
+    // 2. РЕАЛИСТИЧНОЕ АВТОНОМНОЕ ПЕРЕМЕЩЕНИЕ БОРТОВОГО ПРОЖЕКТОРА
+    this.searchTime = (this.searchTime || 0) + delta;
+    const st = this.searchTime;
+
+    // Вычисляем траекторию поискового луча:
+    // Широкие дуги сканирования по секторам кратера и периодическое наведение на игрока
+    let targetX, targetY, targetZ;
+    const cycle = st % 12;
+    if (playerPos && cycle > 7.5 && cycle < 11.0) {
+      const blend = Math.sin(((cycle - 7.5) / 3.5) * Math.PI);
+      const sweepX = Math.cos(st * 0.4) * 16 + Math.sin(st * 1.2) * 5;
+      const sweepZ = Math.sin(st * 0.35) * 16 + Math.cos(st * 0.9) * 5;
+      targetX = THREE.MathUtils.lerp(sweepX, playerPos.x, blend * 0.85);
+      targetZ = THREE.MathUtils.lerp(sweepZ, playerPos.z, blend * 0.85);
+      targetY = THREE.MathUtils.lerp(3.5, playerPos.y, blend);
+    } else {
+      const sweepRadius = 14 + Math.sin(st * 0.38) * 8.5;
+      const sweepAngle = st * 0.62 + Math.sin(st * 1.3) * 0.45;
+      targetX = Math.cos(sweepAngle) * sweepRadius;
+      targetZ = Math.sin(sweepAngle) * sweepRadius;
+      targetY = 2.5 + Math.sin(st * 0.75) * 3.5;
+    }
+
+    // Обновляем позицию цели прожектора в мире
+    if (this.heliSearchTarget) {
+      this.heliSearchTarget.position.set(targetX, targetY, targetZ);
+      this.heliSearchTarget.updateMatrixWorld(true);
+    }
+
+    // 3. Поворот гимбала прожектора на вертолете прямо к точке сканирования
+    if (this.searchGimbal && this.searchPod) {
+      const targetWorld = new THREE.Vector3(targetX, targetY, targetZ);
+      const gimbalWorld = this.searchGimbal.getWorldPosition(new THREE.Vector3());
+      const m = new THREE.Matrix4().lookAt(targetWorld, gimbalWorld, new THREE.Vector3(0, 1, 0));
+      const qWorld = new THREE.Quaternion().setFromRotationMatrix(m);
+      const podWorldQ = this.searchPod.getWorldQuaternion(new THREE.Quaternion());
+      this.searchGimbal.quaternion.copy(podWorldQ.clone().invert().multiply(qWorld));
+    }
+
+    // 4. Ориентация и масштабирование объёмного светового луча от вертолета к земле
+    if (this.searchBeamMesh && this.searchLens) {
+      const lampWorld = new THREE.Vector3();
+      this.searchLens.getWorldPosition(lampWorld);
+
+      const targetPos = this.heliSearchTarget.position;
+      const dist = lampWorld.distanceTo(targetPos);
+
+      // Вершина конуса строго фиксирована у линзы прожектора на вертолёте
+      this.searchBeamMesh.position.copy(lampWorld);
+      // Ось +Z направлена прямо в точку падения света на поверхности
+      this.searchBeamMesh.lookAt(targetPos);
+
+      // Основание конуса расширяется навстречу земле в соответствии с узким углом раскрытия SpotLight
+      const spotAngle = (this.heliSearchlight ? this.heliSearchlight.angle : Math.PI / 24);
+      const radiusAtTarget = Math.tan(spotAngle) * dist;
+
+      this.searchBeamMesh.scale.set(radiusAtTarget, radiusAtTarget, dist);
+    }
+  }
+
+  // =========================================================================
+  // ☁️ ГРОЗОВЫЕ ПЕПЕЛЬНЫЕ ОБЛАКА В КРАСНОМ НЕБЕ ВУЛКАНА
+  // =========================================================================
+
+  buildSkyClouds() {
+    this.cloudsGroup = new THREE.Group();
+    // Красно-пепельный оттенок дымовых облаков (MeshBasicMaterial для максимального FPS)
+    const cloudMat = new THREE.MeshBasicMaterial({
+      color: 0x8a1525,
+      transparent: true,
+      opacity: 0.65,
+      depthWrite: false
+    });
+
+    const cloudPuffGeo = new THREE.DodecahedronGeometry(6.5, 1);
+
+    for (let c = 0; c < 6; c++) {
+      const cluster = new THREE.Group();
+      const angle = (c / 6) * Math.PI * 2;
+      const dist = 45 + (c % 3) * 15;
+      const cx = Math.cos(angle) * dist;
+      const cz = Math.sin(angle) * dist;
+      const cy = 68 + (c % 4) * 5;
+
+      for (let p = 0; p < 3; p++) {
+        const puff = new THREE.Mesh(cloudPuffGeo, cloudMat);
+        puff.position.set(
+          (Math.random() - 0.5) * 10,
+          (Math.random() - 0.5) * 4,
+          (Math.random() - 0.5) * 10
+        );
+        const scale = 0.7 + Math.random() * 0.6;
+        puff.scale.set(scale * 1.4, scale * 0.7, scale * 1.2);
+        cluster.add(puff);
+      }
+
+      cluster.position.set(cx, cy, cz);
+      this.cloudsGroup.add(cluster);
+    }
+
+    this.root.add(this.cloudsGroup);
+  }
+
+  updateClouds(delta) {
+    if (this.cloudsGroup) {
+      this.cloudsGroup.rotation.y += delta * 0.012;
+    }
+  }
+
+  // =========================================================================
+  // 🌋 КРАСНАЯ МЕСТНОСТЬ ВОКРУГ ВУЛКАНА (ТРЕБОВАНИЕ 5)
+  // Внешние склоны конуса вулкана, багровая равнина с лавой и скальные пики
+  // =========================================================================
+
+  buildOuterVolcanoTerrain() {
+    this.outerTerrainGroup = new THREE.Group();
+
+    const outerMat = new THREE.MeshStandardMaterial({
+      map: getOuterTerrainTexture(),
+      roughness: 0.88,
+      metalness: 0.15,
+      side: THREE.FrontSide
+    });
+
+    // 1. Внешний конус вулкана: скалистые склоны, спускающиеся от жерла (R=34м, Y=38м) до подножия (R=115м, Y=0м)
+    const coneGeo = new THREE.CylinderGeometry(
+      this.calderaRadius * 1.08, // верх (край кальдеры)
+      115,                      // низ (подножие вулкана)
+      this.calderaHeight,       // высота
+      36,
+      3,
+      true                      // открытый цилиндр
+    );
+    // Добавляем процедурные неровности и гребни на склонах вулкана
+    const posAttr = coneGeo.attributes.position;
+    for (let i = 0; i < posAttr.count; i++) {
+      const y = posAttr.getY(i);
+      if (y < this.calderaHeight / 2 - 2) {
+        const factor = 1.0 + (Math.sin(posAttr.getX(i) * 0.12) * Math.cos(posAttr.getZ(i) * 0.12)) * 0.09;
+        posAttr.setX(i, posAttr.getX(i) * factor);
+        posAttr.setZ(i, posAttr.getZ(i) * factor);
+      }
+    }
+    coneGeo.computeVertexNormals();
+
+    const outerCone = new THREE.Mesh(coneGeo, outerMat);
+    outerCone.position.set(0, this.calderaHeight / 2, 0);
+    this.outerTerrainGroup.add(outerCone);
+
+    // 2. Огромная красная вулканическая равнина вокруг вулкана (R=35м .. 280м)
+    const groundGeo = new THREE.RingGeometry(this.calderaRadius * 1.05, 280, 48, 8);
+    const groundMesh = new THREE.Mesh(groundGeo, outerMat);
+    groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.position.set(0, 0.05, 0);
+    this.outerTerrainGroup.add(groundMesh);
+
+    // 3. Кольцо дальних остроконечных красных скал и пиков на горизонте
+    const peakGeo = new THREE.ConeGeometry(14, 46, 6);
+    const peakMat = new THREE.MeshStandardMaterial({
+      map: getVolcanoSideTexture(),
+      roughness: 0.9,
+      metalness: 0.1
+    });
+
+    for (let p = 0; p < 22; p++) {
+      const angle = (p / 22) * Math.PI * 2 + (Math.random() - 0.5) * 0.15;
+      const dist = 135 + (p % 3) * 30 + Math.random() * 25;
+      const px = Math.cos(angle) * dist;
+      const pz = Math.sin(angle) * dist;
+      const scaleH = 0.85 + Math.random() * 0.85;
+      const scaleW = 0.9 + Math.random() * 0.7;
+
+      const peak = new THREE.Mesh(peakGeo, peakMat);
+      peak.position.set(px, 20 * scaleH, pz);
+      peak.scale.set(scaleW, scaleH, scaleW);
+      peak.rotation.y = Math.random() * Math.PI * 2;
+      this.outerTerrainGroup.add(peak);
+    }
+
+    this.root.add(this.outerTerrainGroup);
+  }
+
+  destroy() {
+    if (this.root) {
+      this.root.traverse((child) => {
+        if (child.isMesh) {
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) {
+            if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
+            else child.material.dispose();
+          }
+        }
+      });
+      if (this.root.parent) {
+        this.root.parent.remove(this.root);
+      }
+    }
+  }
+}

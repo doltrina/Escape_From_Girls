@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { soundEngine } from './audio.js';
+import { FirstPersonBody } from './firstPersonBody.js';
 
 export class Player {
-  constructor(camera, domElement, map) {
+  constructor(camera, domElement, scene = null, map = null) {
     this.camera = camera;
     this.domElement = domElement;
+    this.scene = scene;
     this.map = map;
 
     this.position = new THREE.Vector3(0, 1.7, 0);
@@ -63,6 +65,23 @@ export class Player {
     this.extraLives = 0;
     this.invulnerabilityTimer = 0;
 
+    // Downed / Co-op Rescue State
+    this.isDowned = false;
+    this.downedTimer = 25.0;
+    this.targetEyeHeight = this.eyeHeight;
+    this.currentEyeHeight = this.eyeHeight;
+    this.revivingTarget = null;
+    this.reviveHoldTime = 0;
+    this.isHoldingRevive = false;
+
+    // Volcano Parkour & Abilities
+    this.canDoubleJump = true;
+    this.lastSafePlatformPos = new THREE.Vector3(0, 2.5, 16);
+    this.onMagmaDeath = null;
+    this.onRocketJump = null;
+    this.onDoubleJump = null;
+    this.onD20MagmaSave = null;
+
     // Inventory System
     this.inventory = {
       forcefield: 0,
@@ -73,19 +92,64 @@ export class Player {
     this.onInventoryChange = null;
     this.onItemUsed = null;
     this.onPassiveItemClicked = null;
+    this.onDownedStateChange = null;
 
     this.isLocked = false;
+    this.wasPointerLocked = false;
+    this.skipMouseMoveFrames = 0;
+
+    // Armor accent color
+    this.armorColor = localStorage.getItem('coop_player_color') || '#00f3ff';
+
+    // 🎮 True First-Person Body, Animated Hands & Viewmodel
+    this.fpBody = (this.scene) ? new FirstPersonBody(this, this.scene) : null;
+
     this.setupInputs();
   }
 
+  setArmorColor(colorHex) {
+    this.armorColor = colorHex;
+    if (this.fpBody && typeof this.fpBody.setArmorColor === 'function') {
+      this.fpBody.setArmorColor(colorHex);
+    }
+  }
+
+  setScene(scene) {
+    if (this.scene === scene) return;
+    this.scene = scene;
+    if (this.fpBody) {
+      this.fpBody.destroy();
+    }
+    this.fpBody = (this.scene) ? new FirstPersonBody(this, this.scene) : null;
+  }
+
+  setDowned(downed) {
+    this.isDowned = downed;
+    if (this.isDowned) {
+      this.downedTimer = 25.0;
+      this.targetEyeHeight = 0.45;
+      this.shieldActive = false;
+      this.shieldTimeRemaining = 0;
+      this.speedBoostTimeRemaining = 0;
+    } else {
+      this.targetEyeHeight = this.eyeHeight;
+      this.invulnerabilityTimer = 3.5; // Brief grace period after revive
+      this.stamina = 100;
+    }
+    if (this.onDownedStateChange) {
+      this.onDownedStateChange(this.isDowned);
+    }
+  }
+
   initFlashlight() {
-    this.flashlight = new THREE.SpotLight(0xfff4e0, 2.5, 25, Math.PI / 6, 0.4, 1.2);
-    this.flashlight.position.set(0.2, -0.2, -0.1);
+    this.flashlight = new THREE.SpotLight(0xfff4e0, 2.8, 35, Math.PI / 6.0, 0.35, 1.2);
+    // Origin at the front glass bezel of the 3D tactical flashlight in front of the hand
+    this.flashlight.position.set(0.22, -0.32, -0.58);
     this.camera.add(this.flashlight);
 
-    // Target slightly ahead
+    // Target straight ahead in the distance
     this.flashlightTarget = new THREE.Object3D();
-    this.flashlightTarget.position.set(0, 0, -5);
+    this.flashlightTarget.position.set(0.22, -0.32, -10.58);
     this.camera.add(this.flashlightTarget);
     this.flashlight.target = this.flashlightTarget;
   }
@@ -93,6 +157,23 @@ export class Player {
   toggleFlashlight() {
     this.flashlightOn = !this.flashlightOn;
     this.flashlight.intensity = this.flashlightOn ? 2.5 : 0;
+    if (this.fpBody) {
+      this.fpBody.triggerFlashlightToggle(this.flashlightOn);
+    } else {
+      soundEngine.playFlashlightClick(this.flashlightOn);
+    }
+  }
+
+  setFlashlightState(on, silent = false) {
+    this.flashlightOn = !!on;
+    if (this.flashlight) {
+      this.flashlight.intensity = this.flashlightOn ? 2.5 : 0;
+    }
+    if (this.fpBody && typeof this.fpBody.triggerFlashlightToggle === 'function') {
+      this.fpBody.triggerFlashlightToggle(this.flashlightOn, silent);
+    } else if (!silent) {
+      soundEngine.playFlashlightClick(this.flashlightOn);
+    }
   }
 
   setupInputs() {
@@ -104,15 +185,33 @@ export class Player {
     });
 
     document.addEventListener('pointerlockchange', () => {
-      this.isLocked = document.pointerLockElement === this.domElement;
+      this.isLocked = (document.pointerLockElement === this.domElement);
+      if (this.isLocked) {
+        this.wasPointerLocked = true;
+        // Skip first 2 mousemove frames to absorb the browser's cursor recentering delta spike
+        this.skipMouseMoveFrames = 2;
+      }
     });
 
     // Mouse movement
     window.addEventListener('mousemove', (e) => {
       if (!this.isLocked) return;
 
-      this.yaw -= e.movementX * this.mouseSensitivity;
-      this.pitch -= e.movementY * this.mouseSensitivity;
+      // Ignore cursor jump during pointer lock acquisition / recentering
+      if (this.skipMouseMoveFrames > 0) {
+        this.skipMouseMoveFrames--;
+        return;
+      }
+
+      // Safeguard against browser pointer lock delta spikes (frame hitches / cursor edge wrap)
+      const maxDelta = 75;
+      const rawX = (e.movementX !== undefined) ? e.movementX : (e.mozMovementX || e.webkitMovementX || 0);
+      const rawY = (e.movementY !== undefined) ? e.movementY : (e.mozMovementY || e.webkitMovementY || 0);
+      const moveX = Math.max(-maxDelta, Math.min(maxDelta, rawX));
+      const moveY = Math.max(-maxDelta, Math.min(maxDelta, rawY));
+
+      this.yaw -= moveX * this.mouseSensitivity;
+      this.pitch -= moveY * this.mouseSensitivity;
 
       // Clamp pitch to avoid neck snap (approx -85 to +85 degrees)
       const maxPitch = Math.PI / 2 - 0.05;
@@ -121,6 +220,11 @@ export class Player {
 
     // Keyboard inputs
     window.addEventListener('keydown', (e) => {
+      // Ignore if typing in text inputs or chat
+      if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
+        return;
+      }
+
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
         e.preventDefault();
       }
@@ -144,33 +248,46 @@ export class Player {
           break;
         case 'ShiftLeft':
         case 'ShiftRight':
-          this.keys.sprint = true;
+          if (!this.isDowned) this.keys.sprint = true;
           break;
         case 'Space':
           this.keys.jump = true;
-          if (this.isGrounded) {
+          if (this.isGrounded && !this.isDowned) {
             this.verticalVelocity = this.jumpForce;
             this.isGrounded = false;
+            this.canDoubleJump = true;
+            soundEngine.playJump();
+          } else if (!this.isGrounded && !this.isDowned && this.canDoubleJump) {
+            // Monster Energy allows double jump in mid-air
+            if (this.speedBoostTimeRemaining > 0) {
+              this.verticalVelocity = this.jumpForce * 1.15;
+              this.canDoubleJump = false;
+              soundEngine.playDoubleJump();
+              if (this.onDoubleJump) this.onDoubleJump();
+            }
           }
+          break;
+        case 'KeyE':
+          this.isHoldingRevive = true;
           break;
         case 'KeyF':
           this.toggleFlashlight();
           break;
         case 'Digit1':
         case 'Numpad1':
-          this.useItem('forcefield');
+          if (!this.isDowned) this.useItem('forcefield');
           break;
         case 'Digit2':
         case 'Numpad2':
-          this.useItem('energy_drink');
+          if (!this.isDowned) this.useItem('energy_drink');
           break;
         case 'Digit3':
         case 'Numpad3':
-          this.useItem('dakimakura');
+          if (!this.isDowned) this.useItem('dakimakura');
           break;
         case 'Digit4':
         case 'Numpad4':
-          this.useItem('d20_dice');
+          if (!this.isDowned) this.useItem('d20_dice');
           break;
       }
     });
@@ -200,21 +317,34 @@ export class Player {
         case 'Space':
           this.keys.jump = false;
           break;
+        case 'KeyE':
+          this.isHoldingRevive = false;
+          break;
       }
     });
   }
 
   spawnAt(pos) {
     this.position.copy(pos);
-    this.position.y = this.eyeHeight;
+    const spawnFloorY = (pos.y !== undefined) ? pos.y : 0;
+    this.position.y = spawnFloorY + this.eyeHeight;
+    this.lastSafePlatformPos.copy(this.position);
     this.velocity.set(0, 0, 0);
     this.verticalVelocity = 0;
+    this.isGrounded = true;
+    this.canDoubleJump = true;
     this.stamina = this.maxStamina;
     this.shieldActive = false;
     this.shieldTimeRemaining = 0;
     this.speedBoostTimeRemaining = 0;
     this.extraLives = 0;
     this.invulnerabilityTimer = 0;
+    this.setDowned(false);
+    this.currentEyeHeight = this.eyeHeight;
+    if (this.fpBody) {
+      this.fpBody.landDip = 0;
+      this.fpBody.landDipVelocity = 0;
+    }
     this.inventory = {
       forcefield: 0,
       energy_drink: 0,
@@ -226,8 +356,15 @@ export class Player {
     }
   }
 
-  update(delta) {
+  update(delta, remotePlayers = []) {
     if (delta > 0.1) delta = 0.1; // Clamp delta spikes
+
+    // Safeguard against NaN position / velocity spikes
+    if (isNaN(this.position.x) || isNaN(this.position.y) || isNaN(this.position.z)) {
+      this.position.copy(this.lastSafePlatformPos);
+      this.velocity.set(0, 0, 0);
+      this.verticalVelocity = 0;
+    }
 
     // Update powerup timers
     if (this.shieldTimeRemaining > 0) {
@@ -239,6 +376,14 @@ export class Player {
       this.invulnerabilityTimer -= delta;
     }
 
+    // Downed timer handling
+    if (this.isDowned) {
+      this.downedTimer = Math.max(0, this.downedTimer - delta);
+    }
+
+    // Smooth camera eye height
+    this.currentEyeHeight = THREE.MathUtils.lerp(this.currentEyeHeight, this.targetEyeHeight, 8 * delta);
+
     const hasSpeedBoost = this.speedBoostTimeRemaining > 0;
     if (hasSpeedBoost) {
       this.speedBoostTimeRemaining -= delta;
@@ -246,10 +391,15 @@ export class Player {
 
     // Determine target speed & stamina
     let isMoving = this.keys.forward || this.keys.backward || this.keys.left || this.keys.right;
-    let wantsSprint = this.keys.sprint && isMoving && !this.isExhausted;
+    let wantsSprint = this.keys.sprint && isMoving && !this.isExhausted && !this.isDowned;
 
     let targetSpeed = this.walkSpeed;
-    if (hasSpeedBoost) {
+    if (this.isDowned) {
+      // Crawling when downed
+      targetSpeed = 1.5;
+      wantsSprint = false;
+      this.stamina = 0;
+    } else if (hasSpeedBoost) {
       targetSpeed = this.sprintSpeed * 1.35;
       wantsSprint = true;
     } else if (wantsSprint && this.stamina > 0) {
@@ -276,13 +426,41 @@ export class Player {
     if (this.keys.right) this.moveDir.add(right);
     if (this.keys.left) this.moveDir.sub(right);
 
-    if (this.moveDir.lengthSq() > 0.001) {
-      this.moveDir.normalize();
-      const targetVel = this.moveDir.clone().multiplyScalar(targetSpeed);
-      this.velocity.lerp(targetVel, this.acceleration * delta);
+    if (this.isGrounded) {
+      // 1. Grounded Movement: Full responsive ground acceleration and friction
+      if (this.moveDir.lengthSq() > 0.001) {
+        this.moveDir.normalize();
+        const targetVel = this.moveDir.clone().multiplyScalar(targetSpeed);
+        this.velocity.lerp(targetVel, this.acceleration * delta);
+      } else {
+        // Ground friction decelerate
+        this.velocity.lerp(new THREE.Vector3(0, 0, 0), this.friction * delta);
+      }
     } else {
-      // Friction decelerate
-      this.velocity.lerp(new THREE.Vector3(0, 0, 0), this.friction * delta);
+      // 2. Airborne Physics: Ballistic momentum is preserved!
+      // In mid-air, player CANNOT artificially accelerate or boost speed!
+      const currentHorizontalSpeed = Math.hypot(this.velocity.x, this.velocity.z);
+
+      if (this.moveDir.lengthSq() > 0.001) {
+        this.moveDir.normalize();
+        // Air steering: very gentle guidance (4.0 vs 45.0) without adding artificial propulsion
+        const airControl = 4.0;
+        const maxAirSpeed = Math.max(this.walkSpeed * 0.6, currentHorizontalSpeed);
+        const airTargetVel = this.moveDir.clone().multiplyScalar(maxAirSpeed);
+        this.velocity.lerp(airTargetVel, airControl * delta);
+
+        // Strict clamp: mid-air steering cannot increase velocity magnitude
+        const newSpeed = Math.hypot(this.velocity.x, this.velocity.z);
+        if (newSpeed > maxAirSpeed && newSpeed > 0.001) {
+          const factor = maxAirSpeed / newSpeed;
+          this.velocity.x *= factor;
+          this.velocity.z *= factor;
+        }
+      } else {
+        // Minimal air drag (preserves natural parabolic jump momentum across chasms)
+        const airDrag = 0.4;
+        this.velocity.lerp(new THREE.Vector3(0, 0, 0), airDrag * delta);
+      }
     }
 
     // Apply horizontal movement with sub-stepping to prevent tunneling at high speeds
@@ -292,27 +470,90 @@ export class Player {
     const stepDelta = delta / subSteps;
 
     for (let s = 0; s < subSteps; s++) {
+      // Step X and resolve collision (slide against X walls)
       this.position.x += this.velocity.x * stepDelta;
+      this.map.resolveCollision(this.position, this.radius);
+
+      // Step Z and resolve collision (slide against Z walls)
       this.position.z += this.velocity.z * stepDelta;
       this.map.resolveCollision(this.position, this.radius);
+
+      // Resolve co-op teammate collisions so players don't walk through each other
+      if (remotePlayers && remotePlayers.length > 0) {
+        this.resolvePlayerCollisions(remotePlayers);
+      }
+    }
+
+    // 3D Floor & Platform Collision Query
+    const floorY = (this.map && typeof this.map.getFloorHeight === 'function')
+      ? this.map.getFloorHeight(this.position.x, this.position.z, this.position.y - this.eyeHeight + 0.4, this.radius)
+      : 0;
+
+    const groundY = floorY + this.eyeHeight;
+
+    // Track safe landing position for D20 miracle rescue (only on stable, non-crumbling platforms)
+    if (this.isGrounded) {
+      if (this.map && this.map.isCrater) {
+        if (floorY > this.map.magmaLevel + 1.8) {
+          this.lastSafePlatformPos.copy(this.position);
+        }
+        if (typeof this.map.onPlayerStep === 'function') {
+          this.map.onPlayerStep(this.position.x, this.position.z, floorY);
+        }
+      } else {
+        this.lastSafePlatformPos.copy(this.position);
+      }
     }
 
     // Gravity & Vertical Movement
-    if (!this.isGrounded) {
+    if (!this.isGrounded || this.position.y > groundY + 0.05) {
+      this.isGrounded = false;
       this.verticalVelocity += this.gravity * delta;
       this.position.y += this.verticalVelocity * delta;
 
-      if (this.position.y <= this.eyeHeight) {
-        this.position.y = this.eyeHeight;
+      if (this.position.y <= groundY) {
+        if (this.verticalVelocity < -3.5) {
+          soundEngine.playLand(Math.abs(this.verticalVelocity));
+        }
+        this.position.y = groundY;
         this.verticalVelocity = 0;
         this.isGrounded = true;
+        this.canDoubleJump = true;
+      }
+    }
+
+    // Safety net: in case player ever falls below floor on standard maze map
+    if (this.map && !this.map.isCrater && this.position.y < -2.0) {
+      this.position.copy(this.lastSafePlatformPos);
+      this.position.y = this.eyeHeight;
+      this.velocity.set(0, 0, 0);
+      this.verticalVelocity = 0;
+      this.isGrounded = true;
+    }
+
+    // Magma Contact Detection (The Floor is Lava!)
+    if (this.map && typeof this.map.isMagmaTouch === 'function' && this.map.isMagmaTouch(this.position.y - this.eyeHeight)) {
+      if (this.inventory.d20_dice > 0 || this.extraLives > 0) {
+        // D20 Miracle Rescue!
+        this.consumeD20Life();
+        soundEngine.playD20Save();
+        this.position.copy(this.lastSafePlatformPos);
+        this.velocity.set(0, 0, 0);
+        this.verticalVelocity = 4.0;
+        this.isGrounded = true;
+        if (this.onD20MagmaSave) this.onD20MagmaSave();
+      } else {
+        // Instant Magma Death
+        if (this.onMagmaDeath) {
+          this.onMagmaDeath();
+        }
       }
     }
 
     // Head bobbing effect
     const horizontalSpeed = Math.hypot(this.velocity.x, this.velocity.z);
     let bobOffset = 0;
-    if (this.isGrounded && horizontalSpeed > 0.5) {
+    if (this.isGrounded && horizontalSpeed > 0.5 && !this.isDowned) {
       const bobFreq = wantsSprint ? 14 : 9;
       this.bobTimer += delta * bobFreq;
       bobOffset = Math.sin(this.bobTimer) * (wantsSprint ? 0.08 : 0.04);
@@ -326,11 +567,73 @@ export class Player {
       this.bobTimer = 0;
     }
 
+    // Update First-Person Body, Animated Viewmodel & Camera Physics
+    if (this.fpBody) {
+      this.fpBody.update(delta);
+    }
+
     // Update Camera Position and Rotation
-    this.camera.position.set(this.position.x, this.position.y + bobOffset, this.position.z);
-    this.camera.rotation.order = 'YXZ';
-    this.camera.rotation.y = this.yaw;
-    this.camera.rotation.x = this.pitch;
+    // Anatomical Head/Neck Pivot:
+    // Natural head pitch pivot: subtle forward arc (0.04m -> 0.08m) and height offset (0.14m -> 0.12m)
+    // Camera stays 17cm-20cm above collar/chest (well outside 0.03m near-clip plane)
+    // while perfectly framing the chest, zipper, belt, thighs, and sneakers in the lower view!
+    const roll = (this.fpBody) ? this.fpBody.roll : 0;
+    const landDip = (this.fpBody) ? this.fpBody.landDip : 0;
+
+    const downPitchFactor = Math.max(0, -this.pitch / (Math.PI / 2));
+    const eyeForwardOffset = 0.04 + downPitchFactor * 0.04;
+    const eyeHeightOffset = 0.14 - downPitchFactor * 0.02;
+
+    const neckBaseY = (this.position.y - this.eyeHeight) + this.currentEyeHeight - 0.14 - landDip + bobOffset;
+    const camX = this.position.x - Math.sin(this.yaw) * eyeForwardOffset;
+    const camY = neckBaseY + eyeHeightOffset;
+    const camZ = this.position.z - Math.cos(this.yaw) * eyeForwardOffset;
+
+    this.camera.position.set(camX, camY, camZ);
+    this.camera.rotation.set(this.pitch, this.yaw, roll, 'YXZ');
+  }
+
+  resolvePlayerCollisions(remotePlayers) {
+    if (!remotePlayers || remotePlayers.length === 0) return;
+
+    for (const rp of remotePlayers) {
+      if (!rp || !rp.root) continue;
+      const rPos = rp.root.position;
+
+      // Vertical overlap check (both players within standing height of each other)
+      const teammateEyeY = rPos.y + this.eyeHeight;
+      const diffY = Math.abs(this.position.y - teammateEyeY);
+      if (diffY > 1.8) continue;
+
+      // Horizontal cylinder collision
+      const dx = this.position.x - rPos.x;
+      const dz = this.position.z - rPos.z;
+      const distSq = dx * dx + dz * dz;
+
+      // Downed teammates allow closer approach to revive with [E]
+      const minDist = rp.isDowned ? 0.60 : 0.88;
+      const minDistSq = minDist * minDist;
+
+      if (distSq < minDistSq && distSq > 0.00001) {
+        const dist = Math.sqrt(distSq);
+        const overlap = minDist - dist;
+        const nx = dx / dist;
+        const nz = dz / dist;
+
+        this.position.x += nx * overlap;
+        this.position.z += nz * overlap;
+
+        const velDot = this.velocity.x * nx + this.velocity.z * nz;
+        if (velDot < 0) {
+          this.velocity.x -= velDot * nx;
+          this.velocity.z -= velDot * nz;
+        }
+
+        if (this.map && typeof this.map.resolveCollision === 'function') {
+          this.map.resolveCollision(this.position, this.radius);
+        }
+      }
+    }
   }
 
   addToInventory(typeId) {
@@ -370,15 +673,32 @@ export class Player {
       this.onInventoryChange(this.inventory);
     }
 
+    // Trigger visible first-person hand animation
+    if (this.fpBody) {
+      this.fpBody.triggerItemAnimation(typeId);
+    }
+
     if (typeId === 'forcefield') {
       this.activateShield(6.0);
+      // Volcano Map Rocket Jump: blast launches player upward!
+      if (this.map && this.map.isCrater) {
+        this.verticalVelocity = 17.5;
+        this.isGrounded = false;
+        soundEngine.playRocketJump();
+        if (this.onRocketJump) this.onRocketJump();
+      }
     } else if (typeId === 'energy_drink') {
       this.activateSpeedBoost(5.0);
+      this.canDoubleJump = true;
       soundEngine.playDrinkEnergy();
     } else if (typeId === 'dakimakura') {
       soundEngine.playDropDecoy();
       if (this.onItemUsed) {
-        this.onItemUsed('dakimakura', this.position.clone());
+        // Throw decoy forward slightly ahead of player
+        const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+        const dropPos = this.position.clone().add(forward.multiplyScalar(3.5));
+        dropPos.y = Math.max(0, this.position.y - this.eyeHeight);
+        this.onItemUsed('dakimakura', dropPos);
       }
     }
 
@@ -392,6 +712,9 @@ export class Player {
       this.extraLives = this.inventory.d20_dice;
       this.invulnerabilityTimer = 2.5; // 2.5 seconds of safety!
       this.activateSpeedBoost(2.2); // Adrenaline burst to flee!
+      if (this.fpBody) {
+        this.fpBody.triggerItemAnimation('d20_dice');
+      }
       if (this.onInventoryChange) {
         this.onInventoryChange(this.inventory);
       }
