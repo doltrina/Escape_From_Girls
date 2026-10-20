@@ -1,33 +1,39 @@
 @echo off
-chcp 65001 >nul
 title Escape From Girls - Launcher
-
-echo ========================================================
-echo   🎮 Запуск Escape From Girls: Сохрани девственность!
-echo ========================================================
-echo.
 
 cd /d "%~dp0"
 
-echo Проверка наличия Node.js...
+echo [1/4] Checking Node.js installation...
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [ОШИБКА] Node.js не установлен!
-    echo Установите Node.js с официального сайта: https://nodejs.org/
+    echo [ERROR] Node.js is not found!
+    echo Please install Node.js from https://nodejs.org/
     pause
     exit /b 1
 )
 
-echo Запуск локального сервера...
-start "" node server.js
+echo [2/4] Checking dependencies...
+if not exist node_modules (
+    echo [INFO] Dependencies not found. Installing packages with npm...
+    call npm install
+    if %errorlevel% neq 0 (
+        echo [ERROR] Failed to install dependencies!
+        pause
+        exit /b 1
+    )
+)
 
-echo Ожидание запуска сервера...
-timeout /t 2 /nobreak >nul
+echo [3/4] Starting game server on http://localhost:3000 ...
+start "Escape From Girls Server" cmd /k "node server.js"
 
-echo Открытие игры в браузере...
+ping 127.0.0.1 -n 3 >nul
+
+echo [4/4] Launching browser...
 start http://localhost:3000
 
 echo.
-echo Сервер успешно запущен на http://localhost:3000
-echo Чтобы остановить сервер, закройте окно с запущенной нодой.
-echo Приятной игры!
+echo ========================================================
+echo   Escape From Girls server is running!
+echo   Close the server window when you want to stop playing.
+echo ========================================================
+
