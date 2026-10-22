@@ -36,4 +36,3 @@ echo ========================================================
 echo   Escape From Girls server is running!
 echo   Close the server window when you want to stop playing.
 echo ========================================================
-
