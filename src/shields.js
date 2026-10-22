@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { soundEngine } from './audio.js';
 
 export const SHIELD_TYPES = {
   FORCEFIELD: {
@@ -31,6 +32,58 @@ export const SHIELD_TYPES = {
   }
 };
 
+// Shared cached geometries and materials (zero re-allocation / zero shader recompile hitches!)
+let pickupResources = null;
+function getPickupResources() {
+  if (pickupResources) return pickupResources;
+
+  pickupResources = {
+    forcefieldGeo: new THREE.BoxGeometry(0.8, 0.4, 0.2),
+    forcefieldMat: new THREE.MeshStandardMaterial({
+      color: 0x22252a,
+      metalness: 0.9,
+      roughness: 0.2,
+      emissive: 0x005577,
+      emissiveIntensity: 0.5
+    }),
+    fanGeo: new THREE.CylinderGeometry(0.12, 0.12, 0.05, 12),
+    fanMat: new THREE.MeshBasicMaterial({ color: 0x00f3ff }),
+
+    energyDrinkGeo: new THREE.CylinderGeometry(0.16, 0.16, 0.55, 16),
+    energyDrinkMat: new THREE.MeshStandardMaterial({
+      color: 0x111111,
+      emissive: 0x22aa00,
+      emissiveIntensity: 0.6,
+      roughness: 0.3,
+      metalness: 0.8
+    }),
+
+    dakimakuraGeo: new THREE.BoxGeometry(0.35, 0.9, 0.15),
+    dakimakuraMat: new THREE.MeshStandardMaterial({
+      color: 0xff66cc,
+      roughness: 0.8,
+      emissive: 0xff0066,
+      emissiveIntensity: 0.4
+    }),
+
+    d20Geo: new THREE.IcosahedronGeometry(0.28, 0),
+    d20Mat: new THREE.MeshStandardMaterial({
+      color: 0xffaa00,
+      wireframe: true,
+      roughness: 0.2,
+      emissive: 0xff8800,
+      emissiveIntensity: 0.8
+    }),
+
+    ringGeo: new THREE.RingGeometry(0.3, 0.5, 20),
+    haloGeo: new THREE.SphereGeometry(0.32, 10, 8),
+    ringMaterials: new Map(),
+    haloMaterials: new Map()
+  };
+
+  return pickupResources;
+}
+
 export class ShieldManager {
   constructor(scene, map) {
     this.scene = scene;
@@ -57,89 +110,62 @@ export class ShieldManager {
   }
 
   createPickupMesh(type) {
+    const res = getPickupResources();
     const group = new THREE.Group();
 
     let mesh;
     if (type.id === 'forcefield') {
-      // GPU Box with glowing fans
-      const geo = new THREE.BoxGeometry(0.8, 0.4, 0.2);
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0x22252a,
-        metalness: 0.9,
-        roughness: 0.2,
-        emissive: 0x005577,
-        emissiveIntensity: 0.5
-      });
-      mesh = new THREE.Mesh(geo, mat);
+      mesh = new THREE.Mesh(res.forcefieldGeo, res.forcefieldMat);
 
-      // Fans
-      const fanGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.05, 12);
-      const fanMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
-      const fan1 = new THREE.Mesh(fanGeo, fanMat);
+      const fan1 = new THREE.Mesh(res.fanGeo, res.fanMat);
       fan1.position.set(-0.2, 0, 0.11);
       fan1.rotation.x = Math.PI / 2;
       mesh.add(fan1);
-      const fan2 = fan1.clone();
-      fan2.position.x = 0.2;
+
+      const fan2 = new THREE.Mesh(res.fanGeo, res.fanMat);
+      fan2.position.set(0.2, 0, 0.11);
+      fan2.rotation.x = Math.PI / 2;
       mesh.add(fan2);
 
     } else if (type.id === 'energy_drink') {
-      // Can
-      const geo = new THREE.CylinderGeometry(0.16, 0.16, 0.55, 16);
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0x111111,
-        emissive: 0x22aa00,
-        emissiveIntensity: 0.6,
-        roughness: 0.3,
-        metalness: 0.8
-      });
-      mesh = new THREE.Mesh(geo, mat);
-
+      mesh = new THREE.Mesh(res.energyDrinkGeo, res.energyDrinkMat);
     } else if (type.id === 'dakimakura') {
-      // Pillowed cushion
-      const geo = new THREE.BoxGeometry(0.35, 0.9, 0.15);
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0xff66cc,
-        roughness: 0.8,
-        emissive: 0xff0066,
-        emissiveIntensity: 0.4
-      });
-      mesh = new THREE.Mesh(geo, mat);
-
+      mesh = new THREE.Mesh(res.dakimakuraGeo, res.dakimakuraMat);
     } else {
-      // D20 Icosahedron
-      const geo = new THREE.IcosahedronGeometry(0.28, 0);
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0xffaa00,
-        wireframe: true,
-        roughness: 0.2,
-        emissive: 0xff8800,
-        emissiveIntensity: 0.8
-      });
-      mesh = new THREE.Mesh(geo, mat);
+      mesh = new THREE.Mesh(res.d20Geo, res.d20Mat);
     }
 
     group.add(mesh);
 
     // Glowing ground ring
-    const ringGeo = new THREE.RingGeometry(0.3, 0.5, 24);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: type.color,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.6
-    });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
+    if (!res.ringMaterials.has(type.color)) {
+      res.ringMaterials.set(type.color, new THREE.MeshBasicMaterial({
+        color: type.color,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.6
+      }));
+    }
+    const ringMat = res.ringMaterials.get(type.color);
+    const ring = new THREE.Mesh(res.ringGeo, ringMat);
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = -0.5;
     group.add(ring);
 
-    // Light source
-    const light = new THREE.PointLight(type.color, 1.8, 4.5, 2);
-    light.position.set(0, 0, 0);
-    group.add(light);
+    // Holographic energy glow halo (no dynamic PointLight = zero shader recompile hitches!)
+    if (!res.haloMaterials.has(type.color)) {
+      res.haloMaterials.set(type.color, new THREE.MeshBasicMaterial({
+        color: type.color,
+        transparent: true,
+        opacity: 0.28,
+        wireframe: true
+      }));
+    }
+    const haloMat = res.haloMaterials.get(type.color);
+    const halo = new THREE.Mesh(res.haloGeo, haloMat);
+    group.add(halo);
 
-    return { group, innerMesh: mesh, ring };
+    return { group, innerMesh: mesh, ring, halo };
   }
 
   spawnRandomPickup(nearPlayerPos = null) {
@@ -147,8 +173,28 @@ export class ShieldManager {
     const randomKey = keys[Math.floor(Math.random() * keys.length)];
     const type = SHIELD_TYPES[randomKey];
 
-    const pos = this.map.getRandomSpawnPoint(nearPlayerPos, 12);
-    pos.y = 1.0;
+    let pos;
+    if (this.map && typeof this.map.getPickupSpawnPoint === 'function') {
+      pos = this.map.getPickupSpawnPoint(nearPlayerPos);
+    } else if (this.map && typeof this.map.getRandomSpawnPoint === 'function') {
+      pos = this.map.getRandomSpawnPoint(nearPlayerPos, 12);
+      if (!this.map.isCrater) {
+        pos.y = 1.0;
+      }
+    } else {
+      pos = new THREE.Vector3(0, 1.0, 0);
+    }
+
+    // Absolute safeguard: on volcano map, NEVER spawn on starting altar (0, 2.5, 16) or within 8m!
+    if (this.map && this.map.isCrater) {
+      if (Math.hypot(pos.x, pos.z - 16) < 8.0) {
+        if (typeof this.map.getPickupSpawnPoint === 'function') {
+          pos = this.map.getPickupSpawnPoint(nearPlayerPos);
+        } else {
+          pos = new THREE.Vector3(5.0, 21.6, 17.0);
+        }
+      }
+    }
 
     const { group, innerMesh, ring } = this.createPickupMesh(type);
     group.position.copy(pos);
@@ -171,13 +217,14 @@ export class ShieldManager {
     }
     this.pickups = [];
 
-    // Spawn initial set
-    for (let i = 0; i < this.maxPickups; i++) {
+    // Volcano map: 3 pickups strategically placed on mid/high tiers. Maze: maxPickups (4).
+    const count = (this.map && this.map.isCrater) ? 3 : this.maxPickups;
+    for (let i = 0; i < count; i++) {
       this.spawnRandomPickup(playerPos);
     }
   }
 
-  update(delta, player, girl, onNotify) {
+  update(delta, player, girl, onNotify, remotePlayers = []) {
     // Update player shield aura visual
     if (player.shieldActive) {
       this.playerAura.position.copy(player.position);
@@ -188,9 +235,11 @@ export class ShieldManager {
       this.playerAura.material.opacity = 0;
     }
 
-    // Periodically spawn new pickup if below max
+    // Periodically spawn new pickup if below max (Balanced: 25s for volcano, 10s for maze)
+    const maxAllowed = (this.map && this.map.isCrater) ? 3 : this.maxPickups;
+    const respawnDelay = (this.map && this.map.isCrater) ? 25.0 : 10.0;
     this.spawnTimer += delta;
-    if (this.pickups.length < this.maxPickups && this.spawnTimer > 10.0) {
+    if (this.pickups.length < maxAllowed && this.spawnTimer > respawnDelay) {
       this.spawnTimer = 0;
       this.spawnRandomPickup(player.position);
     }
@@ -205,14 +254,16 @@ export class ShieldManager {
       p.innerMesh.rotation.x = Math.sin(p.hoverOffset * 0.5) * 0.2;
       p.group.position.y = p.position.y + Math.sin(p.hoverOffset) * 0.15;
 
-      // Distance to player
-      const dist = Math.hypot(p.position.x - pPos.x, p.position.z - pPos.z);
-      if (dist < 1.3) {
+      // 1. Check local player collection
+      const distFlat = Math.hypot(p.position.x - pPos.x, p.position.z - pPos.z);
+      const distY = Math.abs(p.position.y - pPos.y);
+      if (distFlat < 1.6 && distY < 2.2) {
         // Collect into player inventory!
         player.addToInventory(p.type.id);
         if (p.type.id === 'd20_dice') {
           player.addExtraLife();
         }
+        soundEngine.playItemPickup();
 
         if (onNotify) {
           onNotify(p.type);
@@ -220,6 +271,26 @@ export class ShieldManager {
 
         this.scene.remove(p.group);
         this.pickups.splice(i, 1);
+        continue;
+      }
+
+      // 2. Check co-op teammates collection (removes picked up artifacts from shared world)
+      if (remotePlayers && remotePlayers.length > 0) {
+        let takenByTeammate = false;
+        for (const rp of remotePlayers) {
+          if (!rp || rp.isDowned) continue;
+          const rPos = (rp.root && rp.root.position) ? rp.root.position : (rp.position ? rp.position : null);
+          if (!rPos) continue;
+          const rDistFlat = Math.hypot(p.position.x - rPos.x, p.position.z - rPos.z);
+          const rDistY = Math.abs(p.position.y - (rPos.y + 0.9));
+          if (rDistFlat < 1.8 && rDistY < 2.2) {
+            this.scene.remove(p.group);
+            this.pickups.splice(i, 1);
+            takenByTeammate = true;
+            break;
+          }
+        }
+        if (takenByTeammate) continue;
       }
     }
   }

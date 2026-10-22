@@ -37,11 +37,11 @@
   <div id="hud" class="hidden">
     <!-- Top Bar -->
     <div class="hud-top">
-      <div class="hud-panel">
+      <div class="hud-panel hud-panel-timer">
         <div class="hud-timer" id="hud-timer">00:00.00</div>
       </div>
 
-      <div class="hud-panel">
+      <div class="hud-panel hud-panel-record">
         <div class="hud-record" id="hud-record">🏆 РЕКОРД: 00:00.00</div>
       </div>
 
@@ -55,7 +55,50 @@
         <div class="stat-badge">
           ❤️ ЖИЗНИ: <span id="hud-lives-count">1</span>
         </div>
+        <div class="stat-badge altitude-badge" id="hud-altitude-badge">
+          🌋 ВЫСОТА: <span id="hud-altitude-value">2m</span>
+        </div>
       </div>
+
+      <!-- Co-op Teammates Squad HUD -->
+      <div id="hud-coop-squad" class="hud-panel coop-squad-panel hidden">
+        <div class="squad-title">👥 ОТРЯД</div>
+        <div class="squad-list" id="squad-list">
+          <!-- Dynamic team members -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ⛩️ Torii Gate Defense Countdown Ring -->
+    <div id="hud-torii-countdown" class="torii-countdown-banner hidden">
+      <div class="torii-symbol">⛩️</div>
+      <div class="torii-text">
+        <strong id="torii-title">АКТИВАЦИЯ ВРАТ ТОРИИ</strong>
+        <p>Держи оборону вершины! Врата откроются через: <span id="torii-seconds">10</span>с</p>
+      </div>
+    </div>
+
+
+    <!-- Center HUD overlays: Revive prompt & Downed Banner -->
+    <div id="hud-revive-prompt" class="revive-prompt hidden">
+      <div class="revive-progress-ring">
+        <svg viewBox="0 0 44 44">
+          <circle cx="22" cy="22" r="18" class="revive-bg-ring"></circle>
+          <circle cx="22" cy="22" r="18" class="revive-fill-ring" id="revive-ring-fill"></circle>
+        </svg>
+        <span class="revive-key">E</span>
+      </div>
+      <div class="revive-text">
+        <strong id="revive-target-name">СПАСЕНИЕ БРО</strong>
+        <span>Удерживай [E], чтобы спасти девственность!</span>
+      </div>
+    </div>
+
+    <!-- Downed Banner -->
+    <div id="hud-downed-banner" class="downed-banner hidden">
+      <div class="downed-pulse"></div>
+      <h2>🆘 ТЕБЯ ЗАГНАЛИ В УГОЛ!</h2>
+      <p>Твоя девственность под угрозой! Ожидай помощи напарника (<span id="downed-timer-num">25</span>с)</p>
     </div>
 
     <!-- Bottom Bar -->
@@ -116,6 +159,14 @@
         </div>
       </div>
     </div>
+
+    <!-- In-Game Chat Box -->
+    <div id="hud-chat-box" class="hud-chat-box hidden">
+      <div class="chat-logs" id="chat-logs"></div>
+      <form id="chat-form" class="chat-input-bar">
+        <input type="text" id="chat-input" maxlength="100" placeholder="Напиши сообщение (Enter для отправки, Esc закрыть)..." autocomplete="off">
+      </form>
+    </div>
   </div>
 
   <!-- Audio element for custom Nextbot music -->
@@ -131,19 +182,58 @@
 
       <p class="game-tagline" id="menu-tagline">
         Она рыщет по коридорам... Если догонит — прощай, девственность!<br>
-        Найди <strong>3 золотых ключа</strong> (один спрятан в опасном тупике!) и открой бронедверь <strong>ВЫХОД</strong>, чтобы сбежать на свободу!
+        Собери <strong>3 священных ключа</strong> и открой путь на свободу!
       </p>
+      <!-- Map Selection Tabs -->
+      <div class="map-selection-card" id="map-selection-section">
+        <div class="map-selection-title">🗺️ ВЫБОР КАРТЫ:</div>
+        <div class="map-tabs-grid" id="map-tabs-grid">
+          <div class="map-tab active" id="tab-map-crater" data-map="crater">
+            <div class="map-tab-badge">НОВИНКА 🔥</div>
+            <div class="map-tab-icon">🌋</div>
+            <div class="map-tab-info">
+              <div class="map-tab-name">МЕСЯЧНЫЙ ВУЛКАН</div>
+              <div class="map-tab-desc">3 яруса • Месячные поднимаются • Паук-Некстбот • Врата Тории</div>
+            </div>
+          </div>
+          <div class="map-tab" id="tab-map-maze" data-map="maze">
+            <div class="map-tab-icon">🏛️</div>
+            <div class="map-tab-info">
+              <div class="map-tab-name">КЛАССИЧЕСКИЙ ЛАБИРИНТ</div>
+              <div class="map-tab-desc">Коридоры • Броне-дверь • Хоррор Nextbot 3D</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div class="menu-action-buttons">
-        <button id="btn-resume-game" class="btn-primary" style="display: none;">
+        <button id="btn-resume-game" class="btn-primary resume-btn" style="display: none;">
           ▶ ПРОДОЛЖИТЬ ПОБЕГ
         </button>
-        <button id="btn-start-game" class="btn-primary">
-          ▶ НАЧАТЬ ПОБЕГ
-        </button>
-        <button id="btn-restart-from-pause" class="btn-secondary" style="display: none;">
-          🔄 С НАЧАЛА
-        </button>
+        <div class="mode-select-grid" id="main-mode-select">
+          <button id="btn-start-game" class="btn-primary mode-btn">
+            <span class="btn-icon">🎮</span>
+            <div class="mode-btn-content">
+              <span class="mode-title">ОДИНОЧНЫЙ ПОБЕГ</span>
+              <span class="mode-desc">Классический режим выживания</span>
+            </div>
+          </button>
+          <button id="btn-open-coop" class="btn-primary coop-launch-btn mode-btn">
+            <span class="btn-icon">👥</span>
+            <div class="mode-btn-content">
+              <span class="mode-title">КООПЕРАТИВ (ОНЛАЙН)</span>
+              <span class="mode-desc">Побег с друзьями • Спасай девственность бро!</span>
+            </div>
+          </button>
+        </div>
+        <div class="pause-secondary-grid" id="pause-secondary-grid" style="display: none;">
+          <button id="btn-restart-from-pause" class="btn-secondary">
+            🔄 С НАЧАЛА
+          </button>
+          <button id="btn-leave-coop-room" class="btn-secondary">
+            🏠 В ГЛАВНОЕ МЕНЮ
+          </button>
+        </div>
       </div>
 
       <!-- Artifacts Legend -->
@@ -151,32 +241,32 @@
         <div class="feature-box">
           <div class="feature-icon">🛡️</div>
           <div class="feature-info">
-            <h4>RTX 5090 (Силовое Поле)</h4>
-            <p>Отталкивает девушку взрывной волной при приближении</p>
+            <h4 id="legend-name-forcefield">RTX 5090 (Силовое Поле)</h4>
+            <p id="legend-desc-forcefield">Отталкивает девушку взрывной волной при приближении</p>
           </div>
         </div>
 
         <div class="feature-box">
           <div class="feature-icon">⚡</div>
           <div class="feature-info">
-            <h4>Monster / Flash</h4>
-            <p>Ультра-буст скорости и бесконечная выносливость на 5с</p>
+            <h4 id="legend-name-energy_drink">Monster / Flash</h4>
+            <p id="legend-desc-energy_drink">Ультра-буст скорости и бесконечная выносливость на 5с</p>
           </div>
         </div>
 
         <div class="feature-box">
           <div class="feature-icon">🎎</div>
           <div class="feature-info">
-            <h4>Дакимакура (Приманка)</h4>
-            <p>Девушка залипает на аниме-подушку на 5 секунд</p>
+            <h4 id="legend-name-dakimakura">Дакимакура (Приманка)</h4>
+            <p id="legend-desc-dakimakura">Девушка залипает на аниме-подушку на 5 секунд</p>
           </div>
         </div>
 
         <div class="feature-box">
           <div class="feature-icon">🎲</div>
           <div class="feature-info">
-            <h4>D20 Кость</h4>
-            <p>Дополнительная жизнь (+1 спасение от девственности)</p>
+            <h4 id="legend-name-d20_dice">D20 Кость</h4>
+            <p id="legend-desc-d20_dice">Дополнительная жизнь (+1 спасение от девственности)</p>
           </div>
         </div>
       </div>
@@ -288,10 +378,23 @@
         <input type="range" id="volume-slider" class="range-slider" min="0" max="1" step="0.05" value="0.8">
       </div>
 
+      <!-- Cutscenes Settings Toggle -->
+      <div class="setting-toggle-box">
+        <label class="toggle-checkbox-label" for="setting-skip-cutscenes">
+          <input type="checkbox" id="setting-skip-cutscenes">
+          <span class="custom-toggle-slider"></span>
+          <span class="toggle-title">🎬 Пропускать катсцены</span>
+        </label>
+        <p class="toggle-subtext">Автоматически пропускать сюжетные катсцены перед началом уровней</p>
+      </div>
+
       <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
           <button id="btn-author-preset" class="btn-secondary" style="color: #00f3ff; border-color: rgba(0, 243, 255, 0.5); background: rgba(0, 243, 255, 0.1);">
             ⭐ Авторские настройки
+          </button>
+          <button id="btn-reset-cutscenes" class="btn-secondary" style="color: #ff0077; border-color: rgba(255, 0, 119, 0.4);">
+            🎬 Пересмотреть сюжет
           </button>
           <button id="btn-reset-assets" class="btn-secondary" style="color: #ffaa00;">
             Сбросить на стандартные
@@ -315,9 +418,10 @@
     </div>
 
     <div class="game-over-content">
-      <h1 class="game-over-title">
+      <h1 class="game-over-title" id="go-title">
         ТЫ ПОТЕРЯЛ ДЕВСТВЕННОСТЬ<br>ТЫ ПРОИГРАЛ
       </h1>
+      <p class="game-over-subtitle" id="go-subtitle" style="font-size: 16px; color: #ff88a3; margin-bottom: 20px; text-shadow: 0 0 10px rgba(255,0,85,0.5);"></p>
 
       <div class="game-over-stats">
         <div class="game-over-stat-item">
@@ -338,12 +442,16 @@
         <button id="btn-restart-game" class="btn-primary">
           🔄 ПОПРОБОВАТЬ СПАСТИСЬ СНОВА
         </button>
+        <button id="btn-go-to-menu" class="btn-secondary">
+          🏠 В ГЛАВНОЕ МЕНЮ
+        </button>
         <button id="btn-toggle-video-sound" class="btn-secondary" style="display: none;">
           🔊 Звук: ВКЛ
         </button>
         <button id="btn-go-settings" class="btn-secondary">
           ⚙️ СМЕНИТЬ ВИДЕО / ФОТО
         </button>
+        <div id="go-coop-restart-notice" class="waiting-notice hidden" style="margin-top: 12px; font-weight: bold; color: #ffaa00; width: 100%; text-align: center;">⏳ Только хост может перезапустить игру. Ожидание хоста...</div>
       </div>
     </div>
   </div>
@@ -359,11 +467,11 @@
     </div>
 
     <div class="game-over-content victory-content">
-      <h1 class="victory-title">
+      <h1 class="victory-title" id="vic-title">
         ТЫ СОХРАНИЛ ДЕВСТВЕННОСТЬ!<br><span class="victory-subtitle-text">СЧАСТЛИВЫЙ КОНЕЦ (ПОБЕДА)</span>
       </h1>
-      <div class="victory-badge-large">👑 ИСТИННЫЙ СИГМА-САМУРАЙ 👑</div>
-      <p class="victory-description">
+      <div class="victory-badge-large" id="vic-badge">👑 ИСТИННЫЙ СИГМА-САМУРАЙ 👑</div>
+      <p class="victory-description" id="vic-desc">
         Ты собрал все 3 ключа, обхитрил девушку и вырвался на свободу! Твоя свобода и чистая душа в безопасности!
       </p>
 
@@ -386,18 +494,170 @@
         <button id="btn-victory-restart" class="btn-primary victory-btn">
           👑 СЫГРАТЬ ЕЩЕ РАЗ
         </button>
+        <button id="btn-victory-to-menu" class="btn-secondary">
+          🏠 В ГЛАВНОЕ МЕНЮ
+        </button>
         <button id="btn-toggle-victory-sound" class="btn-secondary" style="display: none;">
           🔊 Звук: ВКЛ
         </button>
         <button id="btn-victory-settings" class="btn-secondary">
           ⚙️ НАСТРОЙКИ
         </button>
+        <div id="vic-coop-restart-notice" class="waiting-notice hidden" style="margin-top: 12px; font-weight: bold; color: #ffaa00; width: 100%; text-align: center;">⏳ Только хост может перезапустить игру. Ожидание хоста...</div>
       </div>
     </div>
   </div>
 
   <!-- Audio element for custom Victory music -->
   <audio id="victory-audio" loop playsinline></audio>
+
+  <!-- Co-op Online Multiplayer Lobby Modal -->
+  <div id="coop-modal" class="hidden">
+    <div class="settings-card coop-card">
+      <div class="settings-header">
+        <h2>👥 ОНЛАЙН КООПЕРАТИВ</h2>
+        <button id="btn-close-coop" class="close-btn">&times;</button>
+      </div>
+
+      <!-- Player Setup (Name & Color) -->
+      <div class="coop-player-setup">
+        <div class="setup-field">
+          <label for="coop-name-input">Твой позывной самурая:</label>
+          <input type="text" id="coop-name-input" maxlength="16" placeholder="Введи ник (например, Самурай)">
+        </div>
+        <div class="setup-field">
+          <label>Цвет твоей брони:</label>
+          <div class="color-picker-row" id="color-picker-row">
+            <button type="button" class="color-dot active" data-color="#00f3ff" style="background:#00f3ff"></button>
+            <button type="button" class="color-dot" data-color="#39ff14" style="background:#39ff14"></button>
+            <button type="button" class="color-dot" data-color="#ff0077" style="background:#ff0077"></button>
+            <button type="button" class="color-dot" data-color="#ffaa00" style="background:#ffaa00"></button>
+            <button type="button" class="color-dot" data-color="#a855f7" style="background:#a855f7"></button>
+            <button type="button" class="color-dot" data-color="#ff3344" style="background:#ff3344"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Connection Screen (Matchmaking & Rooms) -->
+      <div id="coop-connect-view" class="coop-view-section">
+        <div class="coop-actions-grid">
+          <div class="coop-action-card">
+            <h3>⚡ Быстрая игра</h3>
+            <p>Подключись к общему серверу и сбегай от девушки вместе со всеми самураями!</p>
+            <button id="btn-coop-quick" class="btn-primary">В БОЙ (ОБЩАЯ КОМНАТА)</button>
+          </div>
+          <div class="coop-action-card">
+            <h3>🔒 Игра с друзьями</h3>
+            <p>Создай отдельную комнату или введи код лобби своего друга</p>
+            <div class="coop-join-row">
+              <input type="text" id="coop-room-code-input" maxlength="12" placeholder="КОД КОМНАТЫ">
+              <button id="btn-coop-join" class="btn-secondary">ВОЙТИ</button>
+            </div>
+            <button id="btn-coop-create" class="btn-secondary" style="margin-top: 10px; width: 100%;">🏠 СОЗДАТЬ СВОЮ КОМНАТУ</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- In-Lobby Room Screen (Shown when connected to room) -->
+      <div id="coop-room-view" class="coop-view-section hidden">
+        <div class="room-status-bar">
+          <div class="room-badge">
+            <span>КОМНАТА:</span>
+            <strong id="coop-display-room">PUBLIC</strong>
+            <button id="btn-copy-room-code" class="btn-copy-code" title="Скопировать код">📋</button>
+          </div>
+          <div class="room-players-count" id="coop-players-count">1/4 Игроков</div>
+        </div>
+
+        <div class="coop-player-list" id="coop-player-list">
+          <!-- Dynamically populated players -->
+        </div>
+
+        <!-- Public room kick timer banner -->
+        <div id="coop-public-timer-banner" class="coop-public-timer-banner hidden">
+          ⏱️ Нажмите «Я ГОТОВ»! Исключение через: <strong id="coop-kick-seconds">10</strong> сек.
+        </div>
+
+        <div class="coop-lobby-actions">
+          <button id="btn-coop-leave" class="btn-secondary">ВЫЙТИ ИЗ КОМНАТЫ</button>
+          <button id="btn-coop-ready" class="btn-primary">🟢 Я ГОТОВ</button>
+          <button id="btn-coop-start-game" class="btn-primary" style="display: none;">🚀 НАЧАТЬ ПОБЕГ ВМЕСТЕ</button>
+          <div id="coop-waiting-host-notice" class="waiting-notice">Ожидание готовности игроков...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 👁️ Co-op Spectator Mode Overlay -->
+  <div id="spectator-hud" class="spectator-hud hidden">
+    <div class="spectator-top-bar">
+      <div class="spectator-badge">
+        <span class="spectator-icon">👁️</span>
+        <span>РЕЖИМ НАБЛЮДЕНИЯ (ВЫ ПОГИБЛИ)</span>
+      </div>
+      <div class="spectator-target-box">
+        <span>Следим за:</span>
+        <strong id="spectator-target-name">Бро</strong>
+      </div>
+      <div class="spectator-controls">
+        <button id="btn-spectator-prev" class="btn-spectator-arrow" title="Предыдущий игрок">◀ [A]</button>
+        <button id="btn-spectator-next" class="btn-spectator-arrow" title="Следующий игрок">[D] ▶</button>
+      </div>
+    </div>
+    <div class="spectator-bottom-hint">
+      [ЛКМ] / [ПКМ] или стрелочки [←] [→] — смена игрока
+    </div>
+  </div>
+
+  <!-- 🎬 Cinematic Story Cutscenes Overlay -->
+  <div id="cutscene-overlay" class="cutscene-overlay hidden">
+    <!-- Letterbox cinematic bars -->
+    <div class="cutscene-letterbox top"></div>
+    <div class="cutscene-letterbox bottom"></div>
+
+    <!-- Screen FX layer for eye waking blur, warp, flash -->
+    <div id="cutscene-fx-layer" class="cutscene-fx-layer"></div>
+
+    <!-- 2D / Viewmodel Stage (Street visual, shrinking art, smartphone, helicopter) -->
+    <div id="cutscene-stage" class="cutscene-stage"></div>
+
+    <!-- Dialogue / Subtitles Box -->
+    <div id="cutscene-subtitles" class="cutscene-subtitles hidden">
+      <div class="subtitle-speaker" id="subtitle-speaker">Спикер</div>
+      <div class="subtitle-text" id="subtitle-text">Текст диалога...</div>
+    </div>
+
+    <!-- Hold to Skip prompt with SVG circular progress ring -->
+    <div id="cutscene-skip-container" class="cutscene-skip-container">
+      <div class="skip-ring-wrap">
+        <svg class="skip-ring-svg" viewBox="0 0 44 44">
+          <circle cx="22" cy="22" r="18" class="skip-ring-bg"></circle>
+          <circle cx="22" cy="22" r="18" class="skip-ring-fill" id="skip-ring-fill"></circle>
+        </svg>
+        <span class="skip-icon">⏩</span>
+      </div>
+      <div class="skip-label">
+        <span class="skip-hint">Удерживай <kbd>ПРОБЕЛ</kbd> или <kbd>ЛКМ</kbd></span>
+        <span class="skip-action">Пропустить сюжет</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🎬 Cutscene Skip Frequency Prompt Modal -->
+  <div id="cutscene-freq-modal" class="hidden">
+    <div class="settings-card prompt-card">
+      <div class="settings-header">
+        <h2>🎬 Пропуск сюжета</h2>
+      </div>
+      <p style="font-size: 16px; color: #ffffff; line-height: 1.5; margin: 12px 0;">
+        Вы часто пропускаете сюжет. Отключить катсцены в настройках?
+      </p>
+      <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 15px;">
+        <button id="btn-freq-yes" class="btn-primary" style="padding: 10px 24px;">Да</button>
+        <button id="btn-freq-no" class="btn-secondary" style="padding: 10px 24px;">Нет</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Main Game Logic Entrypoint -->
   <script type="module" src="./src/main.js"></script>
