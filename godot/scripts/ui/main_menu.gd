@@ -12,6 +12,7 @@ extends Control
 @onready var btn_close_controls: Button = find_child("BtnClose", true, false)
 @onready var background_rect: TextureRect = find_child("Background", true, false)
 @onready var girl_eyes: TextureRect = find_child("GirlEyesFlare", true, false)
+@onready var logo_rect: TextureRect = find_child("Logo", true, false)
 
 var selected_map: GameManager.MapType = GameManager.MapType.MAZE
 
@@ -21,19 +22,20 @@ var next_blink_time: float = 3.2
 var is_blinking: bool = false
 var blink_timer: float = 0.0
 
+# Glitch shader variables
+var glitch_timer: float = 2.0
+var glitch_active: bool = false
+var glitch_duration: float = 0.0
+
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	GameManager.change_state(GameManager.GameState.MENU)
 
-	# Ensure generated menu background texture is loaded
-	if background_rect:
-		var tex = load("res://assets/textures/menu_bg.png")
+	# Background texture is assigned directly in the scene (menu_bg.jpg)
+	if background_rect and not background_rect.texture:
+		var tex = load("res://assets/textures/menu_bg.jpg")
 		if not tex:
-			var global_path = ProjectSettings.globalize_path("res://assets/textures/menu_bg.png")
-			if FileAccess.file_exists(global_path):
-				var img = Image.new()
-				if img.load(global_path) == OK:
-					tex = ImageTexture.create_from_image(img)
+			tex = load("res://assets/textures/menu_bg.png")
 		if tex:
 			background_rect.texture = tex
 
@@ -42,6 +44,18 @@ func _ready() -> void:
 			highscore_label.text = "🏆 РЕКОРД ВЫЖИВАНИЯ: %.1f сек" % GameManager.high_score
 		else:
 			highscore_label.text = "🏆 РЕКОРД ВЫЖИВАНИЯ: 0.0 сек"
+
+	if girl_eyes:
+		girl_eyes.pivot_offset = girl_eyes.size * 0.5
+		girl_eyes.scale = Vector2.ONE
+
+	# Setup smooth hover scaling on all buttons
+	_setup_button_hover(btn_play)
+	_setup_button_hover(btn_map)
+	_setup_button_hover(btn_controls)
+	_setup_button_hover(btn_quit)
+	_setup_button_hover(btn_preset)
+	_setup_button_hover(btn_close_controls)
 
 	if btn_play:
 		btn_play.pressed.connect(_on_play_pressed)
@@ -64,6 +78,20 @@ func _ready() -> void:
 	update_map_button()
 	update_preset_button()
 
+func _setup_button_hover(btn: Button) -> void:
+	if not btn: return
+	btn.pivot_offset = btn.size / 2.0
+	btn.resized.connect(func(): if is_instance_valid(btn): btn.pivot_offset = btn.size / 2.0)
+	btn.mouse_entered.connect(func(): _animate_button_scale(btn, 1.05))
+	btn.mouse_exited.connect(func(): _animate_button_scale(btn, 1.0))
+	btn.focus_entered.connect(func(): _animate_button_scale(btn, 1.05))
+	btn.focus_exited.connect(func(): _animate_button_scale(btn, 1.0))
+
+func _animate_button_scale(btn: Button, target_scale: float) -> void:
+	if not is_instance_valid(btn): return
+	var tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(btn, "scale", Vector2(target_scale, target_scale), 0.14)
+
 func _process(delta: float) -> void:
 	# Menacing breathing and blinking red eye flares on nextbot silhouette
 	if girl_eyes:
@@ -76,18 +104,38 @@ func _process(delta: float) -> void:
 			next_blink_time -= delta
 			if next_blink_time <= 0.0:
 				is_blinking = true
-				blink_timer = 0.14
-				next_blink_time = randf_range(2.5, 5.5)
+				blink_timer = 0.12
+				next_blink_time = randf_range(2.8, 6.0)
 		else:
 			blink_timer -= delta
-			pulse *= 0.05 # Eyes shut
+			pulse = 0.0 # Eyes completely shut when blinking
 			if blink_timer <= 0.0:
 				is_blinking = false
-				pulse = 1.5 # Intense flare on reopening!
+				pulse = 1.6 # Intense flare on reopening!
 
-		girl_eyes.modulate.a = clampf(pulse, 0.0, 1.7)
-		var s = 0.96 + pulse * 0.1
-		girl_eyes.scale = Vector2(s, s)
+		# Modulate alpha & glow only - never touch scale or position so eyes stay perfectly aligned
+		var a = clampf(pulse, 0.0, 1.8)
+		girl_eyes.modulate = Color(1.0 + clampf(pulse - 1.0, 0.0, 0.6), 0.9, 0.9, a)
+		girl_eyes.scale = Vector2.ONE
+
+	# Dynamic periodic cyber glitch burst on logo
+	if logo_rect and logo_rect.material is ShaderMaterial:
+		var mat = logo_rect.material as ShaderMaterial
+		if not glitch_active:
+			glitch_timer -= delta
+			if glitch_timer <= 0.0:
+				glitch_active = true
+				glitch_duration = randf_range(0.18, 0.30)
+				glitch_timer = randf_range(2.8, 5.0)
+		else:
+			glitch_duration -= delta
+			var intensity = randf_range(0.45, 0.95)
+			mat.set_shader_parameter("glitch_intensity", intensity)
+			if glitch_duration <= 0.0:
+				glitch_active = false
+				mat.set_shader_parameter("glitch_intensity", 0.0)
+
+
 
 func update_map_button() -> void:
 	if not btn_map: return
