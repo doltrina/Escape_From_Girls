@@ -11,8 +11,15 @@ extends Control
 @onready var controls_popup: Control = find_child("ControlsPopup", true, false)
 @onready var btn_close_controls: Button = find_child("BtnClose", true, false)
 @onready var background_rect: TextureRect = find_child("Background", true, false)
+@onready var girl_eyes: TextureRect = find_child("GirlEyesFlare", true, false)
 
 var selected_map: GameManager.MapType = GameManager.MapType.MAZE
+
+# Eyes animation variables
+var eye_time: float = 0.0
+var next_blink_time: float = 3.2
+var is_blinking: bool = false
+var blink_timer: float = 0.0
 
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -56,6 +63,31 @@ func _ready() -> void:
 
 	update_map_button()
 	update_preset_button()
+
+func _process(delta: float) -> void:
+	# Menacing breathing and blinking red eye flares on nextbot silhouette
+	if girl_eyes:
+		eye_time += delta
+		# Smooth sinister breathing pulsation
+		var pulse = 0.85 + sin(eye_time * 2.6) * 0.35 + sin(eye_time * 5.8) * 0.15
+
+		# Lifelike periodic blinking
+		if not is_blinking:
+			next_blink_time -= delta
+			if next_blink_time <= 0.0:
+				is_blinking = true
+				blink_timer = 0.14
+				next_blink_time = randf_range(2.5, 5.5)
+		else:
+			blink_timer -= delta
+			pulse *= 0.05 # Eyes shut
+			if blink_timer <= 0.0:
+				is_blinking = false
+				pulse = 1.5 # Intense flare on reopening!
+
+		girl_eyes.modulate.a = clampf(pulse, 0.0, 1.7)
+		var s = 0.96 + pulse * 0.1
+		girl_eyes.scale = Vector2(s, s)
 
 func update_map_button() -> void:
 	if not btn_map: return

@@ -158,4 +158,71 @@ btn_red_press = draw_hud_bracket_button(
 )
 btn_red_press.save("godot/assets/textures/hud_btn_red_press.png", "PNG")
 
+# 6. Red Close Button with Hazard Stripes (Normal & Hover)
+def draw_close_red_button(w=220, h=44, is_hover=False):
+    scale = 2
+    sw, sh = w * scale, h * scale
+    img = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
+    glow_img = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    glow_draw = ImageDraw.Draw(glow_img)
+
+    pad = 5 * scale
+    x0, y0 = pad, pad
+    x1, y1 = sw - pad, sh - pad
+    corner_cut = 7 * scale
+    bracket_w = 16 * scale
+    line_w = max(2, int(2.2 * scale))
+
+    fill_col = (45, 12, 20, 220) if is_hover else (25, 8, 14, 185)
+    body_poly = [
+        (x0 + corner_cut, y0),
+        (x1 - corner_cut, y0),
+        (x1, y0 + corner_cut),
+        (x1, y1 - corner_cut),
+        (x1 - corner_cut, y1),
+        (x0 + corner_cut, y1),
+        (x0, y1 - corner_cut),
+        (x0, y0 + corner_cut)
+    ]
+    draw.polygon(body_poly, fill=fill_col)
+
+    bracket_col = (255, 110, 140, 255) if is_hover else (255, 50, 80, 255)
+    glow_col = (255, 50, 90, 220) if is_hover else (240, 30, 70, 140)
+
+    left_b = [(x0 + bracket_w, y0), (x0 + corner_cut, y0), (x0, y0 + corner_cut), (x0, y1 - corner_cut), (x0 + corner_cut, y1), (x0 + bracket_w, y1)]
+    right_b = [(x1 - bracket_w, y0), (x1 - corner_cut, y0), (x1, y0 + corner_cut), (x1, y1 - corner_cut), (x1 - corner_cut, y1), (x1 - bracket_w, y1)]
+
+    glow_draw.line(left_b, fill=glow_col, width=line_w + (5 * scale if is_hover else 3 * scale))
+    glow_draw.line(right_b, fill=glow_col, width=line_w + (5 * scale if is_hover else 3 * scale))
+
+    top_l = [(x0 + bracket_w + 8 * scale, y0), (x1 - bracket_w - 8 * scale, y0)]
+    bot_l = [(x0 + bracket_w + 8 * scale, y1), (x1 - bracket_w - 8 * scale, y1)]
+    glow_draw.line(top_l, fill=glow_col, width=line_w + 2 * scale)
+    glow_draw.line(bot_l, fill=glow_col, width=line_w + 2 * scale)
+
+    glow_img = glow_img.filter(ImageFilter.GaussianBlur(radius=3 * scale if not is_hover else 4 * scale))
+
+    draw.line(left_b, fill=bracket_col, width=line_w)
+    draw.line(right_b, fill=bracket_col, width=line_w)
+    draw.line(top_l, fill=bracket_col, width=max(1, int(1.2 * scale)))
+    draw.line(bot_l, fill=bracket_col, width=max(1, int(1.2 * scale)))
+
+    # Diagonal hazard stripes inside brackets
+    for k in range(3):
+        sx = x0 + (5 + k * 3.5) * scale
+        draw.line([(sx, y1 - 3 * scale), (sx + 3 * scale, y0 + 3 * scale)], fill=bracket_col, width=int(1.2 * scale))
+        rx = x1 - (5 + k * 3.5) * scale
+        draw.line([(rx, y1 - 3 * scale), (rx - 3 * scale, y0 + 3 * scale)], fill=bracket_col, width=int(1.2 * scale))
+
+    final = Image.alpha_composite(glow_img, img)
+    final = final.resize((w, h), Image.Resampling.LANCZOS)
+    return final
+
+btn_close_norm = draw_close_red_button(220, 44, False)
+btn_close_norm.save("godot/assets/textures/hud_btn_close_norm.png", "PNG")
+
+btn_close_hover = draw_close_red_button(220, 44, True)
+btn_close_hover.save("godot/assets/textures/hud_btn_close_hover.png", "PNG")
+
 print("Generated all HUD bracket button textures successfully!")
