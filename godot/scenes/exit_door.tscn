@@ -1,0 +1,111 @@
+[gd_scene load_steps=12 format=3 uid="uid://cexitdoor001"]
+
+[ext_resource type="Script" path="res://scripts/items/exit_door.gd" id="1_door"]
+[ext_resource type="Texture2D" path="res://assets/textures/exit_sign.png" id="2_exit_sign"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_frame"]
+albedo_color = Color(0.12, 0.14, 0.18, 1)
+metallic = 0.8
+roughness = 0.3
+
+[sub_resource type="BoxMesh" id="BoxMesh_frame_pillar"]
+material = SubResource("StandardMaterial3D_frame")
+size = Vector3(0.5, 4.2, 0.5)
+
+[sub_resource type="BoxMesh" id="BoxMesh_frame_top"]
+material = SubResource("StandardMaterial3D_frame")
+size = Vector3(4.5, 0.6, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_leaf"]
+albedo_color = Color(0.2, 0.22, 0.28, 1)
+metallic = 0.95
+roughness = 0.25
+
+[sub_resource type="BoxMesh" id="BoxMesh_leaf"]
+material = SubResource("StandardMaterial3D_leaf")
+size = Vector3(3.6, 3.8, 0.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_leaf"]
+size = Vector3(3.6, 3.8, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sign"]
+albedo_texture = ExtResource("2_exit_sign")
+emission_enabled = true
+emission_texture = ExtResource("2_exit_sign")
+emission_energy_multiplier = 1.2
+
+[sub_resource type="QuadMesh" id="QuadMesh_sign"]
+material = SubResource("StandardMaterial3D_sign")
+size = Vector2(3.2, 1.0)
+
+[sub_resource type="SphereMesh" id="SphereMesh_led"]
+radius = 0.12
+height = 0.24
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_trigger"]
+size = Vector3(4.0, 3.5, 2.5)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_exit"]
+size = Vector3(3.5, 3.5, 2.0)
+
+[node name="ExitDoor" type="Node3D"]
+script = ExtResource("1_door")
+
+[node name="FramePillarL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9, 2.1, 0)
+mesh = SubResource("BoxMesh_frame_pillar")
+
+[node name="FramePillarR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.9, 2.1, 0)
+mesh = SubResource("BoxMesh_frame_pillar")
+
+[node name="FrameTop" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.9, 0)
+mesh = SubResource("BoxMesh_frame_top")
+
+[node name="DoorLeaf" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="DoorLeaf"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.9, 0)
+mesh = SubResource("BoxMesh_leaf")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="DoorLeaf"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.9, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DoorLeaf/StaticBody3D"]
+shape = SubResource("BoxShape3D_leaf")
+
+[node name="ExitSign" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.3, 0.28)
+mesh = SubResource("QuadMesh_sign")
+
+[node name="Locks" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3, 0.28)
+
+[node name="LED1" type="MeshInstance3D" parent="Locks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.6, 0, 0)
+mesh = SubResource("SphereMesh_led")
+
+[node name="LED2" type="MeshInstance3D" parent="Locks"]
+mesh = SubResource("SphereMesh_led")
+
+[node name="LED3" type="MeshInstance3D" parent="Locks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.6, 0, 0)
+mesh = SubResource("SphereMesh_led")
+
+[node name="TriggerZone" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 1.2)
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TriggerZone"]
+shape = SubResource("BoxShape3D_trigger")
+
+[node name="ExitZone" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, -1.2)
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ExitZone"]
+shape = SubResource("BoxShape3D_exit")
