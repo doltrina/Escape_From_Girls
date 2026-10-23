@@ -60,9 +60,9 @@ func _ready() -> void:
 func update_map_button() -> void:
 	if not btn_map: return
 	if selected_map == GameManager.MapType.MAZE:
-		btn_map.text = "🗺️ КАРТА: КЛАССИЧЕСКИЙ ЛАБИРИНТ"
+		btn_map.text = "КАРТА: КЛАССИЧЕСКИЙ ЛАБИРИНТ"
 	else:
-		btn_map.text = "🌋 КАРТА: МЕСЯЧНЫЙ ВУЛКАН"
+		btn_map.text = "КАРТА: МЕСЯЧНЫЙ ВУЛКАН"
 
 func update_preset_button() -> void:
 	if not btn_preset: return

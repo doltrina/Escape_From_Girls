@@ -1,141 +1,94 @@
-[gd_scene load_steps=12 format=3 uid="uid://cmainmenu001"]
+[gd_scene load_steps=18 format=3 uid="uid://cmainmenu001"]
 
 [ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_menu"]
 [ext_resource type="Texture2D" path="res://assets/textures/menu_bg.png" id="2_bg_tex"]
+[ext_resource type="FontFile" path="res://assets/fonts/tech_font.ttf" id="3_tech_font"]
+[ext_resource type="Texture2D" path="res://assets/textures/hud_btn_red_norm.png" id="4_red_norm"]
+[ext_resource type="Texture2D" path="res://assets/textures/hud_btn_red_hover.png" id="5_red_hover"]
+[ext_resource type="Texture2D" path="res://assets/textures/hud_btn_red_press.png" id="6_red_press"]
+[ext_resource type="Texture2D" path="res://assets/textures/hud_btn_cyan_norm.png" id="7_cyan_norm"]
+[ext_resource type="Texture2D" path="res://assets/textures/hud_btn_cyan_hover.png" id="8_cyan_hover"]
+[ext_resource type="Texture2D" path="res://assets/textures/hud_btn_cyan_press.png" id="9_cyan_press"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_play"]
-bg_color = Color(0.04, 0.45, 0.65, 0.95)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.15, 0.95, 1, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-shadow_color = Color(0, 0.8, 1, 0.35)
-shadow_size = 10
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_red_norm"]
+texture = ExtResource("4_red_norm")
+texture_margin_left = 32.0
+texture_margin_top = 10.0
+texture_margin_right = 32.0
+texture_margin_bottom = 10.0
+axis_stretch_horizontal = 1
+axis_stretch_vertical = 1
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_play_hover"]
-bg_color = Color(0.08, 0.62, 0.88, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.8, 1, 1, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-shadow_color = Color(0, 0.95, 1, 0.6)
-shadow_size = 14
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_red_hover"]
+texture = ExtResource("5_red_hover")
+texture_margin_left = 32.0
+texture_margin_top = 10.0
+texture_margin_right = 32.0
+texture_margin_bottom = 10.0
+axis_stretch_horizontal = 1
+axis_stretch_vertical = 1
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_norm"]
-bg_color = Color(0.07, 0.09, 0.14, 0.88)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0, 0.75, 0.95, 0.4)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_red_press"]
+texture = ExtResource("6_red_press")
+texture_margin_left = 32.0
+texture_margin_top = 10.0
+texture_margin_right = 32.0
+texture_margin_bottom = 10.0
+axis_stretch_horizontal = 1
+axis_stretch_vertical = 1
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_hover"]
-bg_color = Color(0.12, 0.28, 0.42, 0.95)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0, 0.95, 1, 0.95)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-shadow_color = Color(0, 0.7, 1, 0.25)
-shadow_size = 8
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_cyan_norm"]
+texture = ExtResource("7_cyan_norm")
+texture_margin_left = 32.0
+texture_margin_top = 10.0
+texture_margin_right = 32.0
+texture_margin_bottom = 10.0
+axis_stretch_horizontal = 1
+axis_stretch_vertical = 1
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_press"]
-bg_color = Color(0.05, 0.4, 0.6, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.8, 1, 1, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_cyan_hover"]
+texture = ExtResource("8_cyan_hover")
+texture_margin_left = 32.0
+texture_margin_top = 10.0
+texture_margin_right = 32.0
+texture_margin_bottom = 10.0
+axis_stretch_horizontal = 1
+axis_stretch_vertical = 1
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_quit"]
-bg_color = Color(0.12, 0.06, 0.08, 0.85)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.8, 0.2, 0.3, 0.45)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_quit_hover"]
-bg_color = Color(0.48, 0.1, 0.16, 0.95)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.3, 0.4, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-shadow_color = Color(1, 0.1, 0.2, 0.35)
-shadow_size = 10
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
-bg_color = Color(0.03, 0.04, 0.08, 0.82)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0, 0.85, 1, 0.45)
-corner_radius_top_left = 16
-corner_radius_top_right = 16
-corner_radius_bottom_right = 16
-corner_radius_bottom_left = 16
-shadow_color = Color(0, 0, 0, 0.75)
-shadow_size = 22
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_badge"]
-bg_color = Color(0.05, 0.07, 0.11, 0.9)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(1, 0.8, 0.2, 0.65)
-corner_radius_top_left = 16
-corner_radius_top_right = 16
-corner_radius_bottom_right = 16
-corner_radius_bottom_left = 16
-shadow_color = Color(0, 0, 0, 0.5)
-shadow_size = 6
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_cyan_press"]
+texture = ExtResource("9_cyan_press")
+texture_margin_left = 32.0
+texture_margin_top = 10.0
+texture_margin_right = 32.0
+texture_margin_bottom = 10.0
+axis_stretch_horizontal = 1
+axis_stretch_vertical = 1
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_popup"]
-bg_color = Color(0.04, 0.05, 0.09, 0.97)
+bg_color = Color(0.04, 0.05, 0.09, 0.96)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
 border_color = Color(0, 0.9, 1, 0.8)
-corner_radius_top_left = 16
-corner_radius_top_right = 16
-corner_radius_bottom_right = 16
-corner_radius_bottom_left = 16
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
 shadow_color = Color(0, 0, 0, 0.85)
 shadow_size = 28
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_popup"]
+bg_color = Color(0.08, 0.12, 0.18, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0, 0.8, 1, 0.5)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -147,7 +100,6 @@ grow_vertical = 2
 script = ExtResource("1_menu")
 
 [node name="Background" type="TextureRect" parent="."]
-modulate = Color(0.9, 0.92, 1, 1)
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -158,7 +110,7 @@ texture = ExtResource("2_bg_tex")
 expand_mode = 1
 stretch_mode = 6
 
-[node name="DarkOverlay" type="ColorRect" parent="."]
+[node name="SoftVignette" type="ColorRect" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -166,176 +118,129 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.02, 0.03, 0.06, 0.42)
+color = Color(0.01, 0.02, 0.04, 0.15)
 
 [node name="TitleBox" type="VBoxContainer" parent="."]
 layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -450.0
-offset_top = 28.0
-offset_right = 450.0
-offset_bottom = 135.0
-grow_horizontal = 2
+offset_left = 68.0
+offset_top = 62.0
+offset_right = 520.0
+offset_bottom = 280.0
 theme_override_constants/separation = 4
+
+[node name="TechHeader" type="HBoxContainer" parent="TitleBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Chevrons" type="Label" parent="TitleBox/TechHeader"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.2, 0.35, 1)
+theme_override_fonts/font = ExtResource("3_tech_font")
+theme_override_font_sizes/font_size = 14
+text = ">>>"
+
+[node name="TechTag" type="Label" parent="TitleBox/TechHeader"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.1, 0.85, 1, 0.7)
+theme_override_fonts/font = ExtResource("3_tech_font")
+theme_override_font_sizes/font_size = 11
+text = "DANGER // PURSUIT_AI // 01.E9.23"
 
 [node name="Title" type="Label" parent="TitleBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0, 0.95, 1, 1)
-theme_override_colors/font_shadow_color = Color(0, 0.4, 0.75, 0.8)
-theme_override_constants/shadow_offset_x = 3
-theme_override_constants/shadow_offset_y = 3
-theme_override_font_sizes/font_size = 48
-text = "ESCAPE FROM GIRLS"
-horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0.9, 1, 0.65)
+theme_override_colors/font_outline_color = Color(1, 0.08, 0.5, 0.85)
+theme_override_constants/shadow_offset_x = 0
+theme_override_constants/shadow_offset_y = 0
+theme_override_constants/shadow_outline_size = 14
+theme_override_constants/outline_size = 4
+theme_override_constants/line_spacing = -12
+theme_override_fonts/font = ExtResource("3_tech_font")
+theme_override_font_sizes/font_size = 62
+text = "ESCAPE
+FROM GIRLS"
 
 [node name="Subtitle" type="Label" parent="TitleBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.82, 0.25, 1)
+theme_override_colors/font_color = Color(1, 0.32, 0.42, 1)
+theme_override_colors/font_shadow_color = Color(0.8, 0, 0.25, 0.6)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_fonts/font = ExtResource("3_tech_font")
 theme_override_font_sizes/font_size = 18
-text = "🛡️ СОХРАНИ СВОЮ ДЕВСТВЕННОСТЬ • NEXTBOT 3D HORROR 🛡️"
-horizontal_alignment = 1
+text = "— СОХРАНИ СВОЮ ДЕВСТВЕННОСТЬ"
 
-[node name="HighScoreBadge" type="PanelContainer" parent="."]
-layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -170.0
-offset_top = 142.0
-offset_right = 170.0
-offset_bottom = 176.0
-grow_horizontal = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_badge")
-
-[node name="Margin" type="MarginContainer" parent="HighScoreBadge"]
+[node name="SubTechInfo" type="HBoxContainer" parent="TitleBox"]
 layout_mode = 2
-theme_override_constants/margin_left = 14
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_right = 14
-theme_override_constants/margin_bottom = 4
+theme_override_constants/separation = 16
 
-[node name="HighScoreLabel" type="Label" parent="HighScoreBadge/Margin"]
+[node name="HighScoreLabel" type="Label" parent="TitleBox/SubTechInfo"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.88, 0.35, 1)
-theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 0.9)
+theme_override_fonts/font = ExtResource("3_tech_font")
+theme_override_font_sizes/font_size = 13
 text = "🏆 РЕКОРД ВЫЖИВАНИЯ: 0.0 сек"
-horizontal_alignment = 1
-vertical_alignment = 1
 
-[node name="MenuCard" type="PanelContainer" parent="."]
+[node name="ButtonsContainer" type="VBoxContainer" parent="."]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -260.0
-offset_top = -162.0
-offset_right = 260.0
-offset_bottom = 278.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+offset_left = 68.0
+offset_top = 315.0
+offset_right = 432.0
+offset_bottom = 575.0
+theme_override_constants/separation = 12
 
-[node name="Margin" type="MarginContainer" parent="MenuCard"]
-layout_mode = 2
-theme_override_constants/margin_left = 22
-theme_override_constants/margin_top = 18
-theme_override_constants/margin_right = 22
-theme_override_constants/margin_bottom = 18
-
-[node name="VBoxContainer" type="VBoxContainer" parent="MenuCard/Margin"]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="BtnPlay" type="Button" parent="MenuCard/Margin/VBoxContainer"]
-custom_minimum_size = Vector2(0, 52)
+[node name="BtnPlay" type="Button" parent="ButtonsContainer"]
+custom_minimum_size = Vector2(364, 52)
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 22
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn_play")
-theme_override_styles/hover = SubResource("StyleBoxFlat_btn_play_hover")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_press")
-text = "▶ НАЧАТЬ ИГРУ"
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("3_tech_font")
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxTexture_red_norm")
+theme_override_styles/hover = SubResource("StyleBoxTexture_red_hover")
+theme_override_styles/pressed = SubResource("StyleBoxTexture_red_press")
+theme_override_styles/focus = SubResource("StyleBoxTexture_red_hover")
+text = "▶  НАЧАТЬ ИГРУ"
 
-[node name="BtnMap" type="Button" parent="MenuCard/Margin/VBoxContainer"]
-custom_minimum_size = Vector2(0, 44)
+[node name="BtnMap" type="Button" parent="ButtonsContainer"]
+custom_minimum_size = Vector2(364, 48)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
-theme_override_font_sizes/font_size = 15
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn_norm")
-theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_press")
-text = "🗺️ КАРТА: КЛАССИЧЕСКИЙ ЛАБИРИНТ"
+theme_override_colors/font_color = Color(0.9, 0.98, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("3_tech_font")
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBoxTexture_cyan_norm")
+theme_override_styles/hover = SubResource("StyleBoxTexture_cyan_hover")
+theme_override_styles/pressed = SubResource("StyleBoxTexture_cyan_press")
+theme_override_styles/focus = SubResource("StyleBoxTexture_cyan_hover")
+text = "КАРТА: КЛАССИЧЕСКИЙ ЛАБИРИНТ"
 
-[node name="BtnPreset" type="Button" parent="MenuCard/Margin/VBoxContainer"]
-custom_minimum_size = Vector2(0, 44)
+[node name="BtnControls" type="Button" parent="ButtonsContainer"]
+custom_minimum_size = Vector2(364, 48)
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.9, 0.45, 1)
-theme_override_font_sizes/font_size = 15
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn_norm")
-theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_press")
-text = "🎨 ПРЕСЕТ: СТАНДАРТНЫЙ (ФОТО)"
+theme_override_colors/font_color = Color(0.9, 0.98, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("3_tech_font")
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBoxTexture_cyan_norm")
+theme_override_styles/hover = SubResource("StyleBoxTexture_cyan_hover")
+theme_override_styles/pressed = SubResource("StyleBoxTexture_cyan_press")
+theme_override_styles/focus = SubResource("StyleBoxTexture_cyan_hover")
+text = "НАСТРОЙКИ"
 
-[node name="SpeedBox" type="VBoxContainer" parent="MenuCard/Margin/VBoxContainer"]
+[node name="BtnQuit" type="Button" parent="ButtonsContainer"]
+custom_minimum_size = Vector2(364, 48)
 layout_mode = 2
-theme_override_constants/separation = 3
-
-[node name="SpeedLabel" type="Label" parent="MenuCard/Margin/VBoxContainer/SpeedBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0, 0.95, 1, 1)
-theme_override_font_sizes/font_size = 14
-text = "⚡ СКОРОСТЬ ДЕВУШКИ: 7.8 м/с"
-horizontal_alignment = 1
-
-[node name="SpeedSlider" type="HSlider" parent="MenuCard/Margin/VBoxContainer/SpeedBox"]
-custom_minimum_size = Vector2(0, 22)
-layout_mode = 2
-min_value = 3.0
-max_value = 13.0
-step = 0.2
-value = 7.8
-
-[node name="BtnControls" type="Button" parent="MenuCard/Margin/VBoxContainer"]
-custom_minimum_size = Vector2(0, 42)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
-theme_override_font_sizes/font_size = 15
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn_norm")
-theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_press")
-text = "🎮 УПРАВЛЕНИЕ"
-
-[node name="BtnQuit" type="Button" parent="MenuCard/Margin/VBoxContainer"]
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.5, 0.55, 1)
-theme_override_font_sizes/font_size = 15
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn_quit")
-theme_override_styles/hover = SubResource("StyleBoxFlat_btn_quit_hover")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_press")
-text = "✕ ВЫЙТИ ИЗ ИГРЫ"
-
-[node name="VersionLabel" type="Label" parent="."]
-layout_mode = 1
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -300.0
-offset_top = -28.0
-offset_right = 300.0
-offset_bottom = -8.0
-grow_horizontal = 2
-grow_vertical = 0
-theme_override_colors/font_color = Color(0.6, 0.7, 0.8, 0.5)
-theme_override_font_sizes/font_size = 12
-text = "v1.2.0 • Godot 4.7 Forward+ • Escape From Girls"
-horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.9, 0.98, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("3_tech_font")
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBoxTexture_cyan_norm")
+theme_override_styles/hover = SubResource("StyleBoxTexture_cyan_hover")
+theme_override_styles/pressed = SubResource("StyleBoxTexture_cyan_press")
+theme_override_styles/focus = SubResource("StyleBoxTexture_cyan_hover")
+text = "ВЫЙТИ ИЗ ИГРЫ"
 
 [node name="ControlsPopup" type="Panel" parent="."]
 visible = false
@@ -346,44 +251,75 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -320.0
-offset_top = -230.0
+offset_top = -240.0
 offset_right = 320.0
-offset_bottom = 230.0
+offset_bottom = 240.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_popup")
 
-[node name="Title" type="Label" parent="ControlsPopup"]
+[node name="PopupMargin" type="MarginContainer" parent="ControlsPopup"]
 layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -200.0
-offset_top = 18.0
-offset_right = 200.0
-offset_bottom = 50.0
-grow_horizontal = 2
-theme_override_colors/font_color = Color(0, 0.95, 1, 1)
-theme_override_font_sizes/font_size = 22
-text = "🎮 УПРАВЛЕНИЕ"
-horizontal_alignment = 1
-
-[node name="Content" type="Label" parent="ControlsPopup"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -280.0
-offset_top = -150.0
-offset_right = 280.0
-offset_bottom = 140.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
-theme_override_constants/line_spacing = 7
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 22
+
+[node name="PopupVBox" type="VBoxContainer" parent="ControlsPopup/PopupMargin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="ControlsPopup/PopupMargin/PopupVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 0.95, 1, 1)
+theme_override_fonts/font = ExtResource("3_tech_font")
+theme_override_font_sizes/font_size = 22
+text = "⚙ НАСТРОЙКИ И УПРАВЛЕНИЕ"
+horizontal_alignment = 1
+
+[node name="BtnPreset" type="Button" parent="ControlsPopup/PopupMargin/PopupVBox"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.4, 1)
+theme_override_fonts/font = ExtResource("3_tech_font")
 theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_popup")
+text = "🎨 ПРЕСЕТ: СТАНДАРТНЫЙ (ФОТО)"
+
+[node name="SpeedBox" type="VBoxContainer" parent="ControlsPopup/PopupMargin/PopupVBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="SpeedLabel" type="Label" parent="ControlsPopup/PopupMargin/PopupVBox/SpeedBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 0.95, 1, 1)
+theme_override_fonts/font = ExtResource("3_tech_font")
+theme_override_font_sizes/font_size = 14
+text = "⚡ СКОРОСТЬ ДЕВУШКИ: 7.8 м/с"
+horizontal_alignment = 1
+
+[node name="SpeedSlider" type="HSlider" parent="ControlsPopup/PopupMargin/PopupVBox/SpeedBox"]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+min_value = 3.0
+max_value = 13.0
+step = 0.2
+value = 7.8
+
+[node name="HSeparator" type="HSeparator" parent="ControlsPopup/PopupMargin/PopupVBox"]
+layout_mode = 2
+
+[node name="Content" type="Label" parent="ControlsPopup/PopupMargin/PopupVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+theme_override_constants/line_spacing = 4
+theme_override_fonts/font = ExtResource("3_tech_font")
+theme_override_font_sizes/font_size = 13
 text = "• W, A, S, D — Передвижение
 • SHIFT — Спринт (расходует выносливость)
 • ПРОБЕЛ — Прыжок / Двойной прыжок (Вулкан)
@@ -395,20 +331,12 @@ text = "• W, A, S, D — Передвижение
 • [4] — 🎲 D20 Кость (+1 Спас-бросок при поимке)
 • ESC — Меню паузы"
 
-[node name="BtnClose" type="Button" parent="ControlsPopup"]
-layout_mode = 1
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -90.0
-offset_top = -56.0
-offset_right = 90.0
-offset_bottom = -16.0
-grow_horizontal = 2
-grow_vertical = 0
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn_norm")
-theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_press")
+[node name="BtnClose" type="Button" parent="ControlsPopup/PopupMargin/PopupVBox"]
+custom_minimum_size = Vector2(160, 38)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("3_tech_font")
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_popup")
 text = "ЗАКРЫТЬ"
