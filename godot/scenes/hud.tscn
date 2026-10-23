@@ -1,0 +1,517 @@
+[gd_scene load_steps=7 format=3 uid="uid://chud001"]
+
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
+[ext_resource type="PackedScene" path="res://scenes/screens/pause_menu.tscn" id="2_pause"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_topbar"]
+bg_color = Color(0.04, 0.05, 0.07, 0.8)
+border_width_bottom = 2
+border_color = Color(0, 0.95, 1, 0.6)
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slot"]
+bg_color = Color(0.08, 0.1, 0.14, 0.85)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0, 0.8, 1, 0.4)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_active"]
+bg_color = Color(0, 0.95, 1, 0.3)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0, 1, 0.8, 0.9)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stamina_fill"]
+bg_color = Color(0, 0.95, 1, 0.9)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="HUD" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_hud")
+
+[node name="HeartbeatVignette" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.8, 0, 0.1, 0.0)
+
+[node name="TopBar" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 32.0
+offset_top = 16.0
+offset_right = -32.0
+offset_bottom = 66.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/separation = 14
+
+[node name="TimerPanel" type="PanelContainer" parent="TopBar"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_topbar")
+
+[node name="Margin" type="MarginContainer" parent="TopBar/TimerPanel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 8
+
+[node name="TimerLabel" type="Label" parent="TopBar/TimerPanel/Margin"]
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+theme_override_font_sizes/font_size = 20
+text = "00:00.0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ObjectivePanel" type="PanelContainer" parent="TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_topbar")
+
+[node name="Margin" type="MarginContainer" parent="TopBar/ObjectivePanel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 8
+
+[node name="ObjectiveLabel" type="Label" parent="TopBar/ObjectivePanel/Margin"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_colors/font_color = Color(0, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "ЦЕЛЬ: НАЙДИ 3 КЛЮЧА И ВЫБЕРИСЬ ЧЕРЕЗ ВЫХОД"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="KeysPanel" type="PanelContainer" parent="TopBar"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_topbar")
+
+[node name="Margin" type="MarginContainer" parent="TopBar/KeysPanel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 6
+
+[node name="KeysContainer" type="HBoxContainer" parent="TopBar/KeysPanel/Margin"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="Key1" type="TextureRect" parent="TopBar/KeysPanel/Margin/KeysContainer"]
+modulate = Color(0.3, 0.3, 0.3, 0.5)
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="TopBar/KeysPanel/Margin/KeysContainer/Key1"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 18
+text = "🔑"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Key2" type="TextureRect" parent="TopBar/KeysPanel/Margin/KeysContainer"]
+modulate = Color(0.3, 0.3, 0.3, 0.5)
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="TopBar/KeysPanel/Margin/KeysContainer/Key2"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 18
+text = "🔑"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Key3" type="TextureRect" parent="TopBar/KeysPanel/Margin/KeysContainer"]
+modulate = Color(0.3, 0.3, 0.3, 0.5)
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="TopBar/KeysPanel/Margin/KeysContainer/Key3"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 18
+text = "🔑"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Crosshair" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dot" type="ColorRect" parent="Crosshair"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -3.0
+offset_top = -3.0
+offset_right = 3.0
+offset_bottom = 3.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0.95, 1, 0.8)
+
+[node name="WarningLabel" type="Label" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = 60.0
+offset_right = 250.0
+offset_bottom = 100.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.1, 0.2, 1)
+theme_override_font_sizes/font_size = 22
+text = "⚠️ ОНА ОЧЕНЬ БЛИЗКО! БЕГИ! ⚠️"
+horizontal_alignment = 1
+
+[node name="BottomBar" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -90.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="StaminaBar" type="ProgressBar" parent="BottomBar"]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 40.0
+offset_top = -10.0
+offset_right = 240.0
+offset_bottom = 10.0
+grow_vertical = 2
+theme_override_styles/fill = SubResource("StyleBoxFlat_stamina_fill")
+value = 100.0
+show_percentage = false
+
+[node name="StaminaLabel" type="Label" parent="BottomBar/StaminaBar"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -38.0
+offset_right = 150.0
+offset_bottom = -16.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(0, 0.95, 1, 0.8)
+theme_override_font_sizes/font_size = 14
+text = "ВЫНОСЛИВОСТЬ (SHIFT)"
+
+[node name="Hotbar" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -160.0
+offset_top = -80.0
+offset_right = 160.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 12
+
+[node name="Slot1" type="Panel" parent="Hotbar"]
+custom_minimum_size = Vector2(60, 60)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+
+[node name="KeyNum" type="Label" parent="Hotbar/Slot1"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 2.0
+offset_right = 20.0
+offset_bottom = 20.0
+theme_override_colors/font_color = Color(0, 0.95, 1, 0.7)
+theme_override_font_sizes/font_size = 11
+text = "[1]"
+
+[node name="Icon" type="Label" parent="Hotbar/Slot1"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -14.0
+offset_top = -14.0
+offset_right = 14.0
+offset_bottom = 14.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 22
+text = "🛡️"
+horizontal_alignment = 1
+
+[node name="Count" type="Label" parent="Hotbar/Slot1"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -20.0
+offset_top = -20.0
+offset_right = -4.0
+offset_bottom = -2.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "0"
+horizontal_alignment = 2
+
+[node name="ActiveIndicator" type="Panel" parent="Hotbar/Slot1"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_active")
+
+[node name="Slot2" type="Panel" parent="Hotbar"]
+custom_minimum_size = Vector2(60, 60)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+
+[node name="KeyNum" type="Label" parent="Hotbar/Slot2"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 2.0
+offset_right = 20.0
+offset_bottom = 20.0
+theme_override_colors/font_color = Color(0, 0.95, 1, 0.7)
+theme_override_font_sizes/font_size = 11
+text = "[2]"
+
+[node name="Icon" type="Label" parent="Hotbar/Slot2"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -14.0
+offset_top = -14.0
+offset_right = 14.0
+offset_bottom = 14.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 22
+text = "⚡"
+horizontal_alignment = 1
+
+[node name="Count" type="Label" parent="Hotbar/Slot2"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -20.0
+offset_top = -20.0
+offset_right = -4.0
+offset_bottom = -2.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "0"
+horizontal_alignment = 2
+
+[node name="ActiveIndicator" type="Panel" parent="Hotbar/Slot2"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_active")
+
+[node name="Slot3" type="Panel" parent="Hotbar"]
+custom_minimum_size = Vector2(60, 60)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+
+[node name="KeyNum" type="Label" parent="Hotbar/Slot3"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 2.0
+offset_right = 20.0
+offset_bottom = 20.0
+theme_override_colors/font_color = Color(0, 0.95, 1, 0.7)
+theme_override_font_sizes/font_size = 11
+text = "[3]"
+
+[node name="Icon" type="Label" parent="Hotbar/Slot3"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -14.0
+offset_top = -14.0
+offset_right = 14.0
+offset_bottom = 14.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 22
+text = "🎎"
+horizontal_alignment = 1
+
+[node name="Count" type="Label" parent="Hotbar/Slot3"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -20.0
+offset_top = -20.0
+offset_right = -4.0
+offset_bottom = -2.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "0"
+horizontal_alignment = 2
+
+[node name="Slot4" type="Panel" parent="Hotbar"]
+custom_minimum_size = Vector2(60, 60)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_slot")
+
+[node name="KeyNum" type="Label" parent="Hotbar/Slot4"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 2.0
+offset_right = 20.0
+offset_bottom = 20.0
+theme_override_colors/font_color = Color(0, 0.95, 1, 0.7)
+theme_override_font_sizes/font_size = 11
+text = "[4]"
+
+[node name="Icon" type="Label" parent="Hotbar/Slot4"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -14.0
+offset_top = -14.0
+offset_right = 14.0
+offset_bottom = 14.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 22
+text = "🎲"
+horizontal_alignment = 1
+
+[node name="Count" type="Label" parent="Hotbar/Slot4"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -20.0
+offset_top = -20.0
+offset_right = -4.0
+offset_bottom = -2.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "0"
+horizontal_alignment = 2
+
+[node name="PauseMenu" parent="." instance=ExtResource("2_pause")]
+

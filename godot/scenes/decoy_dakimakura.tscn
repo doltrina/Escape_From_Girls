@@ -1,0 +1,27 @@
+[gd_scene load_steps=5 format=3 uid="uid://cdecoy001"]
+
+[ext_resource type="Script" path="res://scripts/items/decoy_dakimakura.gd" id="1_decoy"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pillow"]
+albedo_color = Color(1, 0.4, 0.75, 1)
+roughness = 0.8
+emission_enabled = true
+emission = Color(1, 0.1, 0.6, 1)
+emission_energy_multiplier = 0.6
+
+[sub_resource type="BoxMesh" id="BoxMesh_pillow"]
+material = SubResource("StandardMaterial3D_pillow")
+size = Vector3(0.4, 1.1, 0.2)
+
+[node name="DecoyDakimakura" type="Node3D"]
+script = ExtResource("1_decoy")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0)
+mesh = SubResource("BoxMesh_pillow")
+
+[node name="OmniLight3D" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+light_color = Color(1, 0.2, 0.7, 1)
+light_energy = 2.0
+omni_range = 6.0

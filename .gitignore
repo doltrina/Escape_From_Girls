@@ -8,10 +8,20 @@ Thumbs.db
 .idea/
 *.log
 
-# Custom/Author 18+ assets (keep repo safe and clean for GitHub)
+# Custom / Author 18+ assets (keep repo safe and clean for GitHub)
 assets/author/*
 !assets/author/README.md
+assets/presets/author/*
+!assets/presets/author/README.md
+godot/assets/presets/author/*
+!godot/assets/presets/author/README.md
+godot/assets/author/*
+!godot/assets/author/README.md
 
 # Scratch directory
 scratch/
 .gemini/
+
+# Godot 4
+.godot/
+godot/.godot/
