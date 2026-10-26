@@ -4,6 +4,8 @@ signal heartbeat_beat(intensity: float)
 
 var sfx_streams: Dictionary = {}
 var chase_player: AudioStreamPlayer = null
+var menu_ambience_player: AudioStreamPlayer = null
+var menu_city_player: AudioStreamPlayer = null
 var heartbeat_timer: float = 0.0
 var current_chase_distance: float = 999.0
 var max_chase_distance: float = 38.0
@@ -13,6 +15,11 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	generate_procedural_sfx()
 	setup_chase_music()
+	setup_menu_ambience()
+	if GameManager.has_signal("state_changed"):
+		GameManager.state_changed.connect(_on_game_state_changed)
+	if GameManager.current_state == GameManager.GameState.MENU:
+		start_menu_ambience()
 
 func generate_procedural_sfx() -> void:
 	sfx_streams["footstep"] = make_wav(0.08, func(t):
@@ -151,6 +158,27 @@ func generate_procedural_sfx() -> void:
 		return trumpet * env * 0.75
 	)
 
+	# Atmospheric neon electric sounds
+	sfx_streams["neon_flicker"] = make_wav(0.20, func(t):
+		var env = exp(-t * 15.0)
+		var buzz = sin(t * 120.0 * TAU) * 0.4 + sin(t * 240.0 * TAU) * 0.25
+		var crackle = (randf() * 2.0 - 1.0) * 0.55 if randf() > 0.4 else 0.0
+		return (buzz + crackle) * env * 0.4
+	)
+
+	sfx_streams["neon_spark"] = make_wav(0.14, func(t):
+		var env = exp(-t * 35.0)
+		var snap = (randf() * 2.0 - 1.0) * 0.75
+		var ping = sin(t * 2800.0 * TAU) * 0.35
+		return (snap + ping) * env * 0.35
+	)
+
+	sfx_streams["neon_restart"] = make_wav(0.32, func(t):
+		var click = sin(t * 1400.0 * TAU) * exp(-t * 80.0) * 0.6
+		var hum = sin(t * 110.0 * TAU) * clampf(t * 5.0, 0.0, 1.0) * exp(-t * 4.5) * 0.35
+		return (click + hum) * 0.4
+	)
+
 func make_wav(duration: float, generator: Callable) -> AudioStreamWAV:
 	var wav = AudioStreamWAV.new()
 	var sample_rate: int = 44100
@@ -170,17 +198,62 @@ func make_wav(duration: float, generator: Callable) -> AudioStreamWAV:
 	wav.data = data
 	return wav
 
-func play_sfx(sfx_name: String) -> void:
+func play_sfx(sfx_name: String, vol_offset_db: float = 0.0) -> void:
 	if not sfx_streams.has(sfx_name):
 		return
 	var player = AudioStreamPlayer.new()
 	player.stream = sfx_streams[sfx_name]
-	player.volume_db = linear_to_db(master_volume)
+	player.volume_db = linear_to_db(master_volume) + vol_offset_db
 	add_child(player)
 	player.play()
 	player.finished.connect(func():
 		player.queue_free()
 	)
+
+func setup_menu_ambience() -> void:
+	menu_ambience_player = AudioStreamPlayer.new()
+	var factory_stream = load("res://assets/audio/factory_ambience.ogg")
+	if factory_stream:
+		if factory_stream is AudioStreamOggVorbis:
+			(factory_stream as AudioStreamOggVorbis).loop = true
+		menu_ambience_player.stream = factory_stream
+		menu_ambience_player.volume_db = -11.0
+		add_child(menu_ambience_player)
+
+	menu_city_player = AudioStreamPlayer.new()
+	var city_stream = load("res://assets/audio/cyber_city_ambience.ogg")
+	if city_stream:
+		if city_stream is AudioStreamOggVorbis:
+			(city_stream as AudioStreamOggVorbis).loop = true
+		menu_city_player.stream = city_stream
+		menu_city_player.volume_db = -16.0
+		add_child(menu_city_player)
+
+func start_menu_ambience() -> void:
+	if menu_ambience_player:
+		menu_ambience_player.volume_db = -11.0
+		if not menu_ambience_player.playing:
+			menu_ambience_player.play()
+	if menu_city_player:
+		menu_city_player.volume_db = -16.0
+		if not menu_city_player.playing:
+			menu_city_player.play()
+
+func stop_menu_ambience() -> void:
+	if menu_ambience_player and menu_ambience_player.playing:
+		var tw = create_tween()
+		tw.tween_property(menu_ambience_player, "volume_db", -80.0, 0.75)
+		tw.tween_callback(menu_ambience_player.stop)
+	if menu_city_player and menu_city_player.playing:
+		var tw2 = create_tween()
+		tw2.tween_property(menu_city_player, "volume_db", -80.0, 0.75)
+		tw2.tween_callback(menu_city_player.stop)
+
+func _on_game_state_changed(new_state: GameManager.GameState) -> void:
+	if new_state == GameManager.GameState.MENU:
+		start_menu_ambience()
+	else:
+		stop_menu_ambience()
 
 func setup_chase_music() -> void:
 	chase_player = AudioStreamPlayer.new()

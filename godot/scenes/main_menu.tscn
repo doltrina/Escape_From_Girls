@@ -15,6 +15,49 @@
 [ext_resource type="Texture2D" uid="uid://bd6oyyqahfhy0" path="res://assets/textures/girl_eyes_flare.png" id="17_eyes_flare"]
 [ext_resource type="Texture2D" uid="uid://dth7hlwcw347v" path="res://assets/textures/game_logo.png" id="18_game_logo"]
 [ext_resource type="Shader" uid="uid://bt86up5dp0n5h" path="res://shaders/logo_glitch.gdshader" id="19_glitch_shader"]
+[ext_resource type="Shader" uid="uid://dcqq1hfwdcapo" path="res://shaders/menu_neon_signs.gdshader" id="20_neon_shader"]
+[ext_resource type="Texture2D" uid="uid://jd2f6s5x4ud8" path="res://assets/textures/neon_mask_1.png" id="21_mask1"]
+[ext_resource type="Texture2D" uid="uid://cxxudqtmg8n4r" path="res://assets/textures/neon_mask_2.png" id="22_mask2"]
+[ext_resource type="Shader" uid="uid://clrod27e53vtf" path="res://shaders/corridor_smoke.gdshader" id="23_smoke_shader"]
+[ext_resource type="Texture2D" uid="uid://dtv6l0ty4yu67" path="res://assets/textures/smoke_noise.png" id="24_smoke_noise"]
+[ext_resource type="Texture2D" uid="uid://y5p5w7akceds" path="res://assets/textures/smoke_wisp.png" id="25_smoke_wisp"]
+[ext_resource type="Texture2D" uid="uid://djxs46ay3uuld" path="res://assets/textures/spark.png" id="26_spark"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_neon"]
+shader = ExtResource("20_neon_shader")
+shader_parameter/mask_texture_1 = ExtResource("21_mask1")
+shader_parameter/mask_texture_2 = ExtResource("22_mask2")
+shader_parameter/sign_intensities_1 = Vector4(1, 1, 1, 1)
+shader_parameter/sign_intensities_2 = Vector4(1, 1, 1, 1)
+shader_parameter/global_flicker = 1.0
+shader_parameter/vignette_strength = 0.15
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_smoke"]
+shader = ExtResource("23_smoke_shader")
+shader_parameter/noise_texture = ExtResource("24_smoke_noise")
+shader_parameter/smoke_color_purple = Color(0.72, 0.22, 0.85, 1)
+shader_parameter/smoke_color_blue = Color(0.24, 0.38, 0.75, 1)
+shader_parameter/smoke_color_cyan = Color(0.18, 0.62, 0.78, 1)
+shader_parameter/smoke_color_red = Color(0.85, 0.2, 0.35, 1)
+shader_parameter/purple_light = 1.0
+shader_parameter/cyan_light = 1.0
+shader_parameter/red_light = 1.0
+shader_parameter/smoke_density = 0.68
+shader_parameter/smoke_speed = 1.0
+shader_parameter/corridor_center = Vector2(0.5, 0.58)
+shader_parameter/corridor_radius = Vector2(0.36, 0.28)
+
+[sub_resource type="Gradient" id="Gradient_smoke"]
+offsets = PackedFloat32Array(0, 0.25, 0.7, 1)
+colors = PackedColorArray(0.7, 0.45, 0.95, 0, 0.55, 0.4, 0.85, 0.16, 0.25, 0.55, 0.75, 0.12, 0.15, 0.35, 0.65, 0)
+
+[sub_resource type="Gradient" id="Gradient_dust"]
+offsets = PackedFloat32Array(0, 0.4, 0.7, 1)
+colors = PackedColorArray(0.3, 0.7, 1, 0, 0.6, 0.85, 1, 0.35, 0.8, 0.5, 1, 0.25, 0.4, 0.6, 1, 0)
+
+[sub_resource type="Gradient" id="Gradient_sparks"]
+offsets = PackedFloat32Array(0, 0.65, 1)
+colors = PackedColorArray(1, 0.98, 0.85, 1, 1, 0.65, 0.15, 0.9, 0.9, 0.2, 0.05, 0)
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_glitch"]
 shader = ExtResource("19_glitch_shader")
@@ -89,24 +132,118 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_menu")
 
-[node name="Background" type="TextureRect" parent="." unique_id=135798635]
+[node name="ParallaxContainer" type="Control" parent="." unique_id=901001001]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -35.0
+offset_top = -25.0
+offset_right = 35.0
+offset_bottom = 25.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Background" type="TextureRect" parent="ParallaxContainer" unique_id=135798635]
+material = SubResource("ShaderMaterial_neon")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 texture = ExtResource("2_5pajh")
 expand_mode = 1
 stretch_mode = 6
 
-[node name="GirlEyesFlare" type="TextureRect" parent="." unique_id=2134143491]
+[node name="CorridorSmoke" type="ColorRect" parent="ParallaxContainer" unique_id=901001002]
+material = SubResource("ShaderMaterial_smoke")
 layout_mode = 1
-offset_left = 624.0
-offset_top = 277.0
-offset_right = 660.0
-offset_bottom = 289.0
-pivot_offset = Vector2(18, 6)
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="SmokeParticles" type="CPUParticles2D" parent="ParallaxContainer" unique_id=901001003]
+position = Vector2(995, 780)
+amount = 20
+texture = ExtResource("25_smoke_wisp")
+lifetime = 4.5
+preprocess = 3.0
+emission_shape = 3
+emission_rect_extents = Vector2(250, 40)
+direction = Vector2(0, -1)
+spread = 35.0
+gravity = Vector2(0, -10)
+initial_velocity_min = 16.0
+initial_velocity_max = 36.0
+angular_velocity_min = -15.0
+angular_velocity_max = 15.0
+scale_amount_min = 1.5
+scale_amount_max = 3.2
+color_ramp = SubResource("Gradient_smoke")
+
+[node name="AtmosphericDust" type="CPUParticles2D" parent="ParallaxContainer" unique_id=901001004]
+position = Vector2(995, 540)
+amount = 32
+texture = ExtResource("26_spark")
+lifetime = 6.0
+preprocess = 4.0
+emission_shape = 3
+emission_rect_extents = Vector2(500, 300)
+direction = Vector2(0.2, -0.8)
+spread = 60.0
+gravity = Vector2(0, -3)
+initial_velocity_min = 5.0
+initial_velocity_max = 16.0
+scale_amount_min = 0.4
+color_ramp = SubResource("Gradient_dust")
+
+[node name="KanjiSparks" type="CPUParticles2D" parent="ParallaxContainer" unique_id=901001005]
+position = Vector2(656, 190)
+emitting = false
+amount = 14
+texture = ExtResource("26_spark")
+lifetime = 0.55
+one_shot = true
+explosiveness = 0.95
+direction = Vector2(-0.3, 1)
+spread = 50.0
+gravity = Vector2(0, 520)
+initial_velocity_min = 70.0
+initial_velocity_max = 180.0
+scale_amount_min = 0.6
+scale_amount_max = 1.4
+color_ramp = SubResource("Gradient_sparks")
+
+[node name="ExitSparks" type="CPUParticles2D" parent="ParallaxContainer" unique_id=901001006]
+position = Vector2(1176, 331)
+emitting = false
+amount = 14
+texture = ExtResource("26_spark")
+lifetime = 0.55
+one_shot = true
+explosiveness = 0.95
+direction = Vector2(0.2, 1)
+spread = 50.0
+gravity = Vector2(0, 520)
+initial_velocity_min = 70.0
+initial_velocity_max = 180.0
+scale_amount_min = 0.6
+scale_amount_max = 1.4
+color_ramp = SubResource("Gradient_sparks")
+
+[node name="GirlEyesFlare" type="TextureRect" parent="ParallaxContainer" unique_id=2134143491]
+layout_mode = 1
+offset_left = 972.0
+offset_top = 428.0
+offset_right = 1027.0
+offset_bottom = 445.0
+pivot_offset = Vector2(27, 9)
 mouse_filter = 2
 texture = ExtResource("17_eyes_flare")
 expand_mode = 1
@@ -114,15 +251,19 @@ stretch_mode = 6
 
 [node name="TitleBox" type="VBoxContainer" parent="." unique_id=839555650]
 layout_mode = 1
-offset_left = 429.0
-offset_top = -5.0
-offset_right = 869.0
-offset_bottom = 234.0
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -280.0
+offset_top = 10.0
+offset_right = 280.0
+offset_bottom = 280.0
+grow_horizontal = 2
 theme_override_constants/separation = 4
 
 [node name="Logo" type="TextureRect" parent="TitleBox" unique_id=150827808]
 material = SubResource("ShaderMaterial_glitch")
-custom_minimum_size = Vector2(440, 218)
+custom_minimum_size = Vector2(560, 270)
 layout_mode = 2
 texture = ExtResource("18_game_logo")
 expand_mode = 1
@@ -130,20 +271,20 @@ stretch_mode = 5
 
 [node name="ButtonsContainer" type="VBoxContainer" parent="." unique_id=1644569909]
 layout_mode = 1
-offset_left = 68.0
-offset_top = 315.0
-offset_right = 458.0
-offset_bottom = 625.0
-theme_override_constants/separation = 10
+offset_left = 100.0
+offset_top = 470.0
+offset_right = 540.0
+offset_bottom = 940.0
+theme_override_constants/separation = 14
 
 [node name="BtnPlay" type="Button" parent="ButtonsContainer" unique_id=1514953931]
-custom_minimum_size = Vector2(390, 66)
+custom_minimum_size = Vector2(440, 78)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.98, 1, 1)
 theme_override_colors/font_focus_color = Color(1, 0.35, 0.45, 1)
 theme_override_colors/font_hover_color = Color(1, 0.35, 0.45, 1)
 theme_override_fonts/font = ExtResource("9_7b55j")
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 40
 theme_override_styles/normal = SubResource("StyleBoxTexture_cyan_norm")
 theme_override_styles/pressed = SubResource("StyleBoxTexture_cyan_hover")
 theme_override_styles/hover = SubResource("StyleBoxTexture_cyan_hover")
@@ -151,13 +292,13 @@ theme_override_styles/focus = SubResource("StyleBoxTexture_cyan_hover")
 text = "▶  НАЧАТЬ ИГРУ"
 
 [node name="BtnMap" type="Button" parent="ButtonsContainer" unique_id=1957706433]
-custom_minimum_size = Vector2(390, 66)
+custom_minimum_size = Vector2(440, 78)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.98, 1, 1)
 theme_override_colors/font_focus_color = Color(1, 0.35, 0.45, 1)
 theme_override_colors/font_hover_color = Color(1, 0.35, 0.45, 1)
 theme_override_fonts/font = ExtResource("9_7b55j")
-theme_override_font_sizes/font_size = 30
+theme_override_font_sizes/font_size = 32
 theme_override_styles/normal = SubResource("StyleBoxTexture_cyan_norm")
 theme_override_styles/pressed = SubResource("StyleBoxTexture_cyan_hover")
 theme_override_styles/hover = SubResource("StyleBoxTexture_cyan_hover")
@@ -165,13 +306,13 @@ theme_override_styles/focus = SubResource("StyleBoxTexture_cyan_hover")
 text = "КАРТА: КЛАССИЧЕСКИЙ ЛАБИРИНТ"
 
 [node name="BtnControls" type="Button" parent="ButtonsContainer" unique_id=2068543099]
-custom_minimum_size = Vector2(390, 66)
+custom_minimum_size = Vector2(440, 78)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.98, 1, 1)
 theme_override_colors/font_focus_color = Color(1, 0.35, 0.45, 1)
 theme_override_colors/font_hover_color = Color(1, 0.35, 0.45, 1)
 theme_override_fonts/font = ExtResource("9_7b55j")
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 40
 theme_override_styles/normal = SubResource("StyleBoxTexture_cyan_norm")
 theme_override_styles/pressed = SubResource("StyleBoxTexture_cyan_hover")
 theme_override_styles/hover = SubResource("StyleBoxTexture_cyan_hover")
@@ -179,13 +320,13 @@ theme_override_styles/focus = SubResource("StyleBoxTexture_cyan_hover")
 text = "НАСТРОЙКИ"
 
 [node name="BtnQuit" type="Button" parent="ButtonsContainer" unique_id=199228319]
-custom_minimum_size = Vector2(390, 66)
+custom_minimum_size = Vector2(440, 78)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.98, 1, 1)
 theme_override_colors/font_focus_color = Color(1, 0.35, 0.45, 1)
 theme_override_colors/font_hover_color = Color(1, 0.35, 0.45, 1)
 theme_override_fonts/font = ExtResource("9_7b55j")
-theme_override_font_sizes/font_size = 36
+theme_override_font_sizes/font_size = 40
 theme_override_styles/normal = SubResource("StyleBoxTexture_cyan_norm")
 theme_override_styles/pressed = SubResource("StyleBoxTexture_cyan_hover")
 theme_override_styles/hover = SubResource("StyleBoxTexture_cyan_hover")
@@ -217,10 +358,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -400.0
-offset_top = -280.0
-offset_right = 400.0
-offset_bottom = 280.0
+offset_left = -460.0
+offset_top = -320.0
+offset_right = 460.0
+offset_bottom = 320.0
 grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("10_glass_frame")

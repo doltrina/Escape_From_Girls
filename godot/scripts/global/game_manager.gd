@@ -84,6 +84,18 @@ func set_nextbot_speed(speed: float) -> void:
 		nextbot_node.current_speed = nextbot_base_speed
 	nextbot_speed_changed.emit(nextbot_base_speed)
 
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_F11 or (event.alt_pressed and event.keycode == KEY_ENTER):
+			toggle_fullscreen()
+
+func toggle_fullscreen() -> void:
+	var mode = DisplayServer.window_get_mode()
+	if mode == DisplayServer.WINDOW_MODE_FULLSCREEN or mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
+	else:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+
 func set_preset(preset: AssetPreset) -> void:
 	current_preset = preset
 	preset_changed.emit(current_preset)
