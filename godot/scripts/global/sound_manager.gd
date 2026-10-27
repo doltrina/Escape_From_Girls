@@ -179,6 +179,35 @@ func generate_procedural_sfx() -> void:
 		return (click + hum) * 0.4
 	)
 
+	# Soft cyberpunk UI feedback (procedural, no sample assets needed)
+	sfx_streams["ui_hover"] = make_wav(0.085, func(t):
+		var env = exp(-t * 42.0)
+		var f = 1046.5 + t * 1900.0
+		var tone = sin(t * f * TAU) * 0.30
+		var shimmer = sin(t * f * 2.01 * TAU) * 0.11
+		var air = (randf() * 2.0 - 1.0) * exp(-t * 120.0) * 0.12
+		return (tone + shimmer + air) * env * 0.6
+	)
+
+	sfx_streams["ui_click"] = make_wav(0.16, func(t):
+		var env = exp(-t * 26.0)
+		var f = 620.0 - t * 1450.0
+		var thump = sin(t * f * TAU) * 0.42
+		var snap = (randf() * 2.0 - 1.0) * exp(-t * 110.0) * 0.4
+		var air = sin(t * 2349.3 * TAU) * exp(-t * 60.0) * 0.16
+		return (thump + snap + air) * env * 0.8
+	)
+
+	sfx_streams["ui_confirm"] = make_wav(0.42, func(t):
+		var env = exp(-t * 7.0)
+		var step = int(t * 20.0)
+		var freqs = [523.25, 659.25, 783.99, 1046.50] # C5, E5, G5, C6
+		var f = freqs[mini(step, 3)]
+		var tone = sin(t * f * TAU) * 0.32 + sin(t * f * 2.0 * TAU) * 0.12
+		var sub = sin(t * 110.0 * TAU) * exp(-t * 12.0) * 0.28
+		return (tone + sub) * env * 0.75
+	)
+
 func make_wav(duration: float, generator: Callable) -> AudioStreamWAV:
 	var wav = AudioStreamWAV.new()
 	var sample_rate: int = 44100
@@ -209,6 +238,15 @@ func play_sfx(sfx_name: String, vol_offset_db: float = 0.0) -> void:
 	player.finished.connect(func():
 		player.queue_free()
 	)
+
+func play_ui_hover() -> void:
+	play_sfx("ui_hover", -19.0)
+
+func play_ui_click() -> void:
+	play_sfx("ui_click", -9.0)
+
+func play_ui_confirm() -> void:
+	play_sfx("ui_confirm", -7.0)
 
 func setup_menu_ambience() -> void:
 	menu_ambience_player = AudioStreamPlayer.new()
