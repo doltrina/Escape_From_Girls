@@ -25,3 +25,6 @@ scratch/
 # Godot 4
 .godot/
 godot/.godot/
+
+# Portable Godot downloaded automatically by launch_godot.ps1
+tools/
